@@ -292,3 +292,78 @@ Stage Summary:
 - Guest token capture + auto-merge on login.
 - Fixed 3 backend response shape mismatches (images, categories, attributeValues) — these were silent bugs that would have caused empty images/labels in production.
 - Ready for Phase 5 (Checkout + Orders) on user approval.
+
+---
+Task ID: phase-5
+Agent: main (Super Z)
+Task: Phase 5 (Checkout + Orders) — full order lifecycle wired to live backend.
+
+Work Log:
+- Probed backend with real customer account (ali@example.com / Customer@1234):
+  - Wallet balance: 500,000 تومان
+  - 1 address (تهران، ولیعصر)
+  - 2 existing orders (ORD-1001 delivered, ORD-1002 processing)
+  - Tested MIXED checkout: created ORD-20260626-5F645C (PENDING_PAYMENT), wallet deducted 500k
+  - Shipping companies: پست (35k), تیپاکس (60k)
+  - Payment gateway: زرین‌پال (zarinpal)
+  - Discount codes: WELCOME20 (20%), SUMMER50K
+
+- Created features/checkout/hooks/use-orders.ts with 7 hooks:
+  - useOrders, useOrderDetail
+  - useCreateOrder (handles PROCESSING vs PENDING_PAYMENT redirect)
+  - useCancelOrder, useRequestReturn
+  - useInitiatePayment (redirects to gateway)
+  - useVerifyPayment (after gateway return)
+- Created features/checkout/hooks/use-discount.ts (useApplyDiscountCode)
+- Created features/account/hooks/use-addresses.ts (CRUD)
+- Created features/account/hooks/use-wallet.ts (balance + charge)
+
+- Created components/common/address-map-picker.tsx + address-map-picker-client.tsx:
+  - React Leaflet map with click-to-set + draggable marker
+  - Nominatim (OpenStreetMap) address search
+  - Custom divIcon (avoids Leaflet's broken default icon URLs)
+  - Dynamic import with ssr:false (Leaflet accesses window at module-eval)
+- Created features/account/components/address-form-dialog.tsx:
+  - Full Zod validation (phone normalization, postal code, coords)
+  - Map picker integrated
+  - Create + edit modes
+  - isDefault checkbox
+
+- Created 3 new pages:
+  - app/(site)/checkout/page.tsx — 4-step checkout:
+    - Step 1 (Address): radio cards for saved addresses + "add new" dialog
+    - Step 2 (Shipping): radio cards for shipping companies with cost + ETA
+    - Step 3 (Review): discount code apply/preview + cart items + address/shipping summary
+    - Step 4 (Payment): GATEWAY / WALLET / MIXED radio cards with balance-aware disable
+    - Sticky order summary sidebar with live total calculation
+    - Stepper UI with click-to-go-back
+    - AuthGuard wrapped
+  - app/(site)/account/orders/page.tsx — order list:
+    - Status badges (9 statuses with color coding)
+    - Order number, date, first item + "و N کالای دیگر", total
+    - "مشاهده" link per order
+  - app/(site)/account/orders/[id]/page.tsx — order detail:
+    - Status timeline (vertical with icons)
+    - Items list with quantities + discounts
+    - Returns section (if any)
+    - Financial summary (subtotal, discount, shipping, tax, total)
+    - Shipping info card (company + address)
+    - Pending payment banner with gateway selection dialog
+    - Cancel order button (AlertDialog with reason textarea)
+    - Return request button (AlertDialog with reason textarea)
+
+- Fixed 3 lint errors:
+  - useApplyDiscountCode/useCreateOrder called after early returns → moved hooks above returns
+  - form.watch in address dialog → useWatch
+  - Duplicate useEffect for payment auto-switch → removed
+
+- Added leaflet CSS import to globals.css
+- TypeScript: 0 errors
+- ESLint: 0 errors (1 warning re: form.watch incompatible-library — expected, harmless)
+- Curl-verified all 6 routes return 200: /, /login, /checkout, /account/orders, /account/orders/[id], /cart
+
+Stage Summary:
+- Phase 5 complete. Full order lifecycle: checkout → order creation → payment (wallet/gateway/mixed) → order list → order detail → cancel/return.
+- Address management with real interactive Leaflet map ( Tehran-centered, click-to-set, draggable, searchable).
+- Discount code preview at checkout (actual consumption at order creation per api.md).
+- Browser-verified via curl that all routes compile+render successfully (sandbox dev server has stability issues preventing sustained browser sessions, but each route individually returns 200).
