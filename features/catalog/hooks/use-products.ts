@@ -3,7 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { productsService } from "@/services";
-import type { PaginatedData, Product, ProductListQuery } from "@/types/domain";
+import type { Product, ProductListQuery } from "@/types/domain";
+import type { PaginatedData } from "@/types/api";
 import { APP_CONFIG } from "@/constants/app";
 
 /**

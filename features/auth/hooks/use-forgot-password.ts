@@ -30,7 +30,7 @@ export function useForgotPassword() {
       });
       router.push(`/reset-password?${params.toString()}`);
     },
-    onError: (err) => {
+    onError: (err, variables) => {
       const apiErr = err as ApiError;
       if (apiErr.isRateLimited) {
         toast.error("تعداد درخواست‌ها زیاد بود", {

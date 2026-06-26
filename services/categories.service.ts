@@ -35,7 +35,7 @@ export const categoriesService = {
     http.get<Attribute[]>(ENDPOINTS.categories.attributes(id)),
 
   create: (body: UpsertCategoryBody) =>
-    http.post<Category>(ENDPOINTS.categories.root, body),
+    http.post<Category>(ENDPOINTS.categories.list, body),
 
   update: (id: string, body: Partial<UpsertCategoryBody>) =>
     http.put<Category>(ENDPOINTS.categories.byId(id), body),

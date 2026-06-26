@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/sheet";
 import { ThemeToggle } from "./theme-toggle";
 import { CartBadge } from "./cart-badge";
+import { CategoryNavMenu } from "./category-nav-menu";
 import { useAuth } from "@/providers/auth-context";
 import { APP_NAME } from "@/constants/app";
 import { cn } from "@/lib/utils";
@@ -155,12 +156,13 @@ export function Header() {
 
       {/* Category nav (desktop) */}
       <nav className="hidden border-t border-border/60 bg-card lg:block">
-        <div className="container-site flex h-11 items-center gap-6 text-sm">
-          <CategoryLink href="/products">همه محصولات</CategoryLink>
-          <CategoryLink href="/categories">دسته‌بندی‌ها</CategoryLink>
-          <CategoryLink href="/brands">برندها</CategoryLink>
-          <CategoryLink href="/products?hasDiscount=true">تخفیف‌دارها</CategoryLink>
-          <CategoryLink href="/products?isFeatured=true">محصولات منتخب</CategoryLink>
+        <div className="container-site flex h-11 items-center gap-4 text-sm">
+          <CategoryNavMenu />
+          <div className="mr-auto flex items-center gap-4">
+            <CategoryLink href="/products?hasDiscount=true">تخفیف‌دارها</CategoryLink>
+            <CategoryLink href="/products?isFeatured=true">محصولات منتخب</CategoryLink>
+            <CategoryLink href="/brands">برندها</CategoryLink>
+          </div>
         </div>
       </nav>
     </header>

@@ -5,6 +5,9 @@
 
 import type { PaginationMeta } from "./api";
 
+// Re-export for convenience so services can import both from "@/types/domain".
+export type { PaginatedData, PaginationMeta } from "./api";
+
 /* ──────────────────────────────────────────────────────────────────────────
    1. Auth
    ────────────────────────────────────────────────────────────────────────── */

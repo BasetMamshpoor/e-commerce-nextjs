@@ -3,7 +3,9 @@
 > یک پروژه‌ی Next.js 16 (App Router) برای یک فروشگاه اینترنتی فارسی کاملاً RTL،
 > مبتنی بر مستندات API در `api.md` و `README.md`.
 
-این شاخه شامل **فاز ۱ (Foundation) + فاز ۲ (Auth)** + پاکسازی و تقویت سئو است.
+این شاخه شامل **فاز ۱ (Foundation) + فاز ۲ (Auth) + فاز ۳ (Catalog)** است.
+
+🔗 **بک‌اند زنده:** `http://mrkafshdoz.com:4000`
 
 ---
 
@@ -99,6 +101,39 @@
 - ✅ **مدیریت rate-limit** (429) و account-block (403) با UX مناسب
 - ✅ **session persistence** + auto-fetch `/users/me` بعد از refresh
 - ✅ **redirect-back**: کاربر پس از ورود به مسیری که قبل از auth بود برمی‌گردد
+
+---
+
+### فاز ۳ — کاتالوگ
+
+۶ مسیر جدید با اتصال به بک‌اند زنده:
+
+- ✅ **`/products`** — لیست محصولات با فیلترهای پیشرفته:
+  - سایدبار فیلتر (desktop) + Sheet موبایل
+  - فیلترها: موجود، تخفیف‌دار، بازه قیمت، برندها، ویژگی‌های داینامیک (با Accordion)
+  - مرتب‌سازی (جدیدترین/ارزان‌ترین/گران‌ترین/محبوب‌ترین)
+  - صفحه‌بندی هوشمند (با ellipsis)
+  - chips فیلترهای فعال با قابلیت حذف
+  - URL-driven (قابل share + bookmark)
+- ✅ **`/products/[slug]`** — صفحه‌ی جزئیات محصول:
+  - گالری تصاویر (اصلی + thumbnails)
+  - انتخاب variant با chips
+  - buy box: قیمت + تخفیف، انتخاب تعداد، افزودن به سبد، quick actions (wishlist/compare/share)
+  - trust badges (ارسال سریع، ضمانت اصالت، بازگشت کالا)
+  - tabs: توضیحات (HTML)، مشخصات (جدول)، ارسال و مرجوعی
+  - محصولات مرتبط (از همان دسته)
+  - ثبت بازدید (`POST /:id/view`)
+  - Product JSON-LD + Breadcrumb
+- ✅ **`/categories`** — درخت کامل دسته‌بندی‌ها
+- ✅ **`/categories/[slug]`** — محصولات یک دسته + CollectionPage JSON-LD
+- ✅ **`/brands`** — شبکه‌ی برندها
+- ✅ **`/brands/[slug]`** — محصولات یک برند + CollectionPage JSON-LD
+
+زیرساخت:
+
+- ✅ ۵ hook جدید کاتالوگ (use-product-by-slug, use-product-filters, use-categories, use-brand-by-slug, + barrel)
+- ✅ **CategoryNavMenu** (mega-menu shadcn NavigationMenu) در هدر — درخت دسته‌بندی‌ها با flyout
+- ✅ ۰ خطای TypeScript، ۰ خطای ESLint
 
 ---
 
@@ -205,13 +240,15 @@ bunx shadcn@latest add <component-name>
 
 ## نقشه‌ی فازهای بعدی
 
-| فاز | محتوا |
-|-----|-------|
-| 3 | Catalog (page products real, categories tree page, product detail with variants) |
-| 4 | Cart, Wishlist, Comparison |
-| 5 | Checkout + Orders |
-| 6 | User account (profile, wallet, addresses, tickets, notifications) |
-| 7 | Comments & Reviews |
-| 8 | Admin panel (full) |
-| 9 | SEO completion + performance optimization |
-| 10 | Polish, animations, a11y audit |
+| فاز | محتوا | وضعیت |
+|-----|-------|-------|
+| 1 | Foundation (architecture, API layer, providers, theme) | ✅ |
+| 2 | Auth (login/register/OTP/forgot/reset) | ✅ |
+| 3 | Catalog (products list, filters, product detail, categories, brands) | ✅ |
+| 4 | Cart, Wishlist, Comparison | ⏳ بعدی |
+| 5 | Checkout + Orders | ⏳ |
+| 6 | User account (profile, wallet, addresses, tickets, notifications) | ⏳ |
+| 7 | Comments & Reviews | ⏳ |
+| 8 | Admin panel (full) | ⏳ |
+| 9 | SEO completion + performance optimization | ⏳ |
+| 10 | Polish, animations, a11y audit | ⏳ |

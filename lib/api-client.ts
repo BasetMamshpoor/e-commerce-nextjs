@@ -228,7 +228,7 @@ async function request<T>(config: AxiosRequestConfig): Promise<T> {
 }
 
 export const http = {
-  get: <T>(url: string, params?: Record<string, unknown>, config?: AxiosRequestConfig) =>
+  get: <T>(url: string, params?: Record<string, unknown> | object, config?: AxiosRequestConfig) =>
     request<T>({ url, method: "GET", params, ...config }),
 
   post: <T>(url: string, body?: unknown, config?: AxiosRequestConfig) =>
