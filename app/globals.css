@@ -1,0 +1,241 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Centralized Color System
+   ──────────────────────────────────────────────────────────────────────────
+   To re-skin the entire site, edit ONLY the CSS variables below.
+   The primary color (Digikala-inspired red) is `--primary`.
+   ────────────────────────────────────────────────────────────────────────── */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-vazirmatn);
+
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* ───────── Light Theme ───────── */
+:root {
+  --radius: 0.75rem;
+
+  /* Brand: Digikala-inspired red (#ef3a4b) */
+  --primary: #ef3a4b;
+  --primary-foreground: #ffffff;
+
+  /* Surface */
+  --background: #f3f4f6;          /* very light blue-gray (per request) */
+  --foreground: #1f2937;          /* near-black gray */
+  --card: #ffffff;
+  --card-foreground: #1f2937;
+  --popover: #ffffff;
+  --popover-foreground: #1f2937;
+
+  /* Secondary surfaces (subtle gray) */
+  --secondary: #e5e7eb;
+  --secondary-foreground: #1f2937;
+  --muted: #f3f4f6;
+  --muted-foreground: #6b7280;
+  --accent: #fee2e2;              /* soft red tint for hover/active */
+  --accent-foreground: #b91c1c;
+
+  /* Feedback */
+  --destructive: #dc2626;
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --info: #2563eb;
+
+  /* Lines / inputs */
+  --border: #e5e7eb;
+  --input: #e5e7eb;
+  --ring: #ef3a4b;
+
+  /* Charts */
+  --chart-1: #ef3a4b;
+  --chart-2: #f59e0b;
+  --chart-3: #16a34a;
+  --chart-4: #2563eb;
+  --chart-5: #8b5cf6;
+
+  /* Sidebar (admin) */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1f2937;
+  --sidebar-primary: #ef3a4b;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #fee2e2;
+  --sidebar-accent-foreground: #b91c1c;
+  --sidebar-border: #e5e7eb;
+  --sidebar-ring: #ef3a4b;
+}
+
+/* ───────── Dark Theme ───────── */
+.dark {
+  --primary: #ef3a4b;
+  --primary-foreground: #ffffff;
+
+  --background: #0f172a;          /* slate-900 */
+  --foreground: #e2e8f0;          /* slate-200 */
+  --card: #1e293b;                /* slate-800 */
+  --card-foreground: #e2e8f0;
+  --popover: #1e293b;
+  --popover-foreground: #e2e8f0;
+
+  --secondary: #334155;           /* slate-700 */
+  --secondary-foreground: #e2e8f0;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --accent: #450a0a;              /* deep red tint */
+  --accent-foreground: #fca5a5;
+
+  --destructive: #f87171;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --info: #60a5fa;
+
+  --border: #334155;
+  --input: #334155;
+  --ring: #ef3a4b;
+
+  --chart-1: #f87171;
+  --chart-2: #fbbf24;
+  --chart-3: #4ade80;
+  --chart-4: #60a5fa;
+  --chart-5: #a78bfa;
+
+  --sidebar: #1e293b;
+  --sidebar-foreground: #e2e8f0;
+  --sidebar-primary: #ef3a4b;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #450a0a;
+  --sidebar-accent-foreground: #fca5a5;
+  --sidebar-border: #334155;
+  --sidebar-ring: #ef3a4b;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    /* RTL is set on <html dir="rtl"> in layout; this just ensures logical props work */
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-vazirmatn), ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: "ss01", "cv01";
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Persian numerals: tighten digit spacing slightly */
+  .nums-fa {
+    font-variant-numeric: proportional-nums;
+    letter-spacing: 0;
+  }
+
+  /* Better tap targets on mobile */
+  @media (pointer: coarse) {
+    button, a, [role="button"] {
+      min-height: 40px;
+    }
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/40;
+  }
+}
+
+/* ───────── Utility classes ───────── */
+@layer utilities {
+  /* Container with consistent padding for storefront */
+  .container-site {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Container for admin (wider) */
+  .container-admin {
+    @apply mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Hide scrollbar but keep scrolling */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Line clamp helpers (extra safety beyond Tailwind's built-in) */
+  .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+}
+
+/* ───────── Animation keyframes ───────── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--muted) 0%,
+    var(--secondary) 50%,
+    var(--muted) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
