@@ -413,3 +413,61 @@ Stage Summary:
 - Phase 6 complete. Full account management: dashboard, profile (with avatar upload), security (password + identifier change with OTP), wallet (balance + transactions + charge), addresses CRUD, tickets (create + conversation), notifications (list + mark read + delete + header bell with unread count).
 - All wired to live backend with real customer account data.
 - Ready for Phase 7 (Comments & Reviews) on user approval.
+
+---
+Task ID: phase-7
+Agent: main (Super Z)
+Task: Phase 7 (Comments & Reviews) — nested comments with ratings on product detail page.
+
+Work Log:
+- Probed backend comments endpoint: GET /comments/product/:productId returns tree structure with ratingSummary (average + count), items with nested replies, likeCount, _count.likes. Note: backend returns userId but NOT user object (fullName/avatarUrl) — added to BACKEND-ISSUES list.
+
+- Created features/comments/hooks/use-comments.ts with 5 hooks:
+  - useProductComments (paginated, tree structure)
+  - useCreateComment (handles both top-level with rating + reply without rating)
+  - useLikeComment (optimistic: toggle like in tree recursively)
+  - useUpdateComment (own comment edit)
+  - useDeleteComment (own comment, 409 if has replies)
+  - Helper: toggleLikeInTree (recursive tree walker)
+
+- Created 4 components:
+  - star-rating.tsx: StarRating (interactive with hover) + RatingSummary (compact display)
+  - comment-form.tsx: RHF + Zod form with:
+    - 5-star rating selector (required for top-level, hidden for replies)
+    - Textarea with character count (5-2000)
+    - Auth-gated (shows login prompt if not authenticated)
+    - Compact mode for inline replies
+    - Toast: "نظر شما ثبت شد — پس از تأیید مدیر نمایش داده می‌شود"
+  - comment-item.tsx: Nested comment with:
+    - Avatar (initials fallback — no user object from backend)
+    - Username + rating stars + relative date
+    - Content (whitespace-pre-wrap)
+    - Like button (optimistic, heart fill toggle)
+    - Reply button (depth < 3 to limit nesting)
+    - Edit button (own comments, inline edit mode)
+    - Delete button (own comments, with confirmation)
+    - Nested replies (recursive, indented with border-r)
+    - Inline reply form (compact, toggled)
+  - comment-section.tsx: Full section with:
+    - Rating summary card (big average + stars + count)
+    - Comment form (collapsible)
+    - Comment list (nested, with skeletons)
+    - Pagination (prev/next + page indicator)
+    - Empty state ("هنوز نظری ثبت نشده")
+
+- Wired CommentSection into app/(site)/products/[slug]/page.tsx (below related products)
+
+- Fixed 3 issues:
+  - Comment type missing userId → added optional userId field
+  - Missing Textarea import in comment-item.tsx
+  - form.watch warning → useWatch
+
+- TypeScript: 0 errors
+- ESLint: 0 errors
+- Browser-verified: product detail page loads with comments section (star rating selector, comment form, rating summary). Backend has 1 approved comment with rating=5 for Nike Air Max.
+
+Stage Summary:
+- Phase 7 complete. Full nested comment system: rating summary, comment form with star rating, nested replies (up to 3 levels), like/unlike with optimistic updates, edit/delete own comments, pagination.
+- All wired to live backend — 1 real comment visible on Nike Air Max product.
+- New backend issue found: comments don't include user object (fullName/avatarUrl) — added to issues list for MD file.
+- Ready for Phase 8 (Admin Panel) on user approval.

@@ -26,6 +26,7 @@ import { EmptyState } from "@/components/common/empty-state";
 import { ProductCard } from "@/components/site/product-card";
 import { WishlistButton } from "@/components/site/wishlist-button";
 import { ComparisonButton } from "@/components/site/comparison-button";
+import { CommentSection } from "@/features/comments/components/comment-section";
 import { useProductBySlug } from "@/features/catalog/hooks/use-product-by-slug";
 import { useProducts } from "@/features/catalog/hooks/use-products";
 import { useAddToCart } from "@/features/cart/hooks";
@@ -158,6 +159,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
 
       {/* Related products */}
       <RelatedProducts product={product} />
+
+      {/* Comments & reviews */}
+      <CommentSection productId={product.id} productName={product.name} />
 
       {/* Product structured data */}
       <JsonLd data={productJsonLd(product)} />

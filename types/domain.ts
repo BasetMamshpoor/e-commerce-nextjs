@@ -631,11 +631,14 @@ export type CommentStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export interface Comment {
   id: string;
+  /** User ID (returned by backend; useful for "is this my comment?" checks). */
+  userId?: string;
   content: string;
   rating?: number | null;
   likeCount: number;
   likedByMe?: boolean;
   attachments?: Media[];
+  /** Nested user object (NOT currently returned by backend — see BACKEND-ISSUES.md). */
   user?: Pick<User, "id" | "fullName" | "avatarUrl">;
   replies?: Comment[];
   createdAt: string;
