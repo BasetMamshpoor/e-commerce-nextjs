@@ -24,6 +24,7 @@ import { ThemeToggle } from "./theme-toggle";
 import { CartBadge } from "./cart-badge";
 import { WishlistBadge } from "./wishlist-badge";
 import { ComparisonBadge } from "./comparison-badge";
+import { NotificationBell } from "./notification-bell";
 import { CategoryNavMenu } from "./category-nav-menu";
 import { useAuth } from "@/providers/auth-context";
 import { APP_NAME } from "@/constants/app";
@@ -83,9 +84,16 @@ export function Header() {
               <MobileLink href="/cart" onClick={() => setMobileOpen(false)}>سبد خرید</MobileLink>
               <MobileLink href="/wishlist" onClick={() => setMobileOpen(false)}>علاقه‌مندی</MobileLink>
               <MobileLink href="/comparison" onClick={() => setMobileOpen(false)}>مقایسه</MobileLink>
-              {isAuthenticated ? (
-                <MobileLink href="/account" onClick={() => setMobileOpen(false)}>حساب کاربری</MobileLink>
-              ) : (
+              {isAuthenticated && (
+                <>
+                  <MobileLink href="/account" onClick={() => setMobileOpen(false)}>حساب کاربری</MobileLink>
+                  <MobileLink href="/account/orders" onClick={() => setMobileOpen(false)}>سفارش‌های من</MobileLink>
+                  <MobileLink href="/account/wallet" onClick={() => setMobileOpen(false)}>کیف پول</MobileLink>
+                  <MobileLink href="/account/tickets" onClick={() => setMobileOpen(false)}>تیکت‌ها</MobileLink>
+                  <MobileLink href="/account/notifications" onClick={() => setMobileOpen(false)}>نوتیفیکیشن‌ها</MobileLink>
+                </>
+              )}
+              {!isAuthenticated && (
                 <MobileLink href="/login" onClick={() => setMobileOpen(false)}>ورود / ثبت‌نام</MobileLink>
               )}
             </nav>
@@ -121,6 +129,7 @@ export function Header() {
           <WishlistBadge />
           <ComparisonBadge />
           <CartBadge />
+          <NotificationBell />
           <ThemeToggle />
           <Button variant="ghost" size="icon" asChild aria-label="حساب کاربری">
             <Link href={isAuthenticated ? "/account" : "/login"}>

@@ -1,4 +1,13 @@
 export {
+  USER_QUERY_KEY,
+  useUserMe,
+  useUpdateProfile,
+  useSetAvatar,
+  useChangePassword,
+  useRequestChangeIdentifier,
+  useVerifyChangeIdentifier,
+} from "./use-user-me";
+export {
   ADDRESSES_QUERY_KEY,
   useAddresses,
   useAddress,

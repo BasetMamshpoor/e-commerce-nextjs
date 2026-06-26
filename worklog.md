@@ -367,3 +367,49 @@ Stage Summary:
 - Address management with real interactive Leaflet map ( Tehran-centered, click-to-set, draggable, searchable).
 - Discount code preview at checkout (actual consumption at order creation per api.md).
 - Browser-verified via curl that all routes compile+render successfully (sandbox dev server has stability issues preventing sustained browser sessions, but each route individually returns 200).
+
+---
+Task ID: phase-6
+Agent: main (Super Z)
+Task: Phase 6 (User Account) — full account management wired to live backend.
+
+Work Log:
+- Probed backend account endpoints with real customer account:
+  - /users/me: returns user with walletBalance (currently 0)
+  - /wallet: balance + transactions (PURCHASE type)
+  - /tickets: 1 ticket with messages
+  - /tickets/departments: 3 departments (فروش, پشتیبانی فنی, ...)
+  - /notifications: 2 notifications (ORDER type)
+  - /notifications/unread-count: { count: 2 }
+
+- Created 3 hook modules:
+  - features/account/hooks/use-user-me.ts: useUserMe, useUpdateProfile, useSetAvatar (upload + set), useChangePassword, useRequestChangeIdentifier, useVerifyChangeIdentifier
+  - features/tickets/hooks/use-tickets.ts: useDepartments, useTickets, useTicketDetail, useCreateTicket, useAddTicketMessage
+  - features/notifications/hooks/use-notifications.ts: useNotifications, useUnreadNotificationsCount (polls every 60s), useMarkNotificationRead (optimistic), useMarkAllNotificationsRead (optimistic), useDeleteNotification (optimistic)
+
+- Created features/account/components/account-sidebar.tsx: sidebar nav with 8 items + user card + logout + unread notifications badge
+- Created app/(site)/account/layout.tsx: AuthGuard + sidebar + content area
+
+- Created 8 account pages:
+  - /account (dashboard): 4 stat cards (wallet, orders, tickets, notifications) + 4 recent activity cards
+  - /account/profile: avatar upload (with camera button) + edit fullName form + read-only email/phone display
+  - /account/security: change password (with currentPassword validation) + change identifier (2-step OTP flow: request → verify)
+  - /account/wallet: balance card + transactions list (with type icons + sign +/-) + charge dialog (quick amounts + custom + gateway selection)
+  - /account/addresses: grid of address cards with edit/delete + add new dialog (with Leaflet map picker from phase 5)
+  - /account/tickets: list with status/priority badges + create dialog (subject, department, priority, message)
+  - /account/tickets/[id]: chat-style conversation (user right, support left) + reply box (auto-scroll, auto-reopen on user reply)
+  - /account/notifications: list with type-colored icons + mark read + delete + mark all + unread count badge
+
+- Created components/site/notification-bell.tsx: header popover with last 5 notifications + unread count badge + "view all" link
+- Updated components/site/header.tsx: added NotificationBell + expanded mobile menu with account sub-links
+
+- Fixed 4 TypeScript errors: NotificationListQuery, CreateTicketBody, AddTicketMessageBody, TicketListQuery were in service files not types/domain → fixed imports
+
+- TypeScript: 0 errors
+- ESLint: 0 errors
+- Curl-verified all 8 account routes return 200: /account, /account/profile, /account/security, /account/wallet, /account/addresses, /account/orders, /account/tickets, /account/notifications
+
+Stage Summary:
+- Phase 6 complete. Full account management: dashboard, profile (with avatar upload), security (password + identifier change with OTP), wallet (balance + transactions + charge), addresses CRUD, tickets (create + conversation), notifications (list + mark read + delete + header bell with unread count).
+- All wired to live backend with real customer account data.
+- Ready for Phase 7 (Comments & Reviews) on user approval.
