@@ -3,10 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
-  Heart,
-  Scale,
   ShoppingCart,
   Star,
   Truck,
@@ -27,18 +24,28 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Breadcrumb } from "@/components/common/breadcrumb";
 import { EmptyState } from "@/components/common/empty-state";
 import { ProductCard } from "@/components/site/product-card";
+import { WishlistButton } from "@/components/site/wishlist-button";
+import { ComparisonButton } from "@/components/site/comparison-button";
 import { useProductBySlug } from "@/features/catalog/hooks/use-product-by-slug";
 import { useProducts } from "@/features/catalog/hooks/use-products";
+import { useAddToCart } from "@/features/cart/hooks";
 import { productsService } from "@/services";
 import { productJsonLd, JsonLd } from "@/lib/seo";
 import {
   discountPercent,
   formatPrice,
-  formatToman,
   toPersianDigits,
 } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import type { ProductVariant } from "@/types/domain";
+import {
+  getProductCategories,
+  getProductImageAlt,
+  getProductImageUrl,
+  getVariantAttributeValues,
+  type Product as ProductType,
+  type ProductImage,
+} from "@/types/domain";
 
 export default function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = React.use(params);
@@ -85,14 +92,15 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
     );
   }
 
+  const categories = getProductCategories(product);
   const breadcrumbItems = [
     { name: "خانه", url: "/" },
     { name: "محصولات", url: "/products" },
   ];
-  if (product.categories?.[0]) {
+  if (categories[0]) {
     breadcrumbItems.push({
-      name: product.categories[0].name,
-      url: `/categories/${product.categories[0].slug}`,
+      name: categories[0].name,
+      url: `/categories/${categories[0].slug}`,
     });
   }
   breadcrumbItems.push({
@@ -140,7 +148,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
             <ProductDescription html={product.description} />
           </TabsContent>
           <TabsContent value="specs" className="mt-4">
-            <ProductSpecs variant={selectedVariant} categories={product.categories ?? []} brand={product.brand ?? null} />
+            <ProductSpecs variant={selectedVariant} categories={categories} brand={product.brand ?? null} />
           </TabsContent>
           <TabsContent value="shipping" className="mt-4">
             <ShippingInfo />
@@ -182,8 +190,8 @@ function ProductGallery({
       <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-card border border-border/60">
         {mainImage && (
           <Image
-            src={mainImage.url}
-            alt={mainImage.alt ?? name}
+            src={getProductImageUrl(mainImage) || "/placeholder.svg"}
+            alt={getProductImageAlt(mainImage, name)}
             fill
             priority
             sizes="(max-width: 1024px) 100vw, 40vw"
@@ -193,27 +201,31 @@ function ProductGallery({
       </div>
       {images.length > 1 && (
         <div className="grid grid-cols-5 gap-2">
-          {images.map((img, i) => (
-            <button
-              key={img.id}
-              onClick={() => setActiveIdx(i)}
-              className={cn(
-                "relative aspect-square overflow-hidden rounded-lg border-2 bg-card transition-all",
-                i === activeIdx
-                  ? "border-primary"
-                  : "border-transparent hover:border-border",
-              )}
-              aria-label={`تصویر ${i + 1}`}
-            >
-              <Image
-                src={img.url}
-                alt={img.alt ?? name}
-                fill
-                sizes="80px"
-                className="object-cover"
-              />
-            </button>
-          ))}
+          {images.map((img, i) => {
+            const url = getProductImageUrl(img);
+            if (!url) return null;
+            return (
+              <button
+                key={img.id}
+                onClick={() => setActiveIdx(i)}
+                className={cn(
+                  "relative aspect-square overflow-hidden rounded-lg border-2 bg-card transition-all",
+                  i === activeIdx
+                    ? "border-primary"
+                    : "border-transparent hover:border-border",
+                )}
+                aria-label={`تصویر ${i + 1}`}
+              >
+                <Image
+                  src={url}
+                  alt={getProductImageAlt(img, name)}
+                  fill
+                  sizes="80px"
+                  className="object-cover"
+                />
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
@@ -235,10 +247,8 @@ function ProductInfo({
 }) {
   // Group attribute values by attribute for variant picker display.
   const variantAttributes = React.useMemo(() => {
-    const allValues = selectedVariant?.attributeValues ?? [];
-    // We just show them as a label for now (variant selection by attribute combination
-    // is complex — we let user pick from available variants directly).
-    return allValues;
+    if (!selectedVariant) return [];
+    return getVariantAttributeValues(selectedVariant);
   }, [selectedVariant]);
 
   return (
@@ -292,7 +302,10 @@ function ProductInfo({
           <h3 className="text-sm font-semibold text-foreground">انتخاب گزینه:</h3>
           <div className="flex flex-wrap gap-2">
             {product.variants.map((v) => {
-              const label = v.attributeValues?.map((av) => av.value).join("، ") || v.sku;
+              const avs = getVariantAttributeValues(v);
+              const label = avs.length > 0
+                ? avs.map((av) => av.value).join("، ")
+                : v.sku;
               const isSelected = selectedVariant?.id === v.id;
               const isOutOfStock = v.stock <= 0;
               return (
@@ -343,7 +356,7 @@ function BuyBox({
   selectedVariant: ProductVariant | null;
 }) {
   const [quantity, setQuantity] = React.useState(1);
-  const [adding, setAdding] = React.useState(false);
+  const addToCart = useAddToCart();
 
   // Reset quantity when variant changes.
   React.useEffect(() => {
@@ -365,15 +378,9 @@ function BuyBox({
   const isOutOfStock = selectedVariant.stock <= 0;
   const maxQty = Math.min(selectedVariant.stock, 99);
 
-  const addToCart = async () => {
+  const onAddToCart = () => {
     if (isOutOfStock) return;
-    setAdding(true);
-    // Phase 4 will wire this to cart mutation; for now, just a toast.
-    await new Promise((r) => setTimeout(r, 500));
-    toast.success("به سبد خرید اضافه شد", {
-      description: `${product.name} × ${toPersianDigits(quantity)}`,
-    });
-    setAdding(false);
+    addToCart.mutate({ variantId: selectedVariant.id, quantity });
   };
 
   const share = async () => {
@@ -463,27 +470,31 @@ function BuyBox({
             </Button>
           </div>
           <Button
-            onClick={addToCart}
-            disabled={adding}
+            onClick={onAddToCart}
+            disabled={addToCart.isPending}
             className="flex-1"
             size="lg"
           >
             <ShoppingCart className="size-4" />
-            {adding ? "در حال افزودن..." : "افزودن به سبد"}
+            {addToCart.isPending ? "در حال افزودن..." : "افزودن به سبد"}
           </Button>
         </div>
       )}
 
       {/* Quick actions */}
       <div className="grid grid-cols-3 gap-2">
-        <Button variant="outline" size="sm" className="gap-1.5">
-          <Heart className="size-4" />
-          علاقه‌مندی
-        </Button>
-        <Button variant="outline" size="sm" className="gap-1.5">
-          <Scale className="size-4" />
-          مقایسه
-        </Button>
+        <WishlistButton
+          productId={product.id}
+          variant="outline"
+          size="sm"
+          showLabel
+        />
+        <ComparisonButton
+          productId={product.id}
+          variant="outline"
+          size="sm"
+          showLabel
+        />
         <Button variant="outline" size="sm" onClick={share} className="gap-1.5">
           <Share2 className="size-4" />
           اشتراک
@@ -545,10 +556,10 @@ function ProductSpecs({
   }
   if (variant) {
     rows.push({ label: "کد SKU", value: variant.sku });
-    if (variant.attributeValues && variant.attributeValues.length > 0) {
-      for (const av of variant.attributeValues) {
-        rows.push({ label: "ویژگی", value: av.value });
-      }
+    const avs = getVariantAttributeValues(variant);
+    for (const av of avs) {
+      const attrName = av.attribute?.name ?? "ویژگی";
+      rows.push({ label: attrName, value: av.value });
     }
   }
 
@@ -593,7 +604,7 @@ function ShippingInfo() {
 
 function RelatedProducts({ product }: { product: ProductDetailProduct }) {
   // Use first category to fetch related.
-  const firstCategory = product.categories?.[0];
+  const firstCategory = getProductCategories(product)[0];
   const { data, isLoading } = useProducts({
     categorySlug: firstCategory?.slug,
     limit: 5,

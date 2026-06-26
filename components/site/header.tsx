@@ -6,8 +6,6 @@ import { useRouter } from "next/navigation";
 import {
   Search,
   ShoppingCart,
-  Heart,
-  Scale,
   User,
   Menu,
   X,
@@ -24,6 +22,8 @@ import {
 } from "@/components/ui/sheet";
 import { ThemeToggle } from "./theme-toggle";
 import { CartBadge } from "./cart-badge";
+import { WishlistBadge } from "./wishlist-badge";
+import { ComparisonBadge } from "./comparison-badge";
 import { CategoryNavMenu } from "./category-nav-menu";
 import { useAuth } from "@/providers/auth-context";
 import { APP_NAME } from "@/constants/app";
@@ -118,16 +118,8 @@ export function Header() {
 
         {/* Actions */}
         <div className="mr-auto flex items-center gap-1 lg:mr-0">
-          <Button variant="ghost" size="icon" asChild aria-label="علاقه‌مندی">
-            <Link href="/wishlist">
-              <Heart className="size-5" />
-            </Link>
-          </Button>
-          <Button variant="ghost" size="icon" asChild aria-label="مقایسه">
-            <Link href="/comparison">
-              <Scale className="size-5" />
-            </Link>
-          </Button>
+          <WishlistBadge />
+          <ComparisonBadge />
           <CartBadge />
           <ThemeToggle />
           <Button variant="ghost" size="icon" asChild aria-label="حساب کاربری">

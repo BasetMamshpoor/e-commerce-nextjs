@@ -7,7 +7,7 @@ import { ENDPOINTS } from "@/api/endpoints";
 import type { Cart, CartResponse } from "@/types/domain";
 
 export const cartService = {
-  get: () => http.get<Cart>(ENDPOINTS.cart.get),
+  get: () => http.get<CartResponse>(ENDPOINTS.cart.get),
 
   addItem: (body: { variantId: string; quantity: number }) =>
     http.post<CartResponse>(ENDPOINTS.cart.addItem, body),

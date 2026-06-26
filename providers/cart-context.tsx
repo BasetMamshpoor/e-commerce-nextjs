@@ -6,10 +6,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   getGuestToken,
   setGuestToken,
+  http,
 } from "@/lib/api-client";
 import { ENDPOINTS } from "@/api/endpoints";
-import { http } from "@/lib/api-client";
-import type { Cart, CartResponse } from "@/types/domain";
+import type { Cart } from "@/types/domain";
 import { useAuth } from "./auth-context";
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -31,14 +31,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const [itemCount, setItemCount] = React.useState(0);
 
-  // Bootstrap guest token if missing (so first /cart request can be associated).
-  React.useEffect(() => {
-    if (!getGuestToken()) {
-      // We don't generate one locally — backend will create one on first request
-      // and return it in `data.guestToken`. We'll capture it from responses below.
-    }
-  }, []);
-
   // Subscribe to cart query cache to keep badge count in sync.
   React.useEffect(() => {
     const unsub = queryClient.getQueryCache().subscribe((event) => {
@@ -59,13 +51,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       .post<Cart>(ENDPOINTS.cart.merge, { guestToken })
       .then((cart) => {
         queryClient.setQueryData(CART_QUERY_KEY, cart);
-        setGuestToken(""); // clear after successful merge
         if (typeof window !== "undefined") {
           localStorage.removeItem("sf_guest");
         }
+        // Clear in-memory guest token after merge.
+        setGuestToken("");
       })
       .catch(() => {
-        // Silently fail — user can still browse; cart will refresh on next /cart GET.
+        // Silent fail.
       });
   }, [isAuthenticated, queryClient]);
 
@@ -87,7 +80,7 @@ export function useCart() {
   return ctx;
 }
 
-/** Helper: optimistically update cart in cache (used by add/update/delete mutations). */
+/** Helper: optimistically update cart in cache. */
 export function setCartCache(
   queryClient: ReturnType<typeof useQueryClient>,
   cart: Cart,
@@ -96,8 +89,10 @@ export function setCartCache(
 }
 
 /** Helper: extract guest token from a CartResponse and persist if new. */
-export function captureGuestTokenFromCartResponse(res: CartResponse) {
-  if (res.guestToken && !getGuestToken()) {
-    setGuestToken(res.guestToken);
-  }
+export function captureGuestTokenFromCartResponse(res: {
+  cart: Cart;
+  wasAdjusted?: boolean;
+  guestToken?: string;
+}) {
+  if (res.guestToken && !getGuestToken()) setGuestToken(res.guestToken);
 }

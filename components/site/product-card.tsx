@@ -3,13 +3,16 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Heart, Scale, ShoppingCart, Star } from "lucide-react";
+import { Star, ShoppingCart } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PersianNumber } from "@/components/common/persian-number";
+import { WishlistButton } from "@/components/site/wishlist-button";
+import { ComparisonButton } from "@/components/site/comparison-button";
+import { AddToCartButton } from "@/components/site/add-to-cart-button";
 import {
   discountPercent,
   formatPrice,
@@ -17,6 +20,10 @@ import {
 } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/types/domain";
+import {
+  getProductImageAlt,
+  getProductImageUrl,
+} from "@/types/domain";
 
 interface ProductCardProps {
   product: Product;
@@ -34,6 +41,8 @@ export function ProductCard({
   showQuickActions = true,
 }: ProductCardProps) {
   const mainImage = product.images?.find((i) => i.isMain) ?? product.images?.[0];
+  const mainImageUrl = mainImage ? getProductImageUrl(mainImage) : "";
+  const mainImageAlt = mainImage ? getProductImageAlt(mainImage, product.name) : product.name;
   const minPrice = product.minPrice;
   const maxPrice = product.maxPrice;
   const hasDiscount = product.hasActiveDiscount;
@@ -45,6 +54,13 @@ export function ProductCard({
     ? discountPercent(compareAtPrice, minPrice)
     : 0;
 
+  // For add-to-cart: we don't have variant info on the card listing, so the button
+  // links to the product page (where the user picks a variant first).
+  // Exception: if the product has only 1 variant, we can add directly.
+  const singleVariant = product.variants && product.variants.length === 1
+    ? product.variants[0]
+    : null;
+
   return (
     <Card
       className={cn(
@@ -52,37 +68,25 @@ export function ProductCard({
         className,
       )}
     >
-      {/* Quick actions (top-right) */}
+      {/* Quick actions (top-left in RTL) */}
       {showQuickActions && (
         <div className="absolute left-2 top-2 z-10 flex flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-          <Button
+          <WishlistButton
+            productId={product.id}
             size="icon"
             variant="secondary"
             className="size-8 bg-background/90 shadow-sm backdrop-blur"
-            aria-label="افزودن به علاقه‌مندی"
-            onClick={() => {
-              // Phase 4 will wire this to wishlist mutation.
-              // TODO: wishlistService.add(product.id)
-            }}
-          >
-            <Heart className="size-4" />
-          </Button>
-          <Button
+          />
+          <ComparisonButton
+            productId={product.id}
             size="icon"
             variant="secondary"
             className="size-8 bg-background/90 shadow-sm backdrop-blur"
-            aria-label="افزودن به مقایسه"
-            onClick={() => {
-              // Phase 4 will wire this to comparison mutation.
-              // TODO: comparisonService.add(product.id)
-            }}
-          >
-            <Scale className="size-4" />
-          </Button>
+          />
         </div>
       )}
 
-      {/* Discount / Out-of-stock badge (top-left in RTL) */}
+      {/* Discount / Out-of-stock badge (top-right in RTL) */}
       <div className="absolute right-2 top-2 z-10 flex flex-col gap-1">
         {hasDiscount && discountPct > 0 && (
           <Badge variant="destructive" className="font-bold">
@@ -102,10 +106,10 @@ export function ProductCard({
         aria-label={product.name}
       >
         <div className="relative aspect-square overflow-hidden bg-muted">
-          {mainImage ? (
+          {mainImageUrl ? (
             <Image
-              src={mainImage.url}
-              alt={mainImage.alt ?? product.name}
+              src={mainImageUrl}
+              alt={mainImageAlt}
               fill
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               className="object-cover transition-transform duration-300 group-hover:scale-105"
@@ -173,18 +177,21 @@ export function ProductCard({
 
       {showAddToCart && !isOutOfStock && (
         <CardFooter className="p-3 pt-0">
-          <Button
-            variant="default"
-            size="sm"
-            className="w-full gap-1.5"
-            onClick={() => {
-              // Phase 4: cart mutation
-              // TODO: cartService.addItem({ variantId: defaultVariant.id, quantity: 1 })
-            }}
-          >
-            <ShoppingCart className="size-4" />
-            افزودن به سبد
-          </Button>
+          {singleVariant ? (
+            <AddToCartButton
+              variantId={singleVariant.id}
+              fullWidth
+              size="sm"
+              label="افزودن به سبد"
+            />
+          ) : (
+            <Button asChild variant="outline" size="sm" className="w-full">
+              <Link href={`/products/${product.slug}`}>
+                <ShoppingCart className="size-4" />
+                مشاهده و خرید
+              </Link>
+            </Button>
+          )}
         </CardFooter>
       )}
     </Card>

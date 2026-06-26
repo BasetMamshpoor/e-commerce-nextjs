@@ -15,7 +15,9 @@ import type {
   Category,
   CommentRatingSummary,
   Product,
+  ProductImage,
 } from "@/types/domain";
+import { getProductCategories, getProductImageUrl } from "@/types/domain";
 
 const SITE_URL = APP_CONFIG.publicSiteUrl.replace(/\/$/, "");
 
@@ -106,9 +108,8 @@ export function productJsonLd(
   product: Product,
   ratingSummary?: CommentRatingSummary,
 ) {
-  const image = product.images?.find((i) => i.isMain)?.url
-    ?? product.images?.[0]?.url
-    ?? `${SITE_URL}/logo.svg`;
+  const mainImage = product.images?.find((i) => i.isMain) ?? product.images?.[0];
+  const image = mainImage ? (getProductImageUrl(mainImage) || `${SITE_URL}/logo.svg`) : `${SITE_URL}/logo.svg`;
 
   const offers = (product.variants ?? []).map((v) => ({
     "@type": "Offer",
@@ -121,6 +122,8 @@ export function productJsonLd(
     itemCondition: "https://schema.org/NewCondition",
     url: absUrl(`/products/${product.slug}`),
   }));
+
+  const categories = getProductCategories(product);
 
   return {
     "@context": "https://schema.org",
@@ -135,7 +138,7 @@ export function productJsonLd(
           name: product.brand.name,
         }
       : undefined,
-    category: product.categories?.[0]?.name,
+    category: categories[0]?.name,
     image: [image],
     offers: offers.length === 1 ? offers[0] : offers,
     aggregateRating:

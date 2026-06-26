@@ -96,6 +96,8 @@ export interface AttributeValue {
   value: string;
   colorHex?: string | null;
   order: number;
+  /** Nested attribute reference (returned by backend in variant context). */
+  attribute?: Pick<Attribute, "id" | "name" | "slug">;
 }
 
 export interface Attribute {
@@ -122,16 +124,46 @@ export type ProductSortOption =
   | "price_desc"
   | "popular";
 
+/** Embedded media object returned by the backend inside ProductImage. */
+export interface ProductImageMedia {
+  id: string;
+  url: string;
+  type?: string;
+  mimeType?: string;
+  size?: number;
+  alt?: string | null;
+  createdAt?: string;
+}
+
 export interface ProductImage {
   id: string;
   mediaId: string;
-  url: string;
+  /** Backend nests the media under `media`. We expose both flat + nested for safety. */
+  media?: ProductImageMedia;
+  url?: string;
   alt?: string | null;
   order: number;
   isMain: boolean;
 }
 
+/** Helper to extract url+alt from either flat or nested shape. */
+export function getProductImageUrl(img: ProductImage): string {
+  return img.url ?? img.media?.url ?? "";
+}
+
+export function getProductImageAlt(img: ProductImage, fallback = ""): string {
+  return img.alt ?? img.media?.alt ?? fallback;
+}
+
 export type DiscountType = "PERCENT" | "FIXED";
+
+/** Junction-row form returned by backend in ProductVariant.attributeValues. */
+export interface VariantAttributeValueLink {
+  id: string;
+  variantId: string;
+  attributeValueId: string;
+  attributeValue: AttributeValue;
+}
 
 export interface ProductVariant {
   id: string;
@@ -147,8 +179,16 @@ export interface ProductVariant {
   isActive: boolean;
   effectivePrice?: number;
   attributeValueIds: string[];
-  attributeValues?: AttributeValue[];
+  /** Backend returns junction rows: [{ id, variantId, attributeValueId, attributeValue }]. */
+  attributeValues?: VariantAttributeValueLink[] | AttributeValue[];
   images?: ProductImage[];
+}
+
+/** Junction-row form returned by backend in Product.categories. */
+export interface ProductCategoryLink {
+  productId: string;
+  categoryId: string;
+  category: Category;
 }
 
 export interface Product {
@@ -161,7 +201,8 @@ export interface Product {
   isFeatured: boolean;
   brandId?: string | null;
   brand?: Brand | null;
-  categories?: Category[];
+  /** Backend returns junction rows: [{ productId, categoryId, category }]. */
+  categories?: ProductCategoryLink[] | Category[];
   images?: ProductImage[];
   variants?: ProductVariant[];
   /** Denormalized from variants for fast filtering/sorting. */
@@ -174,6 +215,40 @@ export interface Product {
   viewCount?: number;
   createdAt: string;
   updatedAt?: string;
+}
+
+/**
+ * Normalize product.categories into a flat Category[] regardless of whether the
+ * backend returned junction rows or a flat list.
+ */
+export function getProductCategories(
+  product: Pick<Product, "categories">,
+): Category[] {
+  if (!product.categories) return [];
+  if (product.categories.length === 0) return [];
+  const first = product.categories[0] as any;
+  if (first && "category" in first) {
+    return (product.categories as ProductCategoryLink[]).map((c) => c.category);
+  }
+  return product.categories as Category[];
+}
+
+/**
+ * Normalize variant.attributeValues into a flat AttributeValue[] regardless
+ * of whether the backend returned junction rows or a flat list.
+ */
+export function getVariantAttributeValues(
+  variant: Pick<ProductVariant, "attributeValues">,
+): AttributeValue[] {
+  if (!variant.attributeValues) return [];
+  if (variant.attributeValues.length === 0) return [];
+  const first = variant.attributeValues[0] as any;
+  if (first && "attributeValue" in first) {
+    return (variant.attributeValues as VariantAttributeValueLink[]).map(
+      (av) => av.attributeValue,
+    );
+  }
+  return variant.attributeValues as AttributeValue[];
 }
 
 /** Filter metadata returned by `GET /products/filters`. */

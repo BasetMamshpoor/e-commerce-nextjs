@@ -194,3 +194,101 @@ Stage Summary:
 - Backend connection confirmed working — empty states are expected because DB is empty (no seed data)
 - Note: dev server has stability issues in this sandbox (Turbopack panics on rapid route compilation) but each route compiles+renders successfully when accessed individually. This is an environment issue, not a code issue.
 - Ready for Phase 4 (Cart, Wishlist, Comparison) on user approval.
+
+---
+Task ID: phase-4
+Agent: main (Super Z)
+Task: Phase 4 (Cart, Wishlist, Comparison) — wire to live seeded backend.
+
+Work Log:
+- Verified backend is now seeded: 3 users, 3 brands, 6 categories (2 levels), 4 products with 12 variants, 2 orders, 2 discount codes, banners, settings
+- Probed cart/wishlist/comparison endpoints — all return 200
+
+- Created features/cart/hooks/use-cart.ts with 6 hooks:
+  - useCart (fetch + capture guest token)
+  - useAddToCart (optimistic: bump quantity if item already in cart)
+  - useUpdateCartItem (optimistic: recompute totals)
+  - useRemoveCartItem (optimistic: filter + recompute)
+  - useClearCart
+  - useMergeCart (called automatically by CartProvider on login)
+- Created features/wishlist/hooks/use-wishlist.ts with 4 hooks + 1 helper:
+  - useWishlist (paginated, auth-gated)
+  - useWishlistProductIds (Set for "is in wishlist?" checks)
+  - useAddToWishlist (optimistic + toast)
+  - useRemoveFromWishlist (optimistic + toast)
+  - useWishlistToggle (combined)
+- Created features/comparison/hooks/use-comparison.ts with 5 hooks:
+  - useComparison (guest + auth, captures guest token)
+  - useComparisonProductIds
+  - useAddToComparison (max 4 enforcement via backend 409)
+  - useRemoveFromComparison
+  - useClearComparison
+  - useComparisonToggle
+
+- Created reusable buttons:
+  - components/site/add-to-cart-button.tsx
+  - components/site/wishlist-button.tsx (with showLabel variant)
+  - components/site/comparison-button.tsx (with showLabel variant)
+- Created components/common/quantity-selector.tsx (used in cart + product detail)
+- Created components/site/wishlist-badge.tsx + comparison-badge.tsx (with count badges)
+- Updated components/site/header.tsx to use new badges (removed inline Heart/Scale icons)
+
+- Created 3 new pages:
+  - app/(site)/cart/page.tsx — full cart UI:
+    - Line items with image, name, attributes label, quantity selector, remove
+    - Optimistic updates on quantity change
+    - Cart summary with subtotal, discount, shipping (free > 500k), grand total
+    - Discount code input (preview — actual apply at checkout)
+    - Guest login prompt if not authenticated
+    - Empty state with CTA
+  - app/(site)/wishlist/page.tsx (auth-guarded):
+    - Grid of wishlist items with image, name, price, remove button
+    - "مشاهده و خرید" CTA per item
+    - Empty state with CTA
+  - app/(site)/comparison/page.tsx:
+    - Comparison table with rows: price, stock, discount, brand, category, featured, variants, add-to-cart
+    - Max 4 products (enforced by backend)
+    - "افزودن" CTA to add more
+    - Per-product remove + clear all
+    - Empty state with CTA
+
+- Wired ProductCard:
+  - WishlistButton + ComparisonButton quick actions (top-left, hover-reveal)
+  - AddToCartButton if single variant, "مشاهده و خرید" link if multi-variant
+- Wired Product Detail BuyBox:
+  - Real useAddToCart mutation (replaced placeholder)
+  - WishlistButton + ComparisonButton with showLabel
+- Updated providers/cart-context.tsx: cleaner merge logic, removed unused imports
+
+- Fixed backend response shape mismatches:
+  - ProductImage: backend returns { mediaId, media: { url, alt } } not flat { url, alt }
+    → Updated type to support both, added getProductImageUrl/getProductImageAlt helpers
+  - Product.categories: backend returns junction rows [{ productId, categoryId, category }]
+    → Updated type to support both, added getProductCategories helper
+  - ProductVariant.attributeValues: backend returns junction rows [{ id, variantId, attributeValueId, attributeValue: { value, colorHex, attribute: { name } } }]
+    → Updated type to support both, added getVariantAttributeValues helper
+  - cartService.get: returns CartResponse (with guestToken), not Cart directly
+  - Updated lib/seo.tsx productJsonLd to use helpers
+
+- Updated tsconfig.json to exclude skills/ folder
+- TypeScript: 0 errors
+- ESLint: 0 errors
+- Browser-verified:
+  - /products shows real products (نایک Air Max, آدیداس Essentials, نایک Dri-FIT) with images
+  - /products/nike-air-max-sneaker shows:
+    - Real breadcrumb (خانه ← محصولات ← اسنیکر)
+    - Variant picker with proper labels: "سفید، ۴۱", "سفید، ۴۲", "مشکی، ۴۲", "مشکی، ۴۳"
+    - Buy box with price (1,800,000 تومان), quantity selector, add-to-cart
+    - Quick actions: wishlist, comparison, share
+    - No console errors after cache clear
+  - /cart shows empty state (guest, no items) with proper CTA
+  - /comparison shows empty state with proper CTA
+  - Category nav menu shows real categories: پوشاک, کفش, اکسسسوری (with flyout children)
+
+Stage Summary:
+- Phase 4 complete. Cart, Wishlist, Comparison fully wired to live backend with real data.
+- All 3 new pages + 3 new reusable buttons + 3 new header badges.
+- Optimistic updates on all cart mutations (add/update/remove).
+- Guest token capture + auto-merge on login.
+- Fixed 3 backend response shape mismatches (images, categories, attributeValues) — these were silent bugs that would have caused empty images/labels in production.
+- Ready for Phase 5 (Checkout + Orders) on user approval.
