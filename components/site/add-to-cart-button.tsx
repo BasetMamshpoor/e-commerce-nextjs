@@ -20,7 +20,7 @@ interface AddToCartButtonProps {
   /** Custom label. */
   label?: string;
   className?: string;
-  size?: "sm" | "default" | "lg";
+  size?: "sm" | "default" | "lg" | "icon";
   variant?: "default" | "outline" | "secondary";
 }
 

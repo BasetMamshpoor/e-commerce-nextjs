@@ -37,9 +37,10 @@ export function useVerifyOtp() {
     onSuccess: (session, variables) => {
       applySession(session);
       toast.success(
-        variables.mode === "register" ? "ثبت‌نام شما تکمیل شد" : "ورود موفقیت‌آمیز بود",
+        variables.mode === "register" ? "ثبت‌نام شما تکمیل شد 🎉" : "خوش آمدید 👋",
       );
-      router.replace("/account");
+      const isAdmin = ["ADMIN", "EDITOR", "SUPPORT"].includes(session.user.role);
+      router.replace(isAdmin ? "/admin" : "/account");
       router.refresh();
     },
     onError: (err) => {

@@ -14,9 +14,8 @@ import type { LoginValues } from "@/features/auth/schemas/auth.schema";
  *
  * On success:
  *   - Persists session (access/refresh tokens + user)
- *   - Shows a success toast
- *   - Redirects to ?redirect= param or /account
- *   - Triggers cart merge (via CartProvider effect)
+ *   - Redirects based on role: admin/editor/support → /admin, customer → /account
+ *   - Honors ?redirect= param if present
  */
 export function useLogin() {
   const { applySession } = useAuth();
@@ -32,9 +31,16 @@ export function useLogin() {
       }),
     onSuccess: (session) => {
       applySession(session);
-      toast.success("ورود موفقیت‌آمیز بود");
+      toast.success("خوش آمدید 👋");
+
       const redirect = searchParams.get("redirect");
-      router.replace(redirect ?? "/account");
+      if (redirect) {
+        router.replace(redirect);
+      } else {
+        // Role-based redirect.
+        const isAdmin = ["ADMIN", "EDITOR", "SUPPORT"].includes(session.user.role);
+        router.replace(isAdmin ? "/admin" : "/account");
+      }
       router.refresh();
     },
     onError: (err) => {

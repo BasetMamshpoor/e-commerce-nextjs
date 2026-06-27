@@ -471,3 +471,46 @@ Stage Summary:
 - All wired to live backend — 1 real comment visible on Nike Air Max product.
 - New backend issue found: comments don't include user object (fullName/avatarUrl) — added to issues list for MD file.
 - Ready for Phase 8 (Admin Panel) on user approval.
+
+---
+Task ID: phase-8-10-fixes
+Agent: main (Super Z)
+Task: Major UI overhaul + admin detail pages + form validation fixes + role-based redirect
+
+Work Log:
+- Fixed login/register role-based redirect: admin/editor/support → /admin, customer → /account
+- Rewrote ProductCard with vibrant design:
+  - rounded-2xl borders, hover shadow with primary tint
+  - Discount badge with Zap icon
+  - Quick actions (wishlist/compare) with glass background, fade-in on hover
+  - Circular add-to-cart button
+  - Out-of-stock overlay with blur
+  - List variant (horizontal layout) for list view mode
+- Created MultiSelectCombobox component (shadcn Command + Popover) for filters with search
+- Rewrote FilterSidebar:
+  - Proper card container with border and background
+  - Brands as MultiSelectCombobox (select with search)
+  - Attribute values as MultiSelectCombobox (>5 values) or checkboxes (<=5 values)
+  - Active filter count + "clear all" button
+  - Proper sections with separators
+- Added grid/list view toggle to /products page
+  - Toggle buttons (LayoutGrid/List icons)
+  - ProductCard supports variant="grid" | "list"
+  - Skeletons adapt to view mode
+
+- Created 4 admin detail pages (all were 404 before):
+  - /admin/products/[id]: full product info, images grid, variants table, edit/delete
+  - /admin/orders/[id]: timeline, items table, financial summary, shipping info, status changer
+  - /admin/users/[id]: user info, wallet balance, order count, sessions list with revoke, block/unblock with reason, role change
+  - /admin/tickets/[id]: conversation view, reply box, status changer
+
+- TypeScript: 0 errors
+- ESLint: 0 errors
+- All 17 admin routes + 3 detail pages verified via curl (HTTP 200)
+
+Stage Summary:
+- Major UI improvements: ProductCard, FilterSidebar, view toggle
+- All admin [id] pages created (were 404)
+- Role-based login redirect
+- Form validation uses FormMessage (inline) for field errors, toast only for API errors
+- Ready for final ZIP

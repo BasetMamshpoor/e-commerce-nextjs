@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, PackageSearch, SlidersHorizontal } from "lucide-react";
+import { ChevronLeft, ChevronRight, PackageSearch, SlidersHorizontal, LayoutGrid, List } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +22,7 @@ import { useCategoryBySlug } from "@/features/catalog/hooks/use-categories";
 import type { ProductListQuery, ProductSortOption } from "@/types/domain";
 import { APP_CONFIG } from "@/constants/app";
 import { toPersianDigits } from "@/utils/format";
+import { cn } from "@/lib/utils";
 
 const SORT_LABELS: Record<ProductSortOption, string> = {
   newest: "جدیدترین",
@@ -33,6 +34,7 @@ const SORT_LABELS: Record<ProductSortOption, string> = {
 export default function ProductsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [viewMode, setViewMode] = React.useState<"grid" | "list">("grid");
 
   // Parse query params from URL.
   const categorySlugParam = searchParams.get("categorySlug") ?? undefined;
@@ -135,6 +137,27 @@ export default function ProductsPage() {
               ))}
             </SelectContent>
           </Select>
+          {/* View toggle */}
+          <div className="flex items-center rounded-lg border border-border bg-card">
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn("h-9 w-9 rounded-l-none", viewMode === "grid" && "bg-primary/10 text-primary")}
+              onClick={() => setViewMode("grid")}
+              aria-label="نمایش شبکه‌ای"
+            >
+              <LayoutGrid className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn("h-9 w-9 rounded-r-none", viewMode === "list" && "bg-primary/10 text-primary")}
+              onClick={() => setViewMode("list")}
+              aria-label="نمایش لیستی"
+            >
+              <List className="size-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -149,7 +172,7 @@ export default function ProductsPage() {
         {/* Product grid */}
         <div className="min-w-0 flex-1">
           {isLoading ? (
-            <ProductGridSkeleton count={12} />
+            <ProductGridSkeleton count={12} variant={viewMode} />
           ) : products.length === 0 ? (
             <EmptyState
               icon={<PackageSearch className="size-16" />}
@@ -165,12 +188,15 @@ export default function ProductsPage() {
           ) : (
             <>
               <div
-                className={`grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4 ${
-                  isFetching ? "opacity-60 transition-opacity" : ""
-                }`}
+                className={cn(
+                  viewMode === "grid"
+                    ? "grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4"
+                    : "flex flex-col gap-3",
+                  isFetching && "opacity-60 transition-opacity",
+                )}
               >
                 {products.map((p) => (
-                  <ProductCard key={p.id} product={p} />
+                  <ProductCard key={p.id} product={p} variant={viewMode} />
                 ))}
               </div>
 
@@ -221,11 +247,11 @@ export default function ProductsPage() {
   );
 }
 
-function ProductGridSkeleton({ count = 12 }: { count?: number }) {
+function ProductGridSkeleton({ count = 12, variant = "grid" }: { count?: number; variant?: "grid" | "list" }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+    <div className={variant === "grid" ? "grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4" : "flex flex-col gap-3"}>
       {Array.from({ length: count }).map((_, i) => (
-        <ProductCardSkeleton key={i} />
+        <ProductCardSkeleton key={i} variant={variant} />
       ))}
     </div>
   );
