@@ -9,6 +9,7 @@ import {
   User,
   Menu,
   X,
+  Sparkles,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -44,19 +45,22 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/80">
       {/* Top bar (desktop) */}
-      <div className="hidden border-b border-border/60 bg-muted/40 lg:block">
+      <div className="hidden border-b border-border/60 bg-muted/30 lg:block">
         <div className="container-site flex h-9 items-center justify-between text-xs text-muted-foreground">
-          <span>ارسال رایگان برای سفارش‌های بالای ۵۰۰٬۰۰۰ تومان</span>
+          <span className="flex items-center gap-1.5">
+            <Sparkles className="size-3.5 text-primary" />
+            ارسال رایگان برای سفارش‌های بالای ۵۰۰٬۰۰۰ تومان
+          </span>
           <div className="flex items-center gap-4">
-            <Link href="/tracking" className="hover:text-foreground">
+            <Link href="/tracking" className="hover:text-foreground transition-colors">
               پیگیری سفارش
             </Link>
-            <Link href="/tickets" className="hover:text-foreground">
+            <Link href="/tickets" className="hover:text-foreground transition-colors">
               پشتیبانی
             </Link>
-            <Link href="/about" className="hover:text-foreground">
+            <Link href="/about" className="hover:text-foreground transition-colors">
               درباره ما
             </Link>
           </div>
@@ -101,8 +105,8 @@ export function Header() {
         </Sheet>
 
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2" aria-label={APP_NAME}>
-          <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+        <Link href="/" className="flex items-center gap-2.5 transition-transform hover:scale-105" aria-label={APP_NAME}>
+          <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/20">
             <ShoppingCart className="size-5" />
           </span>
           <span className="hidden text-lg font-bold text-foreground sm:inline">

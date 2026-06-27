@@ -3,7 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Zap } from "lucide-react";
 
 import {
   Carousel,
@@ -118,9 +118,10 @@ function HeroSlideView({ slide, isLoading }: { slide: HeroSlide; isLoading: bool
   if (slide.isFallback || !slide.imageUrl) {
     // Gradient fallback slide
     return (
-      <div className="relative aspect-[2/1] w-full overflow-hidden rounded-2xl bg-gradient-to-l from-primary to-red-700 px-6 py-10 text-primary-foreground shadow-lg sm:aspect-[3/1] sm:px-12 sm:py-16">
+      <div className="relative aspect-[2/1] w-full overflow-hidden rounded-2xl bg-gradient-to-l from-primary via-red-600 to-red-800 px-6 py-10 text-primary-foreground shadow-xl sm:aspect-[3/1] sm:px-12 sm:py-16">
         <div className="relative z-10 max-w-2xl">
-          <span className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-medium backdrop-blur">
+          <span className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-medium backdrop-blur-md">
+            <Zap className="size-3.5" />
             جشنواره تابستانه
           </span>
           <h2 className="mb-4 text-2xl font-bold leading-tight sm:text-4xl lg:text-5xl">
@@ -130,7 +131,7 @@ function HeroSlideView({ slide, isLoading }: { slide: HeroSlide; isLoading: bool
             از جدیدترین محصولات با بهترین قیمت‌ها خرید کنید. ارسال رایگان برای
             سفارش‌های بالای ۵۰۰٬۰۰۰ تومان.
           </p>
-          <Button asChild size="lg" variant="secondary">
+          <Button asChild size="lg" variant="secondary" className="shadow-lg">
             <Link href={slide.link}>
               مشاهده محصولات
               <ArrowLeft className="size-4" />
@@ -139,6 +140,9 @@ function HeroSlideView({ slide, isLoading }: { slide: HeroSlide; isLoading: bool
         </div>
         <div className="absolute -left-20 -top-20 size-72 rounded-full bg-white/10 blur-3xl" />
         <div className="absolute -bottom-32 left-1/3 size-96 rounded-full bg-white/5 blur-3xl" />
+        <div className="absolute right-10 top-10 hidden text-9xl font-bold text-white/5 sm:block">
+          فروش
+        </div>
       </div>
     );
   }
@@ -146,7 +150,7 @@ function HeroSlideView({ slide, isLoading }: { slide: HeroSlide; isLoading: bool
   return (
     <Link
       href={slide.link}
-      className="relative block aspect-[2/1] w-full overflow-hidden rounded-2xl bg-muted shadow-lg sm:aspect-[3/1]"
+      className="relative block aspect-[2/1] w-full overflow-hidden rounded-2xl bg-muted shadow-xl sm:aspect-[3/1]"
       aria-label={slide.title}
     >
       <Image
@@ -155,11 +159,11 @@ function HeroSlideView({ slide, isLoading }: { slide: HeroSlide; isLoading: bool
         fill
         priority={slide.id === "fallback"}
         sizes="(max-width: 768px) 100vw, 1200px"
-        className="object-cover"
+        className="object-cover transition-transform duration-700 hover:scale-105"
       />
-      <div className="absolute inset-0 bg-gradient-to-l from-black/40 via-transparent to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-l from-black/60 via-black/20 to-transparent" />
       <div className="absolute inset-0 flex items-center px-6 sm:px-12">
-        <h2 className="max-w-md text-xl font-bold text-white drop-shadow-md sm:text-3xl">
+        <h2 className="max-w-md text-xl font-bold text-white drop-shadow-lg sm:text-3xl lg:text-4xl">
           {slide.title}
         </h2>
       </div>

@@ -635,6 +635,8 @@ export interface Comment {
   userId?: string;
   content: string;
   rating?: number | null;
+  /** Approval status (returned by admin list endpoint). */
+  status?: CommentStatus;
   likeCount: number;
   likedByMe?: boolean;
   attachments?: Media[];

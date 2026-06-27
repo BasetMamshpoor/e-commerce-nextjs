@@ -3,13 +3,12 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Star, ShoppingCart } from "lucide-react";
+import { Star, ShoppingCart, Zap } from "lucide-react";
 
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PersianNumber } from "@/components/common/persian-number";
 import { WishlistButton } from "@/components/site/wishlist-button";
 import { ComparisonButton } from "@/components/site/comparison-button";
 import { AddToCartButton } from "@/components/site/add-to-cart-button";
@@ -17,6 +16,7 @@ import {
   discountPercent,
   formatPrice,
   formatTomanShort,
+  toPersianDigits,
 } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/types/domain";
@@ -28,9 +28,7 @@ import {
 interface ProductCardProps {
   product: Product;
   className?: string;
-  /** Show "افزودن به سبد" button on hover. Default: true */
   showAddToCart?: boolean;
-  /** Show wishlist + comparison quick actions. Default: true */
   showQuickActions?: boolean;
 }
 
@@ -48,15 +46,11 @@ export function ProductCard({
   const hasDiscount = product.hasActiveDiscount;
   const isOutOfStock = !product.isInStock;
 
-  // For "compare at" reference, use the highest price if there's a discount.
   const compareAtPrice = hasDiscount && maxPrice > minPrice ? maxPrice : null;
   const discountPct = compareAtPrice
     ? discountPercent(compareAtPrice, minPrice)
     : 0;
 
-  // For add-to-cart: we don't have variant info on the card listing, so the button
-  // links to the product page (where the user picks a variant first).
-  // Exception: if the product has only 1 variant, we can add directly.
   const singleVariant = product.variants && product.variants.length === 1
     ? product.variants[0]
     : null;
@@ -64,37 +58,43 @@ export function ProductCard({
   return (
     <Card
       className={cn(
-        "group relative overflow-hidden border-border/60 transition-all hover:border-primary/40 hover:shadow-md",
+        "group relative overflow-hidden border-border/40 card-hover",
         className,
       )}
     >
-      {/* Quick actions (top-left in RTL) */}
+      {/* Quick actions */}
       {showQuickActions && (
-        <div className="absolute left-2 top-2 z-10 flex flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="absolute left-2 top-2 z-20 flex flex-col gap-1.5 opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0 -translate-x-2">
           <WishlistButton
             productId={product.id}
             size="icon"
             variant="secondary"
-            className="size-8 bg-background/90 shadow-sm backdrop-blur"
+            className="size-8 glass shadow-sm"
           />
           <ComparisonButton
             productId={product.id}
             size="icon"
             variant="secondary"
-            className="size-8 bg-background/90 shadow-sm backdrop-blur"
+            className="size-8 glass shadow-sm"
           />
         </div>
       )}
 
-      {/* Discount / Out-of-stock badge (top-right in RTL) */}
-      <div className="absolute right-2 top-2 z-10 flex flex-col gap-1">
+      {/* Badges */}
+      <div className="absolute right-2 top-2 z-20 flex flex-col items-end gap-1">
         {hasDiscount && discountPct > 0 && (
-          <Badge variant="destructive" className="font-bold">
-            ٪{formatPrice(discountPct)} تخفیف
+          <Badge className="bg-destructive text-destructive-foreground shadow-sm">
+            <Zap className="size-3" />
+            ٪{toPersianDigits(discountPct)}
+          </Badge>
+        )}
+        {product.isFeatured && !hasDiscount && (
+          <Badge className="bg-warning text-warning-foreground shadow-sm">
+            ویژه
           </Badge>
         )}
         {isOutOfStock && (
-          <Badge variant="secondary" className="bg-muted text-muted-foreground">
+          <Badge variant="secondary" className="glass shadow-sm">
             ناموجود
           </Badge>
         )}
@@ -102,23 +102,26 @@ export function ProductCard({
 
       <Link
         href={`/products/${product.slug}`}
-        className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className="block"
         aria-label={product.name}
       >
-        <div className="relative aspect-square overflow-hidden bg-muted">
+        {/* Image */}
+        <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-muted/50 to-muted">
           {mainImageUrl ? (
             <Image
               src={mainImageUrl}
               alt={mainImageAlt}
               fill
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              className="object-cover transition-transform duration-300 group-hover:scale-105"
+              className="object-cover transition-transform duration-500 group-hover:scale-110"
             />
           ) : (
-            <div className="flex size-full items-center justify-center text-muted-foreground">
-              <ShoppingCart className="size-12 opacity-30" />
+            <div className="flex size-full items-center justify-center text-muted-foreground/30">
+              <ShoppingCart className="size-14" />
             </div>
           )}
+          {/* Gradient overlay on hover */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
         </div>
       </Link>
 
@@ -126,50 +129,51 @@ export function ProductCard({
         {product.brand && (
           <Link
             href={`/brands/${product.brand.slug}`}
-            className="block text-xs text-muted-foreground hover:text-primary"
+            className="block text-[11px] font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:text-primary"
           >
             {product.brand.name}
           </Link>
         )}
         <Link
           href={`/products/${product.slug}`}
-          className="line-clamp-2 text-sm font-medium text-foreground hover:text-primary"
+          className="line-clamp-2 text-sm font-medium leading-snug text-foreground transition-colors hover:text-primary"
         >
           {product.name}
         </Link>
 
         {/* Rating */}
         {product.ratingAverage != null && product.ratingCount! > 0 && (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1 text-xs">
             <Star className="size-3 fill-warning text-warning" />
-            <span className="nums-fa">{product.ratingAverage.toFixed(1)}</span>
-            <span>({formatPrice(product.ratingCount!)})</span>
+            <span className="font-medium text-foreground nums-fa">
+              {toPersianDigits(product.ratingAverage.toFixed(1))}
+            </span>
+            <span className="text-muted-foreground nums-fa">
+              ({toPersianDigits(product.ratingCount!)})
+            </span>
           </div>
         )}
 
         {/* Price */}
-        <div className="pt-1">
+        <div className="pt-1.5">
           {isOutOfStock ? (
             <span className="text-sm text-muted-foreground">—</span>
-          ) : minPrice === maxPrice ? (
-            <div className="space-y-0.5">
-              <div className="text-sm font-bold text-foreground nums-fa">
-                {formatTomanShort(minPrice)} <span className="text-xs font-normal">تومان</span>
-              </div>
-            </div>
           ) : (
             <div className="space-y-0.5">
-              <div className="text-xs text-muted-foreground nums-fa">
-                از {formatPrice(minPrice)}
+              {compareAtPrice && (
+                <p className="text-xs text-muted-foreground line-through nums-fa">
+                  {formatPrice(compareAtPrice)}
+                </p>
+              )}
+              <div className="flex items-baseline gap-1">
+                <span className="text-base font-bold text-foreground nums-fa">
+                  {formatTomanShort(minPrice)}
+                </span>
+                <span className="text-[10px] font-normal text-muted-foreground">تومان</span>
+                {minPrice !== maxPrice && (
+                  <span className="text-[10px] text-muted-foreground">+</span>
+                )}
               </div>
-              <div className="text-sm font-bold text-foreground nums-fa">
-                {formatTomanShort(minPrice)} <span className="text-xs font-normal">تومان</span>
-              </div>
-            </div>
-          )}
-          {compareAtPrice && (
-            <div className="text-xs text-muted-foreground line-through nums-fa">
-              {formatPrice(compareAtPrice)}
             </div>
           )}
         </div>
@@ -185,9 +189,9 @@ export function ProductCard({
               label="افزودن به سبد"
             />
           ) : (
-            <Button asChild variant="outline" size="sm" className="w-full">
+            <Button asChild variant="outline" size="sm" className="w-full group/btn">
               <Link href={`/products/${product.slug}`}>
-                <ShoppingCart className="size-4" />
+                <ShoppingCart className="size-4 transition-transform group-hover/btn:scale-110" />
                 مشاهده و خرید
               </Link>
             </Button>
@@ -200,7 +204,7 @@ export function ProductCard({
 
 export function ProductCardSkeleton() {
   return (
-    <Card className="overflow-hidden border-border/60">
+    <Card className="overflow-hidden border-border/40">
       <Skeleton className="aspect-square w-full" />
       <CardContent className="space-y-2 p-3">
         <Skeleton className="h-3 w-1/3" />

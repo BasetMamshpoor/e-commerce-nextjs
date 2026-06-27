@@ -1,6 +1,6 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { Truck, ShieldCheck, Headphones, CreditCard } from "lucide-react";
+import { Truck, ShieldCheck, Headphones, CreditCard, Sparkles } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,10 +22,10 @@ export default function HomePage() {
 
       {/* Feature strip */}
       <section className="mb-10 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4" aria-label="مزایای خرید">
-        <FeatureCard icon={<Truck className="size-5" />} title="ارسال سریع" desc="تحویل در کوتاه‌ترین زمان" />
-        <FeatureCard icon={<ShieldCheck className="size-5" />} title="ضمانت اصالت" desc="تضمین کالای اصل" />
-        <FeatureCard icon={<CreditCard className="size-5" />} title="پرداخت امن" desc="درگاه‌های معتبر بانکی" />
-        <FeatureCard icon={<Headphones className="size-5" />} title="پشتیبانی ۲۴/۷" desc="همیشه در کنار شما" />
+        <FeatureCard icon={<Truck className="size-5" />} title="ارسال سریع" desc="تحویل در کوتاه‌ترین زمان" color="text-blue-600 bg-blue-50 dark:bg-blue-950/30" />
+        <FeatureCard icon={<ShieldCheck className="size-5" />} title="ضمانت اصالت" desc="تضمین کالای اصل" color="text-green-600 bg-green-50 dark:bg-green-950/30" />
+        <FeatureCard icon={<CreditCard className="size-5" />} title="پرداخت امن" desc="درگاه‌های معتبر بانکی" color="text-purple-600 bg-purple-50 dark:bg-purple-950/30" />
+        <FeatureCard icon={<Headphones className="size-5" />} title="پشتیبانی ۲۴/۷" desc="همیشه در کنار شما" color="text-orange-600 bg-orange-50 dark:bg-orange-950/30" />
       </section>
 
       {/* Categories */}
@@ -69,15 +69,17 @@ function FeatureCard({
   icon,
   title,
   desc,
+  color,
 }: {
   icon: React.ReactNode;
   title: string;
   desc: string;
+  color: string;
 }) {
   return (
-    <Card className="border-border/60 bg-card">
+    <Card className="group border-border/40 card-hover">
       <CardContent className="flex items-center gap-3 p-4">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <div className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${color} transition-transform group-hover:scale-110`}>
           {icon}
         </div>
         <div className="min-w-0">
