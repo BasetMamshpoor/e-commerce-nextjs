@@ -1,268 +1,66 @@
-"use client";
-
-import * as React from "react";
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, PackageSearch, SlidersHorizontal, LayoutGrid, List } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Breadcrumb } from "@/components/common/breadcrumb";
-import { EmptyState } from "@/components/common/empty-state";
-import { ProductCard, ProductCardSkeleton } from "@/components/site/product-card";
-import { FilterSidebar, MobileFilterSheet } from "@/components/site/filter-sidebar";
-import { useProducts } from "@/features/catalog/hooks/use-products";
-import { useCategoryBySlug } from "@/features/catalog/hooks/use-categories";
-import type { ProductListQuery, ProductSortOption } from "@/types/domain";
+import type { Metadata } from "next";
+import { productsService, categoriesService } from "@/services";
+import { ProductsClient } from "@/components/site/products-client";
+import type { ProductListQuery, ProductSortOption, PaginatedData, Product, Category } from "@/types/domain";
 import { APP_CONFIG } from "@/constants/app";
-import { toPersianDigits } from "@/utils/format";
-import { cn } from "@/lib/utils";
+import { absUrl } from "@/lib/seo";
 
-const SORT_LABELS: Record<ProductSortOption, string> = {
-  newest: "جدیدترین",
-  price_asc: "ارزان‌ترین",
-  price_desc: "گران‌ترین",
-  popular: "محبوب‌ترین",
+export const metadata: Metadata = {
+  title: "همه محصولات",
+  description: "خرید آنلاین محصولات با بهترین قیمت و تحویل سریع",
+  alternates: { canonical: absUrl("/products") },
+  openGraph: {
+    title: "همه محصولات | فروشگاه اینترنتی",
+    description: "خرید آنلاین محصولات با بهترین قیمت",
+    url: absUrl("/products"),
+  },
 };
 
-export default function ProductsPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [viewMode, setViewMode] = React.useState<"grid" | "list">("grid");
+interface PageProps {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
 
-  // Parse query params from URL.
-  const categorySlugParam = searchParams.get("categorySlug") ?? undefined;
-  const brandIdsParam = searchParams.get("brandIds") ?? undefined;
-  const attrIdsParam = searchParams.get("attributeValueIds") ?? undefined;
-  const minPriceParam = searchParams.get("minPrice");
-  const maxPriceParam = searchParams.get("maxPrice");
-  const inStockParam = searchParams.get("inStock") === "true";
-  const hasDiscountParam = searchParams.get("hasDiscount") === "true";
-  const isFeaturedParam = searchParams.get("isFeatured") === "true";
-  const searchParam = searchParams.get("search") ?? undefined;
-  const sortParam = (searchParams.get("sort") as ProductSortOption) ?? "newest";
-  const pageParam = Number(searchParams.get("page") ?? 1);
+export default async function ProductsPage({ searchParams }: PageProps) {
+  const sp = await searchParams;
 
+  // Parse query params from URL (server-side)
   const query: ProductListQuery = {
-    page: pageParam,
+    page: 1,
     limit: APP_CONFIG.defaultPageSize,
-    categorySlug: categorySlugParam,
-    brandIds: brandIdsParam,
-    attributeValueIds: attrIdsParam,
-    minPrice: minPriceParam ? Number(minPriceParam) : undefined,
-    maxPrice: maxPriceParam ? Number(maxPriceParam) : undefined,
-    inStock: inStockParam || undefined,
-    hasDiscount: hasDiscountParam || undefined,
-    isFeatured: isFeaturedParam || undefined,
-    search: searchParam,
-    sort: sortParam,
+    categorySlug: typeof sp.categorySlug === "string" ? sp.categorySlug : undefined,
+    brandIds: typeof sp.brandIds === "string" ? sp.brandIds : undefined,
+    attributeValueIds: typeof sp.attributeValueIds === "string" ? sp.attributeValueIds : undefined,
+    minPrice: sp.minPrice ? Number(sp.minPrice) : undefined,
+    maxPrice: sp.maxPrice ? Number(sp.maxPrice) : undefined,
+    inStock: sp.inStock === "true" || undefined,
+    hasDiscount: sp.hasDiscount === "true" || undefined,
+    isFeatured: sp.isFeatured === "true" || undefined,
+    search: typeof sp.search === "string" ? sp.search : undefined,
+    sort: (sp.sort as ProductSortOption) ?? "newest",
   };
 
-  const { data, isLoading, isFetching } = useProducts(query);
-  const { data: category } = useCategoryBySlug(query.categorySlug);
+  // Fetch initial data on the server
+  let initialProducts: PaginatedData<Product> | null = null;
+  let category: Category | null = null;
 
-  const updateSort = (sort: ProductSortOption) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("sort", sort);
-    params.delete("page");
-    router.replace(`/products?${params.toString()}`, { scroll: false });
-  };
-
-  const goToPage = (page: number) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("page", String(page));
-    router.replace(`/products?${params.toString()}`, { scroll: true });
-  };
-
-  const products = data?.items ?? [];
-  const meta = data?.meta;
-  const currentPage = meta?.page ?? query.page ?? 1;
-  const totalPages = meta?.totalPages ?? 1;
-
-  // Breadcrumb items.
-  const breadcrumbItems = [
-    { name: "خانه", url: "/" },
-    { name: "محصولات", url: "/products" },
-  ];
-  if (category) {
-    breadcrumbItems.push({
-      name: category.name,
-      url: `/categories/${category.slug}`,
-    });
+  try {
+    const [products, cat] = await Promise.all([
+      productsService.list(query),
+      query.categorySlug
+        ? categoriesService.bySlug(query.categorySlug).catch(() => null)
+        : Promise.resolve(null),
+    ]);
+    initialProducts = products;
+    category = cat;
+  } catch {
+    // Backend might be unreachable — client component will handle retry
   }
 
-  // Page title.
-  const pageTitle = query.search
-    ? `نتایج جست‌وجو: «${query.search}»`
-    : category
-      ? category.name
-      : query.hasDiscount
-        ? "محصولات تخفیف‌دار"
-        : query.isFeatured
-          ? "محصولات منتخب"
-          : "همه محصولات";
-
   return (
-    <div className="container-site py-6">
-      <Breadcrumb items={breadcrumbItems} />
-
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-foreground sm:text-2xl">{pageTitle}</h1>
-          {meta && (
-            <p className="mt-1 text-sm text-muted-foreground">
-              {toPersianDigits(meta.total)} کالا
-              {query.search && ""}
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <MobileFilterSheet categorySlug={query.categorySlug} />
-          <Select value={query.sort} onValueChange={(v) => updateSort(v as ProductSortOption)}>
-            <SelectTrigger className="w-[140px] sm:w-[180px]">
-              <SlidersHorizontal className="size-4 text-muted-foreground" />
-              <SelectValue placeholder="مرتب‌سازی" />
-            </SelectTrigger>
-            <SelectContent>
-              {(Object.keys(SORT_LABELS) as ProductSortOption[]).map((s) => (
-                <SelectItem key={s} value={s}>
-                  {SORT_LABELS[s]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {/* View toggle */}
-          <div className="flex items-center rounded-lg border border-border bg-card">
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn("h-9 w-9 rounded-l-none", viewMode === "grid" && "bg-primary/10 text-primary")}
-              onClick={() => setViewMode("grid")}
-              aria-label="نمایش شبکه‌ای"
-            >
-              <LayoutGrid className="size-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn("h-9 w-9 rounded-r-none", viewMode === "list" && "bg-primary/10 text-primary")}
-              onClick={() => setViewMode("list")}
-              aria-label="نمایش لیستی"
-            >
-              <List className="size-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex gap-6">
-        {/* Sidebar (desktop) */}
-        <aside className="hidden w-64 shrink-0 lg:block">
-          <div className="sticky top-32 max-h-[calc(100vh-9rem)] overflow-y-auto pb-4">
-            <FilterSidebar categorySlug={query.categorySlug} />
-          </div>
-        </aside>
-
-        {/* Product grid */}
-        <div className="min-w-0 flex-1">
-          {isLoading ? (
-            <ProductGridSkeleton count={12} variant={viewMode} />
-          ) : products.length === 0 ? (
-            <EmptyState
-              icon={<PackageSearch className="size-16" />}
-              title="محصولی یافت نشد"
-              description="با فیلترهای فعلی محصولی پیدا نشد. فیلترها را تغییر دهید یا آنها را پاک کنید."
-              action={
-                <Button asChild variant="outline" size="sm">
-                  <Link href="/products">حذف فیلترها</Link>
-                </Button>
-              }
-              className="border border-dashed border-border rounded-xl"
-            />
-          ) : (
-            <>
-              <div
-                className={cn(
-                  viewMode === "grid"
-                    ? "grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4"
-                    : "flex flex-col gap-3",
-                  isFetching && "opacity-60 transition-opacity",
-                )}
-              >
-                {products.map((p) => (
-                  <ProductCard key={p.id} product={p} variant={viewMode} />
-                ))}
-              </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="mt-8 flex items-center justify-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => goToPage(currentPage - 1)}
-                    disabled={currentPage <= 1}
-                    aria-label="صفحه قبل"
-                  >
-                    <ChevronRight className="size-4" />
-                  </Button>
-                  {Array.from({ length: Math.min(totalPages, 7) }).map((_, i) => {
-                    // Show first 3, last 3, and neighbors of current.
-                    const page = computePageList(currentPage, totalPages)[i];
-                    if (!page) return null;
-                    return (
-                      <Button
-                        key={page}
-                        variant={page === currentPage ? "default" : "outline"}
-                        size="icon"
-                        onClick={() => goToPage(page)}
-                        className="nums-fa"
-                      >
-                        {toPersianDigits(page)}
-                      </Button>
-                    );
-                  })}
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => goToPage(currentPage + 1)}
-                    disabled={currentPage >= totalPages}
-                    aria-label="صفحه بعد"
-                  >
-                    <ChevronLeft className="size-4" />
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+    <ProductsClient
+      initialQuery={query}
+      initialProducts={initialProducts}
+      category={category}
+    />
   );
-}
-
-function ProductGridSkeleton({ count = 12, variant = "grid" }: { count?: number; variant?: "grid" | "list" }) {
-  return (
-    <div className={variant === "grid" ? "grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4" : "flex flex-col gap-3"}>
-      {Array.from({ length: count }).map((_, i) => (
-        <ProductCardSkeleton key={i} variant={variant} />
-      ))}
-    </div>
-  );
-}
-
-/**
- * Build a smart page list: show all if totalPages <= 7, else show 1...current-1, current, current+1...last
- */
-function computePageList(current: number, total: number): number[] {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-  if (current <= 4) return [1, 2, 3, 4, 5, -1, total]; // -1 = ellipsis placeholder
-  if (current >= total - 3) return [1, -1, total - 4, total - 3, total - 2, total - 1, total];
-  return [1, -1, current - 1, current, current + 1, -1, total];
 }

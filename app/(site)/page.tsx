@@ -1,10 +1,11 @@
-import { ArrowLeft } from "lucide-react";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { Truck, ShieldCheck, Headphones, CreditCard, Sparkles } from "lucide-react";
+import { ArrowLeft, Truck, ShieldCheck, Headphones, CreditCard, Sparkles } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { HomeHeroSlider } from "@/components/site/home-hero-slider";
+import { HomeStories } from "@/components/site/home-stories";
 import { HomeCategoriesGrid } from "@/components/site/home-categories-grid";
 import { HomeFeaturedProducts, HomeDiscountProducts } from "@/components/site/home-products";
 import { HomeTopBrands } from "@/components/site/home-top-brands";
@@ -12,13 +13,36 @@ import { HomeMiddleBanners } from "@/components/site/home-middle-banners";
 import { HomeBlogSection } from "@/components/site/home-blog-section";
 import { HomeNewsletter } from "@/components/site/home-newsletter";
 import { PopupDisplay } from "@/components/site/popup-display";
-import { itemListJsonLd, JsonLd } from "@/lib/seo";
+import { itemListJsonLd, JsonLd, absUrl } from "@/lib/seo";
+import { APP_NAME, APP_DESCRIPTION } from "@/constants/app";
+
+export const metadata: Metadata = {
+  title: `${APP_NAME} | فروشگاه اینترنتی`,
+  description: APP_DESCRIPTION,
+  alternates: { canonical: absUrl("/") },
+  openGraph: {
+    title: `${APP_NAME} | فروشگاه اینترنتی`,
+    description: APP_DESCRIPTION,
+    url: absUrl("/"),
+    type: "website",
+    locale: "fa_IR",
+    siteName: APP_NAME,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: APP_NAME,
+    description: APP_DESCRIPTION,
+  },
+};
 
 export default function HomePage() {
   return (
     <div className="container-site py-6">
-      {/* Hero slider */}
+      {/* Hero slider — client component, fetches its own data */}
       <HomeHeroSlider />
+
+      {/* Stories — client component */}
+      <HomeStories />
 
       {/* Feature strip */}
       <section className="mb-10 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4" aria-label="مزایای خرید">
@@ -28,31 +52,31 @@ export default function HomePage() {
         <FeatureCard icon={<Headphones className="size-5" />} title="پشتیبانی ۲۴/۷" desc="همیشه در کنار شما" color="text-orange-600 bg-orange-50 dark:bg-orange-950/30" />
       </section>
 
-      {/* Categories */}
+      {/* Categories — client component, fetches from React Query */}
       <HomeCategoriesGrid />
 
-      {/* Middle banners */}
+      {/* Middle banners — client component */}
       <HomeMiddleBanners />
 
-      {/* Featured products */}
+      {/* Featured products — client component */}
       <HomeFeaturedProducts />
 
-      {/* Discount products */}
+      {/* Discount products — client component */}
       <HomeDiscountProducts />
 
-      {/* Top brands */}
+      {/* Top brands — client component */}
       <HomeTopBrands />
 
-      {/* Blog */}
+      {/* Blog — client component */}
       <HomeBlogSection />
 
-      {/* Newsletter */}
+      {/* Newsletter — client component */}
       <HomeNewsletter />
 
-      {/* Promotional popups (one-shot per session) */}
+      {/* Promotional popups — client component */}
       <PopupDisplay />
 
-      {/* Site-wide ItemList for SEO (top categories) — populated at runtime by categories */}
+      {/* SEO: ItemList structured data */}
       <JsonLd
         data={itemListJsonLd([
           { name: "محصولات", url: "/products" },

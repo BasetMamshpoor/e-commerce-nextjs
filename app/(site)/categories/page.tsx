@@ -1,16 +1,29 @@
-"use client";
-
+import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 
+import { Card, CardContent } from "@/components/ui/card";
 import { Breadcrumb } from "@/components/common/breadcrumb";
 import { EmptyState } from "@/components/common/empty-state";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useCategoriesTree } from "@/features/catalog/hooks";
-import { FolderTree } from "lucide-react";
+import { categoriesService } from "@/services";
+import type { Category } from "@/types/domain";
+import { absUrl, collectionPageJsonLd, JsonLd } from "@/lib/seo";
 
-export default function CategoriesPage() {
-  const { data: tree, isLoading } = useCategoriesTree();
+export const metadata: Metadata = {
+  title: "دسته‌بندی‌ها",
+  description: "همه دسته‌بندی‌های محصولات فروشگاه",
+  alternates: { canonical: absUrl("/categories") },
+};
+
+export const revalidate = 300; // Revalidate every 5 minutes
+
+export default async function CategoriesPage() {
+  let tree: Category[] = [];
+  try {
+    tree = await categoriesService.tree();
+  } catch {
+    // Backend unreachable
+  }
 
   return (
     <div className="container-site py-6">
@@ -24,15 +37,8 @@ export default function CategoriesPage() {
         همه دسته‌بندی‌ها
       </h1>
 
-      {isLoading ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-32 w-full rounded-xl" />
-          ))}
-        </div>
-      ) : !tree || tree.length === 0 ? (
+      {tree.length === 0 ? (
         <EmptyState
-          icon={<FolderTree className="size-16" />}
           title="دسته‌بندی‌ای موجود نیست"
           description="در حال حاضر دسته‌بندی‌ای برای نمایش وجود ندارد."
         />
@@ -49,6 +55,14 @@ export default function CategoriesPage() {
           ))}
         </div>
       )}
+
+      <JsonLd
+        data={collectionPageJsonLd({
+          type: "category",
+          name: "دسته‌بندی‌ها",
+          url: "/categories",
+        })}
+      />
     </div>
   );
 }

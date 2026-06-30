@@ -1,16 +1,29 @@
-"use client";
-
+import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 
+import { Card, CardContent } from "@/components/ui/card";
 import { Breadcrumb } from "@/components/common/breadcrumb";
 import { EmptyState } from "@/components/common/empty-state";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tag } from "lucide-react";
-import { useBrands } from "@/features/catalog/hooks";
+import { brandsService } from "@/services";
+import type { Brand } from "@/types/domain";
+import { absUrl, collectionPageJsonLd, JsonLd } from "@/lib/seo";
 
-export default function BrandsPage() {
-  const { data: brands, isLoading } = useBrands();
+export const metadata: Metadata = {
+  title: "برندها",
+  description: "همه برندهای موجود در فروشگاه",
+  alternates: { canonical: absUrl("/brands") },
+};
+
+export const revalidate = 300;
+
+export default async function BrandsPage() {
+  let brands: Brand[] = [];
+  try {
+    brands = await brandsService.list();
+  } catch {
+    // Backend unreachable
+  }
 
   return (
     <div className="container-site py-6">
@@ -22,15 +35,8 @@ export default function BrandsPage() {
       />
       <h1 className="mb-6 text-xl font-bold text-foreground sm:text-2xl">همه برندها</h1>
 
-      {isLoading ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 w-full rounded-xl" />
-          ))}
-        </div>
-      ) : !brands || brands.length === 0 ? (
+      {brands.length === 0 ? (
         <EmptyState
-          icon={<Tag className="size-16" />}
           title="برندی موجود نیست"
           description="در حال حاضر برندی برای نمایش وجود ندارد."
         />
@@ -44,13 +50,7 @@ export default function BrandsPage() {
             >
               <div className="relative size-16 overflow-hidden">
                 {b.logoUrl ? (
-                  <Image
-                    src={b.logoUrl}
-                    alt={b.name}
-                    fill
-                    sizes="64px"
-                    className="object-contain"
-                  />
+                  <Image src={b.logoUrl} alt={b.name} fill sizes="64px" className="object-contain" />
                 ) : (
                   <div className="flex size-full items-center justify-center text-2xl font-bold text-primary">
                     {b.name.slice(0, 1)}
@@ -62,6 +62,14 @@ export default function BrandsPage() {
           ))}
         </div>
       )}
+
+      <JsonLd
+        data={collectionPageJsonLd({
+          type: "brand",
+          name: "برندها",
+          url: "/brands",
+        })}
+      />
     </div>
   );
 }
