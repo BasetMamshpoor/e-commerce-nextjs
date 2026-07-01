@@ -17,6 +17,7 @@ interface AdminTableColumn<T> {
   render: (item: T) => React.ReactNode;
   className?: string;
   align?: "right" | "left" | "center";
+  hideOnMobile?: boolean;
 }
 
 interface AdminTableProps<T> {
