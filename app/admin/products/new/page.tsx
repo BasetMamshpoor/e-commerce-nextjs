@@ -72,9 +72,7 @@ export default function AdminProductNewPage() {
     discountValue: "" as string | number,
   });
 
-  const [variants, setVariants] = React.useState<VariantFormData[]>([
-    { sku: "", priceAdjustment: 0, stock: 0, isDefault: true, attributeValueIds: [] },
-  ]);
+  const [variants, setVariants] = React.useState<VariantFormData[]>([]);
 
   const [images, setImages] = React.useState<ProductImageItem[]>([]);
   const [displayAttrs, setDisplayAttrs] = React.useState<DisplayAttributeFormData[]>([]);
@@ -103,10 +101,8 @@ export default function AdminProductNewPage() {
       toast.error("قیمت پایه محصول الزامی است");
       return;
     }
-    if (variants.length === 0) {
-      toast.error("حداقل یک تنوع الزامی است");
-      return;
-    }
+    // Variants are optional — if no variant attributes selected, product has no variants
+    // (just base price + stock managed separately).
 
     setSaving(true);
     try {
@@ -397,13 +393,14 @@ export default function AdminProductNewPage() {
           {/* Variants */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">تنوع‌ها (Variants) *</CardTitle>
+              <CardTitle className="text-base">تنوع‌ها (Variants)</CardTitle>
             </CardHeader>
             <CardContent>
               <VariantBuilder
                 variants={variants}
                 onChange={setVariants}
                 attributes={attributes}
+                basePrice={basePriceNum}
               />
             </CardContent>
           </Card>
@@ -431,8 +428,12 @@ export default function AdminProductNewPage() {
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">تعداد تنوع‌ها:</span>
-                <span className="font-bold nums-fa">{toPersianDigits(variants.length)}</span>
+                <span className="text-muted-foreground">تنوع‌ها:</span>
+                <span className="font-bold nums-fa">
+                  {variants.length > 0
+                    ? toPersianDigits(variants.length)
+                    : "بدون تنوع"}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">تعداد تصاویر:</span>
