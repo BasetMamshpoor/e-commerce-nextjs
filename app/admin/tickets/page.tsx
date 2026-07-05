@@ -95,7 +95,7 @@ export default function AdminTicketsPage() {
       ]}
       data={data?.items ?? []}
       isLoading={loading}
-      getRowId={(t) => t.id}
+      getRowId={(t) => String(t.id)}
       getRowHref={(t) => `/admin/tickets/${t.id}`}
       page={page}
       totalPages={data?.meta.totalPages ?? 1}

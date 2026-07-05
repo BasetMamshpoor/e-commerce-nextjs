@@ -35,7 +35,7 @@ export default function AdminCommentsPage() {
     load();
   }, [load]);
 
-  const handleApprove = async (id: string) => {
+  const handleApprove = async (id: number) => {
     try {
       await commentsService.adminUpdate(id, { status: "APPROVED" });
       toast.success("نظر تأیید شد");
@@ -45,7 +45,7 @@ export default function AdminCommentsPage() {
     }
   };
 
-  const handleReject = async (id: string) => {
+  const handleReject = async (id: number) => {
     try {
       await commentsService.adminUpdate(id, { status: "REJECTED" });
       toast.success("نظر رد شد");
@@ -120,7 +120,7 @@ export default function AdminCommentsPage() {
         ]}
         data={data?.items ?? []}
         isLoading={loading}
-        getRowId={(c) => c.id}
+        getRowId={(c) => String(c.id)}
         page={page}
         totalPages={data?.meta.totalPages ?? 1}
         total={data?.meta.total ?? 0}

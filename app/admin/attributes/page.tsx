@@ -41,7 +41,7 @@ export default function AdminAttributesPage() {
     load();
   }, [load]);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: number) => {
     if (!confirm("حذف این ویژگی؟")) return;
     try {
       await attributesService.delete(id);
@@ -52,7 +52,7 @@ export default function AdminAttributesPage() {
     }
   };
 
-  const handleDeleteValue = async (attrId: string, valueId: string) => {
+  const handleDeleteValue = async (attrId: number, valueId: number) => {
     try {
       await attributesService.deleteValue(valueId);
       toast.success("مقدار حذف شد");
@@ -143,7 +143,7 @@ export default function AdminAttributesPage() {
   );
 }
 
-function AddValueForm({ attributeId, onAdded }: { attributeId: string; onAdded: () => void }) {
+function AddValueForm({ attributeId, onAdded }: { attributeId: number; onAdded: () => void }) {
   const [value, setValue] = React.useState("");
   const [colorHex, setColorHex] = React.useState("");
   const [saving, setSaving] = React.useState(false);

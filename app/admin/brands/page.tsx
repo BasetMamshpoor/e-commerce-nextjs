@@ -38,7 +38,7 @@ export default function AdminBrandsPage() {
     load();
   }, [load]);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: number) => {
     if (!confirm("حذف این برند؟")) return;
     try {
       await brandsService.delete(id);
@@ -120,7 +120,7 @@ export default function AdminBrandsPage() {
         ]}
         data={brands}
         isLoading={loading}
-        getRowId={(b) => b.id}
+        getRowId={(b) => String(b.id)}
         emptyTitle="برندی یافت نشد"
       />
 

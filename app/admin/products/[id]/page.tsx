@@ -34,7 +34,7 @@ export default function AdminProductDetailPage({ params }: { params: Promise<{ i
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    productsService.adminById(id).then(setProduct).finally(() => setLoading(false));
+    productsService.adminById(Number(id)).then(setProduct).finally(() => setLoading(false));
   }, [id]);
 
   if (loading) {
@@ -220,7 +220,7 @@ export default function AdminProductDetailPage({ params }: { params: Promise<{ i
                   {product.variants?.map((v) => (
                     <TableRow key={v.id}>
                       <TableCell className="font-mono text-xs" dir="ltr">{v.sku}</TableCell>
-                      <TableCell className="text-xs nums-fa">{formatPrice(v.price)}</TableCell>
+                      <TableCell className="text-xs nums-fa">{formatPrice(v.effectivePrice ?? 0)}</TableCell>
                       <TableCell className="text-xs nums-fa">{toPersianDigits(v.stock)}</TableCell>
                     </TableRow>
                   ))}

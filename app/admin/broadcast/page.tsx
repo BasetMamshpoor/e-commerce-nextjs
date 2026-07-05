@@ -26,7 +26,7 @@ export default function AdminBroadcastPage() {
     if (!form.title.trim() || !form.message.trim()) { toast.error("عنوان و پیام الزامی است"); return; }
     setSending(true); setSentCount(null);
     try {
-      const userIds = form.userIds.split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
+      const userIds = form.userIds.split(/[,\n]/).map((s) => s.trim()).filter(Boolean).map(Number);
       const result = await notificationsService.broadcast({ type: form.type, title: form.title, message: form.message, link: form.link || undefined, userIds: userIds.length > 0 ? userIds : undefined });
       setSentCount(result.sentCount);
       toast.success(`پخش به ${toPersianDigits(result.sentCount)} کاربر ارسال شد`);

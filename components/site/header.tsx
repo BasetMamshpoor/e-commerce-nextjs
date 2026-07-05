@@ -27,6 +27,7 @@ import { WishlistBadge } from "./wishlist-badge";
 import { ComparisonBadge } from "./comparison-badge";
 import { NotificationBell } from "./notification-bell";
 import { CategoryNavMenu } from "./category-nav-menu";
+import { SearchAutocomplete } from "./search-autocomplete";
 import { useAuth } from "@/providers/auth-context";
 import { APP_NAME } from "@/constants/app";
 import { cn } from "@/lib/utils";
@@ -34,13 +35,13 @@ import { cn } from "@/lib/utils";
 export function Header() {
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();
-  const [searchQuery, setSearchQuery] = React.useState("");
+  const [mobileSearchQuery, setMobileSearchQuery] = React.useState("");
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
-  const onSearch = (e: React.FormEvent) => {
+  const onMobileSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchQuery.trim()) return;
-    router.push(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
+    if (!mobileSearchQuery.trim()) return;
+    router.push(`/search?q=${encodeURIComponent(mobileSearchQuery.trim())}`);
     setMobileOpen(false);
   };
 
@@ -114,19 +115,8 @@ export function Header() {
           </span>
         </Link>
 
-        {/* Search (desktop) */}
-        <form onSubmit={onSearch} className="hidden flex-1 lg:block">
-          <div className="relative">
-            <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="جست‌وجو در محصولات..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pr-9"
-            />
-          </div>
-        </form>
+        {/* Search (desktop) — autocomplete dropdown */}
+        <SearchAutocomplete className="hidden flex-1 lg:block" />
 
         {/* Actions */}
         <div className="mr-auto flex items-center gap-1 lg:mr-0">
@@ -145,14 +135,14 @@ export function Header() {
 
       {/* Search (mobile) */}
       <div className="container-site pb-3 lg:hidden">
-        <form onSubmit={onSearch}>
+        <form onSubmit={onMobileSearch}>
           <div className="relative">
             <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
               placeholder="جست‌وجو..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={mobileSearchQuery}
+              onChange={(e) => setMobileSearchQuery(e.target.value)}
               className="pr-9"
             />
           </div>

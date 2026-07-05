@@ -29,6 +29,9 @@ const SORT_LABELS: Record<ProductSortOption, string> = {
   price_asc: "ارزان‌ترین",
   price_desc: "گران‌ترین",
   popular: "محبوب‌ترین",
+  bestselling: "پرفروش‌ترین",
+  most_viewed: "پربازدیدترین",
+  most_popular: "پرمخاطب‌ترین",
 };
 
 export default function BrandDetailPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -49,7 +52,7 @@ export default function BrandDetailPage({ params }: { params: Promise<{ slug: st
   const query: ProductListQuery = {
     page: pageParam,
     limit: APP_CONFIG.defaultPageSize,
-    brandIds: brandId,
+    brandIds: brandId != null ? String(brandId) : undefined,
     minPrice: minPriceParam ? Number(minPriceParam) : undefined,
     maxPrice: maxPriceParam ? Number(maxPriceParam) : undefined,
     inStock: inStockParam || undefined,

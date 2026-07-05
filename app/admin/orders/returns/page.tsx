@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { RotateCcw, Check, X, DollarSign, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { RotateCcw, Check, X, DollarSign, Loader2, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -63,13 +64,16 @@ export default function AdminReturnsPage() {
       <div><h1 className="text-xl font-bold text-foreground sm:text-2xl">درخواست‌های مرجوعی</h1><p className="mt-1 text-sm text-muted-foreground">بررسی و پردازش مرجوعی‌ها</p></div>
       <AdminTable title=""
         columns={[
-          { key: "id", header: "شناسه", render: (r) => <span className="font-mono text-xs" dir="ltr">{r.id.slice(-8)}</span> },
+          { key: "id", header: "شناسه", render: (r) => <span className="font-mono text-xs nums-fa" dir="ltr">#{toPersianDigits(r.id)}</span> },
           { key: "reason", header: "دلیل", render: (r) => <span className="line-clamp-2 text-sm text-foreground">{r.reason}</span> },
           { key: "status", header: "وضعیت", render: (r) => { const cfg = STATUS_CONFIG[r.status] ?? STATUS_CONFIG.PENDING; return <Badge variant={cfg.variant}>{cfg.label}</Badge>; } },
           { key: "amount", header: "مبلغ بازگشتی", hideOnMobile: true, align: "left", render: (r) => r.refundAmount ? <span className="nums-fa">{formatPrice(r.refundAmount)}</span> : "—" },
           { key: "date", header: "تاریخ", hideOnMobile: true, render: (r) => <span className="text-xs text-muted-foreground">{formatDateTimeFa(r.createdAt)}</span> },
           { key: "actions", header: "عملیات", align: "left", render: (r) => (
             <div className="flex flex-wrap gap-1">
+              <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0" aria-label="مشاهده جزئیات">
+                <Link href={`/admin/orders/returns/${r.id}`}><Eye className="size-3.5" /></Link>
+              </Button>
               {r.status === "PENDING" && (<>
                 <Button size="sm" variant="outline" className="h-7 gap-1 text-xs text-green-600" onClick={() => openReview(r, "APPROVED")}><Check className="size-3" />تأیید</Button>
                 <Button size="sm" variant="outline" className="h-7 gap-1 text-xs text-red-600" onClick={() => openReview(r, "REJECTED")}><X className="size-3" />رد</Button>
@@ -79,7 +83,7 @@ export default function AdminReturnsPage() {
             </div>
           )},
         ]}
-        data={data?.items ?? []} isLoading={loading} getRowId={(r) => r.id} page={page} totalPages={data?.meta.totalPages ?? 1} total={data?.meta.total ?? 0} onPageChange={setPage} emptyTitle="درخواست مرجوعی وجود ندارد"
+        data={data?.items ?? []} isLoading={loading} getRowId={(r) => String(r.id)} page={page} totalPages={data?.meta.totalPages ?? 1} total={data?.meta.total ?? 0} onPageChange={setPage} emptyTitle="درخواست مرجوعی وجود ندارد"
       />
       <AlertDialog open={!!reviewReturn} onOpenChange={(open) => !open && setReviewReturn(null)}>
         <AlertDialogContent>

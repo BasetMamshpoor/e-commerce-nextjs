@@ -99,7 +99,7 @@ export default function AdminUsersPage() {
       ]}
       data={data?.items ?? []}
       isLoading={loading}
-      getRowId={(u) => u.id}
+      getRowId={(u) => String(u.id)}
       getRowHref={(u) => `/admin/users/${u.id}`}
       page={page}
       totalPages={data?.meta.totalPages ?? 1}

@@ -30,9 +30,9 @@ const commentSchema = z.object({
 type CommentFormValues = z.infer<typeof commentSchema>;
 
 interface CommentFormProps {
-  productId: string;
+  productId: number;
   /** If set, this is a reply form (no rating). */
-  parentId?: string;
+  parentId?: number;
   /** Called after successful submission (to close reply form etc). */
   onSuccess?: () => void;
   /** Compact mode for inline reply. */

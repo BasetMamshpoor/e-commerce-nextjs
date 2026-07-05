@@ -60,7 +60,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
   const [updatingStatus, setUpdatingStatus] = React.useState(false);
 
   React.useEffect(() => {
-    ordersService.adminById(id).then(setOrder).finally(() => setLoading(false));
+    ordersService.adminById(Number(id)).then(setOrder).finally(() => setLoading(false));
   }, [id]);
 
   if (loading) {

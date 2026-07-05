@@ -39,7 +39,7 @@ export function useAddToWishlist() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (productId: string) => wishlistService.add(productId),
+    mutationFn: (productId: number) => wishlistService.add(productId),
     onMutate: async (productId) => {
       await queryClient.cancelQueries({ queryKey: WISHLIST_QUERY_KEY });
       const previous = queryClient.getQueryData<PaginatedData<WishlistItem>>([
@@ -52,7 +52,7 @@ export function useAddToWishlist() {
         const optimistic: PaginatedData<WishlistItem> = {
           items: [
             {
-              id: `optimistic-${productId}`,
+              id: -Date.now(),
               productId,
               product: {
                 id: productId,
@@ -100,7 +100,7 @@ export function useRemoveFromWishlist() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (productId: string) => wishlistService.remove(productId),
+    mutationFn: (productId: number) => wishlistService.remove(productId),
     onMutate: async (productId) => {
       await queryClient.cancelQueries({ queryKey: WISHLIST_QUERY_KEY });
       const previous = queryClient.getQueryData<PaginatedData<WishlistItem>>([
@@ -143,8 +143,8 @@ export function useWishlistToggle() {
 
   return {
     isPending: add.isPending || remove.isPending,
-    isInWishlist: (productId: string) => ids.has(productId),
-    toggle: (productId: string) => {
+    isInWishlist: (productId: number) => ids.has(productId),
+    toggle: (productId: number) => {
       if (ids.has(productId)) remove.mutate(productId);
       else add.mutate(productId);
     },

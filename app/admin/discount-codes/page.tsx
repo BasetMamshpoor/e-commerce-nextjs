@@ -43,7 +43,7 @@ export default function AdminDiscountCodesPage() {
     load();
   }, [load]);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: number) => {
     if (!confirm("حذف این کد تخفیف؟")) return;
     try {
       await discountCodesService.delete(id);
@@ -136,7 +136,7 @@ export default function AdminDiscountCodesPage() {
         ]}
         data={data?.items ?? []}
         isLoading={loading}
-        getRowId={(d) => d.id}
+        getRowId={(d) => String(d.id)}
         page={page}
         totalPages={data?.meta.totalPages ?? 1}
         total={data?.meta.total ?? 0}

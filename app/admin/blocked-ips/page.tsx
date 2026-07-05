@@ -50,7 +50,7 @@ export default function AdminBlockedIpsPage() {
     }
   };
 
-  const onUnblock = async (id: string) => {
+  const onUnblock = async (id: number) => {
     if (!confirm("رفع مسدودیت؟")) return;
     try {
       await securityService.unblockIp(id);

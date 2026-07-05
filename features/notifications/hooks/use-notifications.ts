@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { notificationsService } from "@/services";
-import type { NotificationListQuery } from "@/services";
+import type { NotificationListQuery } from "@/types/domain";
 import { ApiError } from "@/types/api";
 import type {
   AppNotification,
@@ -39,7 +39,7 @@ export function useMarkNotificationRead() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => notificationsService.read(id),
+    mutationFn: (id: number) => notificationsService.read(id),
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
       const previous = queryClient.getQueriesData<PaginatedData<AppNotification>>({
@@ -116,7 +116,7 @@ export function useDeleteNotification() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => notificationsService.delete(id),
+    mutationFn: (id: number) => notificationsService.delete(id),
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
       const previous = queryClient.getQueriesData<PaginatedData<AppNotification>>({

@@ -8,6 +8,7 @@ import { ApiError } from "@/types/api";
 import type {
   Comment,
   ProductCommentsData,
+  CreateCommentBody,
 } from "@/types/domain";
 import { useAuth } from "@/providers/auth-context";
 
@@ -18,7 +19,7 @@ export const COMMENTS_QUERY_KEY = ["comments"] as const;
  * SSR-friendly: can be called from server components too.
  */
 export function useProductComments(
-  productId: string | undefined,
+  productId: number | undefined,
   page = 1,
   limit = 20,
 ) {
@@ -41,18 +42,18 @@ export function useCreateComment() {
 
   return useMutation({
     mutationFn: (params: {
-      productId: string;
+      productId: number;
       content: string;
-      parentId?: string;
+      parentId?: number;
       rating?: number;
-      attachmentMediaIds?: string[];
+      attachmentMediaIds?: number[];
     }) =>
       commentsService.create(params.productId, {
         content: params.content,
         parentId: params.parentId,
         rating: params.rating,
         attachmentMediaIds: params.attachmentMediaIds,
-      }),
+      } satisfies CreateCommentBody),
     onSuccess: (_data, variables) => {
       // Don't optimistically add — new comments have status=PENDING and
       // won't appear in the public list until approved. Just invalidate.
@@ -91,7 +92,7 @@ export function useLikeComment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (commentId: string) => commentsService.like(commentId),
+    mutationFn: (commentId: number) => commentsService.like(commentId),
     onMutate: async (commentId) => {
       // Optimistic: find the comment in any product's cache and toggle like.
       await queryClient.cancelQueries({ queryKey: COMMENTS_QUERY_KEY });
@@ -133,7 +134,7 @@ export function useUpdateComment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (params: { id: string; content: string }) =>
+    mutationFn: (params: { id: number; content: string }) =>
       commentsService.update(params.id, { content: params.content }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: COMMENTS_QUERY_KEY });
@@ -155,7 +156,7 @@ export function useDeleteComment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => commentsService.delete(id),
+    mutationFn: (id: number) => commentsService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: COMMENTS_QUERY_KEY });
       toast.success("نظر حذف شد");
@@ -181,17 +182,17 @@ export function useDeleteComment() {
  */
 function toggleLikeInTree(
   data: ProductCommentsData,
-  commentId: string,
+  commentId: number,
 ): ProductCommentsData {
   let changed = false;
 
   const mapComment = (c: Comment): Comment => {
     if (c.id === commentId) {
       changed = true;
-      const wasLiked = c.likedByMe ?? false;
+      const wasLiked = c.isLiked ?? false;
       return {
         ...c,
-        likedByMe: !wasLiked,
+        isLiked: !wasLiked,
         likeCount: wasLiked ? c.likeCount - 1 : c.likeCount + 1,
       };
     }

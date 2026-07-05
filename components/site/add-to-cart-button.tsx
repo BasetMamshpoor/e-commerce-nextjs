@@ -9,7 +9,7 @@ import { useAddToCart } from "@/features/cart/hooks";
 import { cn } from "@/lib/utils";
 
 interface AddToCartButtonProps {
-  variantId: string;
+  variantId: number;
   quantity?: number;
   /** Disable (e.g. out of stock). */
   disabled?: boolean;

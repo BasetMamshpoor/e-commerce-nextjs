@@ -514,3 +514,193 @@ Stage Summary:
 - Role-based login redirect
 - Form validation uses FormMessage (inline) for field errors, toast only for API errors
 - Ready for final ZIP
+
+---
+Task ID: ts-migration-fix
+Agent: general-purpose (subagent)
+Task: Fix remaining TypeScript errors from string→integer ID migration.
+
+Work Log:
+- Hooks fixed:
+  - features/account/hooks/use-addresses.ts (id: string → number; import types from @/types/domain)
+  - features/account/hooks/use-user-me.ts (removed setAvatar call — API doesn't support it)
+  - features/checkout/hooks/use-orders.ts (id: string → number; import types from @/types/domain)
+  - features/tickets/hooks/use-tickets.ts (id: string → number; import types from @/types/domain)
+  - features/comments/hooks/use-comments.ts (likedByMe → isLiked)
+  - features/catalog/hooks/use-categories.ts (id: string → number)
+  - features/comparison/hooks/use-comparison.ts (added useComparisonToggle hook for URL-based toggle)
+
+- Comment components fixed:
+  - features/comments/components/comment-form.tsx (productId/parentId: string → number)
+  - features/comments/components/comment-item.tsx (productId: number; user/userId → authorId/authorName; likedByMe → isLiked)
+  - features/comments/components/comment-section.tsx (productId: number)
+
+- Site components fixed:
+  - components/site/add-to-cart-button.tsx (variantId: string → number)
+  - components/site/wishlist-button.tsx (productId: string → number)
+  - components/site/popup-display.tsx (dismissed Set<string> → Set<number>)
+  - components/site/home-hero-slider.tsx (HeroSlide.id: string → number | string)
+  - components/site/product-detail-client.tsx (CommentSectionLazy productId: number; variant price logic; removed non-existent attribute lookup)
+  - components/site/filter-sidebar.tsx (String(id) for Select/Combobox values)
+
+- Common components fixed:
+  - components/common/variant-builder.tsx (VariantFormData: price → priceAdjustment; attributeValueIds: number[]; removed per-variant discount fields)
+  - components/common/category-tree-select.tsx (selectedIds: string[] → number[])
+
+- Account pages fixed:
+  - app/(site)/account/addresses/page.tsx (deletingId: number | null)
+  - app/(site)/account/orders/[id]/page.tsx (parse id with Number(); orderId props: number)
+  - app/(site)/account/tickets/[id]/page.tsx (parse id with Number())
+  - app/(site)/account/tickets/page.tsx (departmentId: number | ""; String(id) for Select)
+
+- Catalog pages fixed:
+  - app/(site)/brands/[slug]/page.tsx (added bestselling/most_viewed/most_popular to SORT_LABELS; brandId → String(brandId))
+  - app/(site)/categories/[slug]/page.tsx (added bestselling/most_viewed/most_popular to SORT_LABELS)
+  - app/(site)/categories/page.tsx (String(c.id) for subcategories)
+  - app/(site)/comparison/[[...ids]]/page.tsx (parse URL IDs to numbers; String(p.id) for onRemove)
+  - app/(site)/checkout/page.tsx (selectedAddressId/selectedShippingId: number | null)
+
+- Admin pages fixed:
+  - app/admin/attributes/page.tsx (id: number)
+  - app/admin/banners/page.tsx (String(b.id) for getRowId; Number(form.mediaId))
+  - app/admin/blocked-ips/page.tsx (id: number)
+  - app/admin/brands/page.tsx (id: number; String(b.id) for getRowId)
+  - app/admin/broadcast/page.tsx (userIds: number[] via .map(Number))
+  - app/admin/categories/page.tsx (parentId: number | ""; String(c.id) for Select)
+  - app/admin/comments/page.tsx (id: number; String(c.id) for getRowId)
+  - app/admin/discount-codes/page.tsx (id: number; String(d.id) for getRowId)
+  - app/admin/media/page.tsx (id: number; originalName fallback for alt)
+  - app/admin/orders/page.tsx (String(o.id) for getRowId)
+  - app/admin/orders/[id]/page.tsx (Number(id) for adminById)
+  - app/admin/popups/page.tsx (String(p.id) for getRowId; Number(form.mediaId))
+  - app/admin/products/page.tsx (String(p.id) for getRowId)
+  - app/admin/products/new/page.tsx (categoryIds: number[]; brandId → Number; basePrice added; priceAdjustment instead of price/discount fields)
+  - app/admin/products/[id]/page.tsx (Number(id) for adminById; v.effectivePrice instead of v.price)
+  - app/admin/products/[id]/edit/page.tsx (Number(id); categoryIds: number[]; brandId → Number)
+  - app/admin/shipping-companies/page.tsx (deleteId: number | null; String(c.id) for getRowId)
+  - app/admin/tickets/[id]/page.tsx (Number(id) for adminById)
+  - app/admin/tickets/page.tsx (String(t.id) for getRowId)
+  - app/admin/users/[id]/page.tsx (Number(id) for byId/sessions; sessionId: number)
+  - app/admin/users/page.tsx (String(u.id) for getRowId)
+
+- Types:
+  - types/domain.ts: added optional `status?: CommentStatus` to Comment (admin endpoint returns it)
+  - lib/seo.tsx: replaced `v.price` with `v.effectivePrice ?? product.basePrice + v.priceAdjustment`
+
+- Dependencies:
+  - installed react-resizable-panels@2.1.7 (was missing; shadcn resizable.tsx was using v2 API)
+
+Patterns of fixes applied:
+1. Hook signatures: string ID params → number across all hook files
+2. React state: useState<string | null> → useState<number | null> for IDs
+3. AdminTable getRowId: wrap with String(item.id)
+4. Select value prop: wrap numeric IDs with String(id) when iterating
+5. URL param IDs: convert with Number(id) before calling service methods
+6. Variant model: removed per-variant price/discount; using priceAdjustment + effectivePrice
+7. Comment model: replaced userId/user/likedByMe with authorId/authorName/isLiked
+8. Comparison: added URL-based useComparisonToggle hook (API has no add/remove)
+9. Body type imports: moved from @/services to @/types/domain (where they are exported)
+10. Lookup maps: added missing enum keys (bestselling/most_viewed/most_popular for ProductSortOption)
+
+Stage Summary:
+- TypeScript: 0 errors (down from 138)
+- ESLint: 0 errors, 2 pre-existing warnings (unused eslint-disable directives in unchanged files)
+- All 138 migration errors resolved without changing service signatures or endpoint paths
+- Only change to types/domain.ts: added optional `status?: CommentStatus` to Comment interface (admin endpoint returns it)
+- One new dependency installed: react-resizable-panels@2.1.7 (was a missing module error before)
+
+---
+Task ID: api-md-completion
+Agent: main (Super Z)
+Task: Re-read api.md and complete all missing frontend features per the new backend API contract.
+
+Work Log:
+- Re-read /home/z/my-project/upload/API.md (1366 lines) thoroughly to identify all missing frontend features.
+- Verified endpoints.ts already aligned with API.md (integer IDs, no /:id/view, comparison only GET, media multipart, etc.).
+- Created missing hooks under features/:
+  - features/admin/hooks/use-admin-notifications.ts (list, unreadCount, read, readAll)
+  - features/admin/hooks/use-admin-withdrawals.ts (adminWithdrawals, reviewWithdrawal)
+  - features/admin/hooks/use-stories.ts (list, adminList, create/update/delete)
+  - features/admin/hooks/use-newsletter.ts (subscribers, subscribe, unsubscribe)
+  - features/admin/hooks/use-payment-gateways.ts (list, CRUD)
+  - features/admin/hooks/use-analytics.ts (overview, sales, order-status, top-products, new-users)
+  - features/search/hooks/use-search.ts (global, quick, main with filters)
+  - features/account/hooks/use-withdrawals.ts (myWithdrawals, requestWithdrawal)
+- Built /search storefront page (app/(site)/search/page.tsx) using /search/main with:
+  - Filter sidebar (price range, brands, inStock, hasDiscount)
+  - Sort dropdown (relevance, price_asc/desc, newest, most_popular, bestselling)
+  - Pagination
+  - Active filter chips
+  - Global search results sidebar (categories, brands, blog posts)
+  - Mobile filter sheet
+- Built SearchAutocomplete component (components/site/search-autocomplete.tsx):
+  - Uses /search/quick endpoint
+  - Keyboard navigation (ArrowUp/Down/Enter/Esc)
+  - Result type icons (product, category, blog_post, brand)
+  - "Search for '{query}'" first item
+- Replaced desktop header search with SearchAutocomplete; updated mobile search to redirect to /search.
+- Added user wallet withdrawals UI to /account/wallet:
+  - "Request withdrawal" button + dialog (amount, description)
+  - "My withdrawal requests" card with status badges (PENDING/APPROVED/REJECTED)
+  - Added WITHDRAWAL_REQUEST to TX_TYPE_CONFIG
+- Built /admin/withdrawals page:
+  - AdminTable with user, amount, status, date columns
+  - Status filter (ALL/PENDING/APPROVED/REJECTED)
+  - Summary cards
+  - Review dialog (approve/reject + admin note)
+- Built /admin/notifications page:
+  - List with type-colored icons (ORDER, RETURN, WITHDRAWAL, TICKET, SYSTEM)
+  - Filter chips (all/unread)
+  - Mark read on click, mark all read button
+  - Links to notification.link
+- Built /admin/stories page:
+  - Grid view of stories with cover image, video badge, expiry badge
+  - Create/edit dialog with cover image upload (Media), video upload (optional), expiry, order, productIds
+- Built /admin/newsletter page:
+  - AdminTable of subscribers with email, join date
+  - Search filter
+  - CSV export button
+  - Unsubscribe action
+- Built /admin/payment-gateways page (ADMIN only):
+  - AdminTable with name, slug, status, config key count
+  - Create/edit dialog with name, slug, isActive, JSON config textarea
+  - Role-based guard (non-admin sees warning)
+- Built /admin/analytics page with recharts:
+  - KPI cards (totalRevenue, totalOrders, totalUsers, totalProducts)
+  - Today + pending cards
+  - Sales area chart (date × revenue)
+  - New users area chart (date × newUsers)
+  - Order status bar chart with color-coded legend
+  - Top products list (rank, name, quantity sold, revenue)
+  - Period selector (day/week/month)
+- Built /admin/orders/returns/[id] detail page:
+  - Breadcrumb + header with status badge + order link
+  - Reason card, customer note, image gallery
+  - Order item info (product name, attributes, qty, price)
+  - Order summary sidebar (number, status, total, date)
+  - Action cards based on status (PENDING: approve/reject, APPROVED: receive, etc.)
+  - Review dialog with action + admin note + refund amount (for REFUNDED)
+- Added "view detail" (Eye icon) link in /admin/orders/returns list page to new detail page.
+- Updated admin sidebar (features/admin/components/admin-sidebar.tsx):
+  - Added groups: اصلی (Dashboard, Analytics, Notifications), کاتالوگ, فروش (+ Withdrawals, Shipping, Payment Gateways), کاربران (+ Ticket Departments, Broadcast), محتوا (+ Stories, Newsletter), سیستم
+  - Role-based filtering (ADMIN-only items hidden from EDITOR/SUPPORT)
+  - Updated Topbar bell to link to /admin/notifications with admin unread count
+  - Extended page title map for all new routes
+- Added WithdrawalRequest.user optional field to types/domain.ts (admin endpoint returns it).
+- Added PaymentGateway.config field to types/domain.ts.
+- Fixed analytics page: added all OrderStatus values to lookup maps (PENDING_PAYMENT, RETURN_REQUESTED, REFUNDED, FAILED); recharts formatters use `unknown` type.
+
+Stage Summary:
+- All missing API.md features now implemented:
+  - /search (3 search endpoints) + autocomplete
+  - Stories admin (CRUD)
+  - Newsletter admin (subscribers + CSV)
+  - Admin Notifications (list + read/unread + count)
+  - Wallet Withdrawals (user request + admin review)
+  - Payment Gateways admin (CRUD)
+  - Analytics dashboard (5 endpoints with recharts)
+  - Returns detail page (/admin/orders/returns/[id])
+- TypeScript: 0 errors
+- ESLint: 0 errors, 0 warnings
+- All new routes verified via curl: HTTP 200 (/, /search, /admin/withdrawals, /admin/analytics, /admin/stories, /admin/notifications, /admin/newsletter, /admin/payment-gateways, /account/wallet)
+- Admin sidebar now exposes all 22 admin pages organized by group with role-based visibility.

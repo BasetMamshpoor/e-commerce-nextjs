@@ -93,7 +93,7 @@ export default function AdminPopupsPage() {
         ]}
         data={popups}
         isLoading={loading}
-        getRowId={(p) => p.id}
+        getRowId={(p) => String(p.id)}
         emptyTitle="پاپ‌آپی موجود نیست"
         headerActions={
           <Button onClick={() => { setEditing(null); setDialogOpen(true); }}>
@@ -127,7 +127,7 @@ function PopupFormDialog({ open, onOpenChange, popup, onSaved }: {
       setForm({
         title: popup?.title ?? "",
         content: popup?.content ?? "",
-        mediaId: popup?.mediaId ?? "",
+        mediaId: popup?.mediaId != null ? String(popup.mediaId) : "",
         link: popup?.link ?? "",
         isActive: popup?.isActive ?? true,
         showOncePerSession: popup?.showOncePerSession ?? true,
@@ -142,7 +142,7 @@ function PopupFormDialog({ open, onOpenChange, popup, onSaved }: {
     }
     setSaving(true);
     try {
-      const body = { ...form, mediaId: form.mediaId || null };
+      const body = { ...form, mediaId: form.mediaId ? Number(form.mediaId) : null };
       if (popup) {
         await popupsService.update(popup.id, body);
         toast.success("به‌روزرسانی شد");

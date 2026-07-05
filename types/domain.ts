@@ -397,6 +397,7 @@ export interface PaymentGateway {
   name: string;
   slug: string;
   isActive: boolean;
+  config?: Record<string, unknown>;
   createdAt: string;
   updatedAt?: string;
 }
@@ -431,11 +432,13 @@ export interface WalletData {
 export interface WithdrawalRequest {
   id: number;
   userId: number;
+  user?: { id: number; fullName: string; email?: string | null; phone?: string | null };
   amount: number;
   status: "PENDING" | "APPROVED" | "REJECTED";
   description?: string | null;
   adminNote?: string | null;
   createdAt: string;
+  updatedAt?: string;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -614,6 +617,7 @@ export interface Comment {
   isLiked?: boolean;
   authorId?: number;
   authorName?: string;
+  status?: CommentStatus;
   attachments?: Media[];
   replies?: Comment[];
   createdAt: string;

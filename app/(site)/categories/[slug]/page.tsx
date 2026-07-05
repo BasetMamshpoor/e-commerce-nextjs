@@ -29,6 +29,9 @@ const SORT_LABELS: Record<ProductSortOption, string> = {
   price_asc: "ارزان‌ترین",
   price_desc: "گران‌ترین",
   popular: "محبوب‌ترین",
+  bestselling: "پرفروش‌ترین",
+  most_viewed: "پربازدیدترین",
+  most_popular: "پرمخاطب‌ترین",
 };
 
 export default function CategoryDetailPage({ params }: { params: Promise<{ slug: string }> }) {

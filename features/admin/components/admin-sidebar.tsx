@@ -24,12 +24,21 @@ import {
   Menu,
   X,
   Bell,
+  Film,
+  Mail,
+  Wallet,
+  CreditCard,
+  TrendingUp,
+  Truck,
+  MessageCircle,
+  ChevronDown,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-context";
 import { useLogout } from "@/features/auth/hooks";
 import { useUnreadNotificationsCount } from "@/features/notifications/hooks";
+import { useAdminUnreadCount } from "@/features/admin/hooks";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -38,12 +47,14 @@ import { toPersianDigits } from "@/utils/format";
 
 const NAV_GROUPS: {
   label: string;
-  items: { href: string; label: string; icon: React.ElementType }[];
+  items: { href: string; label: string; icon: React.ElementType; roles?: string[] }[];
 }[] = [
   {
     label: "اصلی",
     items: [
       { href: "/admin", label: "داشبورد", icon: LayoutDashboard },
+      { href: "/admin/analytics", label: "تحلیل و گزارش‌ها", icon: TrendingUp, roles: ["ADMIN"] },
+      { href: "/admin/notifications", label: "اعلان‌های ادمین", icon: Bell },
     ],
   },
   {
@@ -61,6 +72,9 @@ const NAV_GROUPS: {
     items: [
       { href: "/admin/orders", label: "سفارش‌ها", icon: ShoppingCart },
       { href: "/admin/discount-codes", label: "کدهای تخفیف", icon: Percent },
+      { href: "/admin/withdrawals", label: "برداشت‌های کیف پول", icon: Wallet, roles: ["ADMIN"] },
+      { href: "/admin/shipping-companies", label: "شرکت‌های ارسال", icon: Truck },
+      { href: "/admin/payment-gateways", label: "درگاه‌های پرداخت", icon: CreditCard, roles: ["ADMIN"] },
     ],
   },
   {
@@ -68,7 +82,9 @@ const NAV_GROUPS: {
     items: [
       { href: "/admin/users", label: "کاربران", icon: Users },
       { href: "/admin/tickets", label: "تیکت‌ها", icon: Ticket },
+      { href: "/admin/ticket-departments", label: "بخش‌های تیکت", icon: MessageCircle, roles: ["ADMIN"] },
       { href: "/admin/comments", label: "نظرات", icon: MessageSquare },
+      { href: "/admin/broadcast", label: "ارسال اعلان گروهی", icon: Megaphone },
     ],
   },
   {
@@ -76,13 +92,15 @@ const NAV_GROUPS: {
     items: [
       { href: "/admin/banners", label: "بنرها", icon: ImageBannerIcon },
       { href: "/admin/popups", label: "پاپ‌آپ‌ها", icon: Megaphone },
+      { href: "/admin/stories", label: "استوری‌ها", icon: Film },
+      { href: "/admin/newsletter", label: "خبرنامه", icon: Mail },
     ],
   },
   {
     label: "سیستم",
     items: [
-      { href: "/admin/settings", label: "تنظیمات", icon: Settings },
-      { href: "/admin/blocked-ips", label: "مسدودسازی IP", icon: ShieldBan },
+      { href: "/admin/settings", label: "تنظیمات", icon: Settings, roles: ["ADMIN"] },
+      { href: "/admin/blocked-ips", label: "مسدودسازی IP", icon: ShieldBan, roles: ["ADMIN"] },
     ],
   },
 ];
@@ -96,9 +114,16 @@ export function AdminSidebar({ open, onOpenChange }: AdminSidebarProps) {
   const pathname = usePathname();
   const { user } = useAuth();
   const logout = useLogout();
+  const userRole = user?.role ?? "CUSTOMER";
 
   const isActive = (href: string) =>
     href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
+
+  // Filter out items that the user's role can't access.
+  const visibleGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => !item.roles || item.roles.includes(userRole)),
+  })).filter((group) => group.items.length > 0);
 
   const initials = (user?.fullName ?? "؟")
     .split(" ")
@@ -166,7 +191,7 @@ export function AdminSidebar({ open, onOpenChange }: AdminSidebarProps) {
         {/* Nav */}
         <ScrollArea className="flex-1 px-3 py-3">
           <nav className="space-y-5">
-            {NAV_GROUPS.map((group) => (
+            {visibleGroups.map((group) => (
               <div key={group.label}>
                 <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
                   {group.label}
@@ -235,7 +260,9 @@ export function AdminSidebar({ open, onOpenChange }: AdminSidebarProps) {
 export function AdminTopbar({ onMenuClick }: { onMenuClick: () => void }) {
   const { user } = useAuth();
   const { data: unreadData } = useUnreadNotificationsCount();
+  const { data: adminUnreadData } = useAdminUnreadCount();
   const unreadCount = unreadData?.count ?? 0;
+  const adminUnread = adminUnreadData?.count ?? 0;
   const pathname = usePathname();
 
   // Generate page title from pathname.
@@ -252,11 +279,20 @@ export function AdminTopbar({ onMenuClick }: { onMenuClick: () => void }) {
       "discount-codes": "کدهای تخفیف",
       users: "کاربران",
       tickets: "تیکت‌ها",
+      "ticket-departments": "بخش‌های تیکت",
       comments: "نظرات",
       banners: "بنرها",
       popups: "پاپ‌آپ‌ها",
+      stories: "استوری‌ها",
+      newsletter: "خبرنامه",
       settings: "تنظیمات",
       "blocked-ips": "مسدودسازی IP",
+      withdrawals: "برداشت‌های کیف پول",
+      notifications: "اعلان‌های ادمین",
+      analytics: "تحلیل و گزارش‌ها",
+      "payment-gateways": "درگاه‌های پرداخت",
+      "shipping-companies": "شرکت‌های ارسال",
+      broadcast: "ارسال اعلان گروهی",
     };
     return map[parts[1]] ?? "پنل مدیریت";
   }, [pathname]);
@@ -281,13 +317,13 @@ export function AdminTopbar({ onMenuClick }: { onMenuClick: () => void }) {
           variant="ghost"
           size="icon"
           className="relative"
-          aria-label="نوتیفیکیشن‌ها"
+          aria-label="اعلان‌های ادمین"
         >
-          <Link href="/account/notifications">
+          <Link href="/admin/notifications">
             <Bell className="size-5" />
-            {unreadCount > 0 && (
+            {adminUnread > 0 && (
               <span className="absolute -right-1 -top-1 flex min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
-                {toPersianDigits(unreadCount > 99 ? "۹۹+" : unreadCount)}
+                {toPersianDigits(adminUnread > 99 ? "۹۹+" : adminUnread)}
               </span>
             )}
           </Link>

@@ -38,7 +38,7 @@ export default function AddressesPage() {
   const { data: addresses, isLoading } = useAddresses();
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editingAddress, setEditingAddress] = React.useState<Address | null>(null);
-  const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  const [deletingId, setDeletingId] = React.useState<number | null>(null);
 
   const onAdd = () => {
     setEditingAddress(null);
@@ -187,7 +187,7 @@ function DeleteAddressDialog({
   addressId,
   onClose,
 }: {
-  addressId: string | null;
+  addressId: number | null;
   onClose: () => void;
 }) {
   const deleteAddress = useDeleteAddress();

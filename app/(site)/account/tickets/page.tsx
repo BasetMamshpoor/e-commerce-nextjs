@@ -160,7 +160,7 @@ function CreateTicketDialog({
   const create = useCreateTicket();
 
   const [subject, setSubject] = React.useState("");
-  const [departmentId, setDepartmentId] = React.useState("");
+  const [departmentId, setDepartmentId] = React.useState<number | "">("");
   const [priority, setPriority] = React.useState<TicketPriority>("NORMAL");
   const [message, setMessage] = React.useState("");
 
@@ -170,7 +170,7 @@ function CreateTicketDialog({
     create.mutate(
       {
         subject,
-        departmentId: departmentId || undefined,
+        departmentId: departmentId === "" ? undefined : Number(departmentId),
         priority,
         message,
       },
@@ -211,13 +211,13 @@ function CreateTicketDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>بخش پشتیبانی</Label>
-              <Select value={departmentId} onValueChange={setDepartmentId}>
+              <Select value={departmentId === "" ? "" : String(departmentId)} onValueChange={(v) => setDepartmentId(v ? Number(v) : "")}>
                 <SelectTrigger>
                   <SelectValue placeholder="انتخاب بخش" />
                 </SelectTrigger>
                 <SelectContent>
                   {departments?.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>
+                    <SelectItem key={d.id} value={String(d.id)}>
                       {d.name}
                     </SelectItem>
                   ))}

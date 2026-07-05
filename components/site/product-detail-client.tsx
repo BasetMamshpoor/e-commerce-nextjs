@@ -334,8 +334,8 @@ function ProductInfo({
     }
   };
 
-  const originalPrice = selectedVariant?.compareAtPrice ?? selectedVariant?.price ?? 0;
-  const currentPrice = selectedVariant?.effectivePrice ?? selectedVariant?.price ?? 0;
+  const originalPrice = (product.basePrice ?? 0) + (selectedVariant?.priceAdjustment ?? 0);
+  const currentPrice = selectedVariant?.effectivePrice ?? originalPrice;
   const hasDiscount = originalPrice > currentPrice;
   const discountPct = hasDiscount ? discountPercent(originalPrice, currentPrice) : 0;
   const isOutOfStock = !selectedVariant || selectedVariant.stock <= 0;
@@ -523,8 +523,7 @@ function ProductSpecs({
     rows.push({ label: "کد SKU", value: variant.sku });
     const avs = getVariantAttributeValues(variant);
     for (const av of avs) {
-      const attrName = av.attribute?.name ?? "ویژگی";
-      rows.push({ label: attrName, value: av.value });
+      rows.push({ label: "ویژگی", value: av.value });
     }
   }
   if (rows.length === 0) return <p className="text-sm text-muted-foreground">مشخصاتی ثبت نشده است.</p>;
@@ -584,7 +583,7 @@ function RelatedProducts({ product }: { product: ProductDetailProduct }) {
 
 /* ───────── Lazy-loaded CommentSection ───────── */
 
-function CommentSectionLazy({ productId, productName }: { productId: string; productName: string }) {
+function CommentSectionLazy({ productId, productName }: { productId: number; productName: string }) {
   const CommentSection = React.useMemo(
     () => React.lazy(() => import("@/features/comments/components/comment-section").then((m) => ({ default: m.CommentSection }))),
     [],

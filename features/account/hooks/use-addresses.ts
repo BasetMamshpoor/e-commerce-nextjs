@@ -4,9 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { addressesService } from "@/services";
-import type { UpsertAddressBody } from "@/services";
 import { ApiError } from "@/types/api";
-import type { Address } from "@/types/domain";
+import type { Address, UpsertAddressBody } from "@/types/domain";
 
 export const ADDRESSES_QUERY_KEY = ["addresses"] as const;
 
@@ -18,7 +17,7 @@ export function useAddresses() {
   });
 }
 
-export function useAddress(id: string | undefined) {
+export function useAddress(id: number | undefined) {
   return useQuery<Address>({
     queryKey: [...ADDRESSES_QUERY_KEY, "detail", id],
     queryFn: () => addressesService.byId(id!),
@@ -46,7 +45,7 @@ export function useUpdateAddress() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: Partial<UpsertAddressBody> }) =>
+    mutationFn: ({ id, body }: { id: number; body: Partial<UpsertAddressBody> }) =>
       addressesService.update(id, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ADDRESSES_QUERY_KEY });
@@ -63,7 +62,7 @@ export function useDeleteAddress() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => addressesService.delete(id),
+    mutationFn: (id: number) => addressesService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ADDRESSES_QUERY_KEY });
       toast.success("آدرس حذف شد");

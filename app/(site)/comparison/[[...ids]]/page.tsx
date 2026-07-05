@@ -46,9 +46,12 @@ function ComparisonContent({ productIds }: { productIds: string[] }) {
   const router = useRouter();
   const [addModalOpen, setAddModalOpen] = React.useState(false);
 
+  // Numeric IDs (parsed from URL) for matching against products.
+  const numericIds = React.useMemo(() => productIds.map(Number).filter((n) => !Number.isNaN(n)), [productIds]);
+
   const { data: products, isLoading } = useQuery({
     queryKey: ["compare-products", productIds],
-    queryFn: async () => { const all = await productsService.list({ limit: 100 }); return all.items.filter((p) => productIds.includes(p.id)); },
+    queryFn: async () => { const all = await productsService.list({ limit: 100 }); return all.items.filter((p) => numericIds.includes(p.id)); },
     staleTime: 30 * 1000,
   });
 
@@ -85,7 +88,7 @@ function ComparisonView({ products, onRemove }: { products: Product[]; onRemove:
   return (
     <div className="space-y-4">
       <div className={cn("grid gap-3", products.length === 1 && "grid-cols-1", products.length === 2 && "grid-cols-1 sm:grid-cols-2", products.length === 3 && "grid-cols-1 sm:grid-cols-3", products.length === 4 && "grid-cols-2 lg:grid-cols-4")}>
-        {products.map((p) => <ComparisonProductCard key={p.id} product={p} onRemove={() => onRemove(p.id)} />)}
+        {products.map((p) => <ComparisonProductCard key={p.id} product={p} onRemove={() => onRemove(String(p.id))} />)}
       </div>
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">

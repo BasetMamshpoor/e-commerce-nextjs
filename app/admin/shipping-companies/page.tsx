@@ -20,7 +20,7 @@ export default function AdminShippingCompaniesPage() {
   const [loading, setLoading] = React.useState(true);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<ShippingCompany | null>(null);
-  const [deleteId, setDeleteId] = React.useState<string | null>(null);
+  const [deleteId, setDeleteId] = React.useState<number | null>(null);
   const [deleting, setDeleting] = React.useState(false);
 
   const load = React.useCallback(() => { setLoading(true); shippingCompaniesService.list({ includeInactive: true }).then(setCompanies).finally(() => setLoading(false)); }, []);
@@ -49,7 +49,7 @@ export default function AdminShippingCompaniesPage() {
             </div>
           )},
         ]}
-        data={companies} isLoading={loading} getRowId={(c) => c.id} emptyTitle="شرکتی یافت نشد"
+        data={companies} isLoading={loading} getRowId={(c) => String(c.id)} emptyTitle="شرکتی یافت نشد"
         headerActions={<Button onClick={() => { setEditing(null); setDialogOpen(true); }}><Plus className="size-4" />شرکت جدید</Button>}
       />
       <ShippingFormDialog open={dialogOpen} onOpenChange={setDialogOpen} company={editing} onSaved={load} />

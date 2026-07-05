@@ -121,7 +121,7 @@ export default function AdminOrdersPage() {
         ]}
         data={orders}
         isLoading={loading}
-        getRowId={(o) => o.id}
+        getRowId={(o) => String(o.id)}
         getRowHref={(o) => `/admin/orders/${o.id}`}
         page={page}
         totalPages={data?.meta.totalPages ?? 1}

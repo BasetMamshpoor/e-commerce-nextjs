@@ -97,7 +97,7 @@ export default function AdminProductsPage() {
       ]}
       data={products}
       isLoading={loading}
-      getRowId={(p) => p.id}
+      getRowId={(p) => String(p.id)}
       getRowHref={(p) => `/admin/products/${p.id}`}
       page={page}
       totalPages={data?.meta.totalPages ?? 1}

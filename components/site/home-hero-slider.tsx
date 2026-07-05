@@ -95,7 +95,7 @@ export function HomeHeroSlider() {
 }
 
 interface HeroSlide {
-  id: string;
+  id: number | string;
   title: string;
   imageUrl?: string;
   link: string;

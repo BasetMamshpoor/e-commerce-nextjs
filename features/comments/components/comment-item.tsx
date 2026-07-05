@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 
 interface CommentItemProps {
   comment: Comment;
-  productId: string;
+  productId: number;
   /** Depth for indentation (0 = top-level). */
   depth?: number;
 }
@@ -37,10 +37,10 @@ export function CommentItem({ comment, productId, depth = 0 }: CommentItemProps)
   const [showReplyForm, setShowReplyForm] = React.useState(false);
   const [isEditing, setIsEditing] = React.useState(false);
 
-  const isOwnComment = user?.id === comment.userId || user?.id === comment.user?.id;
+  const isOwnComment = user?.id === comment.authorId;
   const hasReplies = comment.replies && comment.replies.length > 0;
   const canReply = depth < MAX_DEPTH;
-  const liked = comment.likedByMe ?? false;
+  const liked = comment.isLiked ?? false;
 
   const handleLike = () => {
     likeMutation.mutate(comment.id);
@@ -52,7 +52,7 @@ export function CommentItem({ comment, productId, depth = 0 }: CommentItemProps)
   };
 
   // Get user display name (backend may not include user object — fallback).
-  const userName = (comment as any).user?.fullName ?? "کاربر";
+  const userName = comment.authorName ?? "کاربر";
   const userInitials = userName
     .split(" ")
     .map((p: string) => p.charAt(0))

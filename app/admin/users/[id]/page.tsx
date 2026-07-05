@@ -68,8 +68,8 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
   const load = React.useCallback(() => {
     setLoading(true);
     Promise.all([
-      usersAdminService.byId(id),
-      usersAdminService.sessions(id).catch(() => []),
+      usersAdminService.byId(Number(id)),
+      usersAdminService.sessions(Number(id)).catch(() => []),
     ]).then(([u, s]) => {
       setUser(u);
       setSessions(s);
@@ -143,7 +143,7 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
     }
   };
 
-  const handleRevokeSession = async (sessionId: string) => {
+  const handleRevokeSession = async (sessionId: number) => {
     if (!confirm("ابطال این نشست؟")) return;
     try {
       await usersAdminService.revokeSession(user.id, sessionId);

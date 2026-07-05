@@ -166,7 +166,7 @@ export function FilterSidebar({ categorySlug }: FilterSidebarProps) {
           <>
             <FilterSection title="برندها">
               <MultiSelectCombobox
-                options={filters.brands.map((b) => ({ value: b.id, label: b.name }))}
+                options={filters.brands.map((b) => ({ value: String(b.id), label: b.name }))}
                 value={selectedBrandIds}
                 onChange={(vals) => {
                   const current = selectedBrandIds;
@@ -187,9 +187,9 @@ export function FilterSidebar({ categorySlug }: FilterSidebarProps) {
 
         {/* Dynamic attributes as comboboxes */}
         {filters && filters.attributes.length > 0 && (
-          <Accordion type="multiple" defaultValue={filters.attributes.slice(0, 3).map((a) => a.id)}>
+          <Accordion type="multiple" defaultValue={filters.attributes.slice(0, 3).map((a) => String(a.id))}>
             {filters.attributes.map((attr) => (
-              <AccordionItem key={attr.id} value={attr.id} className="border-b-0">
+              <AccordionItem key={attr.id} value={String(attr.id)} className="border-b-0">
                 <AccordionTrigger className="py-2.5 text-sm font-medium hover:no-underline">
                   {attr.name}
                 </AccordionTrigger>
@@ -197,17 +197,17 @@ export function FilterSidebar({ categorySlug }: FilterSidebarProps) {
                   {attr.values.length > 5 ? (
                     <MultiSelectCombobox
                       options={attr.values.map((v) => ({
-                        value: v.id,
+                        value: String(v.id),
                         label: v.value,
                         colorHex: v.colorHex,
                       }))}
                       value={selectedAttrValueIds.filter((id) =>
-                        attr.values.some((v) => v.id === id),
+                        attr.values.some((v) => String(v.id) === id),
                       )}
                       onChange={(vals) => {
                         // Replace this attribute's selections
                         const otherAttrs = selectedAttrValueIds.filter((id) =>
-                          !attr.values.some((v) => v.id === id),
+                          !attr.values.some((v) => String(v.id) === id),
                         );
                         const next = [...otherAttrs, ...vals];
                         updateParams({
@@ -224,8 +224,8 @@ export function FilterSidebar({ categorySlug }: FilterSidebarProps) {
                         <div key={v.id} className="flex items-center gap-2">
                           <Checkbox
                             id={`attr-${v.id}`}
-                            checked={isAttrChecked(v.id)}
-                            onCheckedChange={() => toggleAttributeValue(v.id)}
+                            checked={isAttrChecked(String(v.id))}
+                            onCheckedChange={() => toggleAttributeValue(String(v.id))}
                           />
                           <Label
                             htmlFor={`attr-${v.id}`}

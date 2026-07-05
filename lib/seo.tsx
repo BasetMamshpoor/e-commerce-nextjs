@@ -114,7 +114,7 @@ export function productJsonLd(
   const offers = (product.variants ?? []).map((v) => ({
     "@type": "Offer",
     sku: v.sku,
-    price: String(v.effectivePrice ?? v.price),
+    price: String(v.effectivePrice ?? product.basePrice + v.priceAdjustment),
     priceCurrency: "IRR",
     availability: v.stock > 0
       ? "https://schema.org/InStock"

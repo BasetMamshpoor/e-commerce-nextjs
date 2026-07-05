@@ -79,12 +79,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const { id } = React.use(params);
   return (
     <AuthGuard>
-      <OrderDetailContent id={id} />
+      <OrderDetailContent id={Number(id)} />
     </AuthGuard>
   );
 }
 
-function OrderDetailContent({ id }: { id: string }) {
+function OrderDetailContent({ id }: { id: number }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: order, isLoading } = useOrderDetail(id);
@@ -440,7 +440,7 @@ function PendingPaymentBanner({
   totalAmount,
   gateways,
 }: {
-  orderId: string;
+  orderId: number;
   totalAmount: number;
   gateways: PaymentGateway[];
 }) {
@@ -522,7 +522,7 @@ function PendingPaymentBanner({
   );
 }
 
-function CancelOrderButton({ orderId }: { orderId: string }) {
+function CancelOrderButton({ orderId }: { orderId: number }) {
   const [open, setOpen] = React.useState(false);
   const [reason, setReason] = React.useState("");
   const cancel = useCancelOrder();
@@ -586,7 +586,7 @@ function CancelOrderButton({ orderId }: { orderId: string }) {
   );
 }
 
-function ReturnRequestButton({ orderId }: { orderId: string }) {
+function ReturnRequestButton({ orderId }: { orderId: number }) {
   const [open, setOpen] = React.useState(false);
   const [reason, setReason] = React.useState("");
   const requestReturn = useRequestReturn();

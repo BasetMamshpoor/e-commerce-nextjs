@@ -42,7 +42,8 @@ const PRIORITY_LABELS: Record<TicketPriority, string> = {
 export default function TicketDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
   const router = useRouter();
-  const { data: ticket, isLoading } = useTicketDetail(id);
+  const numericId = Number(id);
+  const { data: ticket, isLoading } = useTicketDetail(numericId);
   const addMessage = useAddTicketMessage();
   const [reply, setReply] = React.useState("");
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
@@ -78,7 +79,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
     e.preventDefault();
     if (!reply.trim()) return;
     addMessage.mutate(
-      { id, body: { message: reply.trim() } },
+      { id: numericId, body: { message: reply.trim() } },
       {
         onSuccess: () => setReply(""),
         onError: () => {

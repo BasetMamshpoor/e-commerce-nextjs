@@ -73,8 +73,8 @@ function CheckoutContent() {
   const { data: wallet } = useWallet();
 
   const [step, setStep] = React.useState<Step>("address");
-  const [selectedAddressId, setSelectedAddressId] = React.useState<string | null>(null);
-  const [selectedShippingId, setSelectedShippingId] = React.useState<string | null>(null);
+  const [selectedAddressId, setSelectedAddressId] = React.useState<number | null>(null);
+  const [selectedShippingId, setSelectedShippingId] = React.useState<number | null>(null);
   const [discountCode, setDiscountCode] = React.useState("");
   const [discountResult, setDiscountResult] = React.useState<DiscountApplyResult | null>(null);
   const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod>("GATEWAY");

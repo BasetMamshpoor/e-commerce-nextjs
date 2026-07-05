@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { ordersService } from "@/services";
-import type { OrderListQuery, RequestReturnBody } from "@/services";
 import { ApiError } from "@/types/api";
 import type {
   CreateOrderBody,
   Order,
+  OrderListQuery,
   PaginatedData,
+  RequestReturnBody,
 } from "@/types/domain";
 import { CART_QUERY_KEY } from "@/providers/cart-context";
 import { APP_CONFIG } from "@/constants/app";
@@ -27,7 +28,7 @@ export function useOrders(query?: OrderListQuery) {
   });
 }
 
-export function useOrderDetail(id: string | undefined) {
+export function useOrderDetail(id: number | undefined) {
   return useQuery<Order>({
     queryKey: [...ORDERS_QUERY_KEY, "detail", id],
     queryFn: () => ordersService.byId(id!),
@@ -85,7 +86,7 @@ export function useCancelOrder() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+    mutationFn: ({ id, reason }: { id: number; reason: string }) =>
       ordersService.cancel(id, { reason }),
     onSuccess: (order) => {
       queryClient.invalidateQueries({ queryKey: ORDERS_QUERY_KEY });
@@ -113,7 +114,7 @@ export function useRequestReturn() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: RequestReturnBody }) =>
+    mutationFn: ({ id, body }: { id: number; body: RequestReturnBody }) =>
       ordersService.requestReturn(id, body),
     onSuccess: (order) => {
       queryClient.invalidateQueries({ queryKey: ORDERS_QUERY_KEY });
@@ -138,7 +139,7 @@ export function useRequestReturn() {
 
 export function useInitiatePayment() {
   return useMutation({
-    mutationFn: ({ id, gatewaySlug }: { id: string; gatewaySlug: string }) =>
+    mutationFn: ({ id, gatewaySlug }: { id: number; gatewaySlug: string }) =>
       ordersService.paymentInitiate(id, { gatewaySlug }),
     onSuccess: (data) => {
       // Redirect to gateway.
@@ -163,7 +164,7 @@ export function useVerifyPayment() {
       id,
       providerParams,
     }: {
-      id: string;
+      id: number;
       providerParams: Record<string, string>;
     }) => ordersService.paymentVerify(id, { providerParams }),
     onSuccess: (order) => {

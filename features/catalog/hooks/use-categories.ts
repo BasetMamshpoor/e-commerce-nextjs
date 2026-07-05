@@ -25,7 +25,7 @@ export function useCategoryBySlug(slug: string | undefined) {
 }
 
 /** Attributes attached to a category (for shop filters). */
-export function useCategoryAttributes(id: string | undefined) {
+export function useCategoryAttributes(id: number | undefined) {
   return useQuery({
     queryKey: ["categories", "attributes", id],
     queryFn: () => categoriesService.attributes(id!),

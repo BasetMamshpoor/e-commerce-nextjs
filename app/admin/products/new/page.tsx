@@ -27,8 +27,8 @@ export default function AdminProductNewPage() {
   const [attributes, setAttributes] = React.useState<Attribute[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
-  const [form, setForm] = React.useState({ name: "", brandId: "", shortDescription: "", description: "", status: "DRAFT" as ProductStatus, isFeatured: false, categoryIds: [] as string[] });
-  const [variants, setVariants] = React.useState<VariantFormData[]>([{ sku: "", price: 0, stock: 0, isDefault: true, attributeValueIds: [] }]);
+  const [form, setForm] = React.useState({ name: "", brandId: "", shortDescription: "", description: "", status: "DRAFT" as ProductStatus, isFeatured: false, categoryIds: [] as number[] });
+  const [variants, setVariants] = React.useState<VariantFormData[]>([{ sku: "", priceAdjustment: 0, stock: 0, isDefault: true, attributeValueIds: [] }]);
 
   React.useEffect(() => {
     Promise.all([brandsService.list({ includeInactive: true }), categoriesService.tree(), attributesService.list()])
@@ -38,14 +38,13 @@ export default function AdminProductNewPage() {
 
   const onSubmit = async () => {
     if (!form.name.trim()) { toast.error("نام محصول الزامی است"); return; }
-    if (variants[0].price <= 0) { toast.error("قیمت تنوع الزامی است"); return; }
     setSaving(true);
     try {
       const body = {
-        name: form.name, brandId: form.brandId || undefined, shortDescription: form.shortDescription || undefined,
-        description: form.description || undefined, status: form.status, isFeatured: form.isFeatured,
+        name: form.name, brandId: form.brandId ? Number(form.brandId) : undefined, shortDescription: form.shortDescription || undefined,
+        description: form.description || undefined, basePrice: 0, status: form.status, isFeatured: form.isFeatured,
         categoryIds: form.categoryIds,
-        variants: variants.map((v) => ({ sku: v.sku || `SKU-${Date.now()}`, price: Number(v.price), compareAtPrice: v.compareAtPrice || undefined, discountType: v.discountType || undefined, discountValue: v.discountValue || undefined, stock: Number(v.stock), isDefault: v.isDefault, attributeValueIds: v.attributeValueIds })),
+        variants: variants.map((v) => ({ sku: v.sku || `SKU-${Date.now()}`, priceAdjustment: Number(v.priceAdjustment), stock: Number(v.stock), isDefault: v.isDefault, attributeValueIds: v.attributeValueIds })),
         images: [],
       };
       const product = await productsService.create(body);
@@ -69,7 +68,7 @@ export default function AdminProductNewPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2"><Label>نام محصول *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="مثال: کفش اسنیکر نایک Air Max" /></div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>برند</Label><Select value={form.brandId} onValueChange={(v) => setForm({ ...form, brandId: v })}><SelectTrigger><SelectValue placeholder="انتخاب برند" /></SelectTrigger><SelectContent>{brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent></Select></div>
+              <div className="space-y-2"><Label>برند</Label><Select value={form.brandId} onValueChange={(v) => setForm({ ...form, brandId: v })}><SelectTrigger><SelectValue placeholder="انتخاب برند" /></SelectTrigger><SelectContent>{brands.map((b) => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}</SelectContent></Select></div>
               <div className="space-y-2"><Label>وضعیت</Label><Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as ProductStatus })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{STATUS_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent></Select></div>
             </div>
             <div className="space-y-2"><Label>توضیح کوتاه</Label><Input value={form.shortDescription} onChange={(e) => setForm({ ...form, shortDescription: e.target.value })} placeholder="توضیح یک‌خطی محصول" /></div>

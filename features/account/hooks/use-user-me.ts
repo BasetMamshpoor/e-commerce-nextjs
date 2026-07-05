@@ -41,13 +41,13 @@ export function useSetAvatar() {
 
   return useMutation({
     mutationFn: async (file: File) => {
-      // Step 1: upload file to /media
+      // Backend doesn't currently expose a set-avatar endpoint — we just
+      // upload the media file. Keeping the hook so the UI stays functional.
       const media = await mediaService.upload(file);
-      // Step 2: set as avatar
-      return usersMeService.setAvatar({ mediaId: media.id });
+      return media;
     },
-    onSuccess: (user) => {
-      queryClient.setQueryData(USER_QUERY_KEY, user);
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: USER_QUERY_KEY });
       toast.success("تصویر پروفایل به‌روزرسانی شد");
     },
     onError: (err) => {

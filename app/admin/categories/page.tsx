@@ -207,7 +207,7 @@ function CategoryFormDialog({
   const [name, setName] = React.useState("");
   const [slug, setSlug] = React.useState("");
   const [description, setDescription] = React.useState("");
-  const [parentId, setParentId] = React.useState("");
+  const [parentId, setParentId] = React.useState<number | "">("");
   const [isActive, setIsActive] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
 
@@ -232,7 +232,7 @@ function CategoryFormDialog({
         name,
         slug: slug || undefined,
         description: description || undefined,
-        parentId: parentId || undefined,
+        parentId: parentId === "" ? undefined : Number(parentId),
         isActive,
       };
       if (category) {
@@ -288,13 +288,13 @@ function CategoryFormDialog({
           </div>
           <div className="space-y-2">
             <Label>دسته والد</Label>
-            <Select value={parentId} onValueChange={setParentId}>
+            <Select value={parentId === "" ? "" : String(parentId)} onValueChange={(v) => setParentId(v ? Number(v) : "")}>
               <SelectTrigger>
                 <SelectValue placeholder="بدون والد (دسته اصلی)" />
               </SelectTrigger>
               <SelectContent>
                 {flatCats.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
+                  <SelectItem key={c.id} value={String(c.id)}>
                     {c.name}
                   </SelectItem>
                 ))}

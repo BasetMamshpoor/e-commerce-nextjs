@@ -9,7 +9,7 @@ import { useAuth } from "@/providers/auth-context";
 import { cn } from "@/lib/utils";
 
 interface WishlistButtonProps {
-  productId: string;
+  productId: number;
   size?: "icon" | "sm" | "default";
   variant?: "ghost" | "outline" | "secondary";
   className?: string;

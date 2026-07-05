@@ -53,7 +53,7 @@ export default function AdminMediaPage() {
     toast.success("آدرس کپی شد");
   };
 
-  const onDelete = async (id: string) => {
+  const onDelete = async (id: number) => {
     if (!confirm("آیا از حذف این فایل مطمئن هستید؟")) return;
     try {
       await mediaService.delete(id);
@@ -116,7 +116,7 @@ export default function AdminMediaPage() {
                 {m.type === "IMAGE" ? (
                   <img
                     src={m.url}
-                    alt={m.alt ?? ""}
+                    alt={m.originalName}
                     className="size-full object-cover"
                   />
                 ) : (

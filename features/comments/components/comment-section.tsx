@@ -16,7 +16,7 @@ import {
 import { toPersianDigits } from "@/utils/format";
 
 interface CommentSectionProps {
-  productId: string;
+  productId: number;
   productName?: string;
 }
 

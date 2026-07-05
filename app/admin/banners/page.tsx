@@ -104,7 +104,7 @@ export default function AdminBannersPage() {
         ]}
         data={banners}
         isLoading={loading}
-        getRowId={(b) => b.id}
+        getRowId={(b) => String(b.id)}
         emptyTitle="بنری موجود نیست"
         headerActions={
           <Button onClick={() => { setEditing(null); setDialogOpen(true); }}>
@@ -137,7 +137,7 @@ function BannerFormDialog({ open, onOpenChange, banner, onSaved }: {
     if (open) {
       setForm({
         title: banner?.title ?? "",
-        mediaId: banner?.mediaId ?? "",
+        mediaId: banner?.mediaId != null ? String(banner.mediaId) : "",
         link: banner?.link ?? "",
         position: banner?.position ?? "HOME_MAIN",
         order: banner?.order ?? 0,
@@ -153,7 +153,7 @@ function BannerFormDialog({ open, onOpenChange, banner, onSaved }: {
     }
     setSaving(true);
     try {
-      const body = { ...form, mediaId: form.mediaId };
+      const body = { ...form, mediaId: Number(form.mediaId) };
       if (banner) {
         await bannersService.update(banner.id, body);
         toast.success("به‌روزرسانی شد");

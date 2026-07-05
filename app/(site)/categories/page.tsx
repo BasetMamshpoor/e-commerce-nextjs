@@ -50,7 +50,7 @@ export default async function CategoriesPage() {
               name={cat.name}
               slug={cat.slug}
               imageUrl={cat.imageUrl}
-              subCategories={(cat.children ?? []).map((c) => ({ id: c.id, name: c.name, slug: c.slug }))}
+              subCategories={(cat.children ?? []).map((c) => ({ id: String(c.id), name: c.name, slug: c.slug }))}
             />
           ))}
         </div>

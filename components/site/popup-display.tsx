@@ -23,12 +23,12 @@ import { APP_CONFIG } from "@/constants/app";
 export function PopupDisplay() {
   const { data: popups, isLoading } = usePopups();
   const [openIndex, setOpenIndex] = React.useState<number | null>(null);
-  const [dismissed, setDismissed] = React.useState<Set<string>>(() => {
+  const [dismissed, setDismissed] = React.useState<Set<number>>(() => {
     if (typeof window === "undefined") return new Set();
     // Check sessionStorage for previously-dismissed-in-this-session popups.
     try {
       const raw = sessionStorage.getItem(APP_CONFIG.storageKeys.dismissedPopups);
-      return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+      return new Set(raw ? (JSON.parse(raw) as number[]) : []);
     } catch {
       return new Set();
     }

@@ -4,15 +4,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { ticketsService } from "@/services";
-import type {
-  CreateTicketBody,
-  AddTicketMessageBody,
-  TicketListQuery,
-} from "@/services";
 import { ApiError } from "@/types/api";
 import type {
+  AddTicketMessageBody,
+  CreateTicketBody,
   Ticket,
   TicketDepartment,
+  TicketListQuery,
   PaginatedData,
 } from "@/types/domain";
 import { APP_CONFIG } from "@/constants/app";
@@ -38,7 +36,7 @@ export function useTickets(query?: TicketListQuery) {
 }
 
 /** Single ticket detail with messages. */
-export function useTicketDetail(id: string | undefined) {
+export function useTicketDetail(id: number | undefined) {
   return useQuery<Ticket>({
     queryKey: [...TICKETS_QUERY_KEY, "detail", id],
     queryFn: () => ticketsService.byId(id!),
@@ -71,7 +69,7 @@ export function useAddTicketMessage() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: AddTicketMessageBody }) =>
+    mutationFn: ({ id, body }: { id: number; body: AddTicketMessageBody }) =>
       ticketsService.addMessage(id, body),
     onSuccess: (ticket) => {
       queryClient.setQueryData(

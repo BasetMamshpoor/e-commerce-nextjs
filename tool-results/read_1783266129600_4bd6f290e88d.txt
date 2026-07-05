@@ -1,0 +1,1087 @@
+     1→/**
+     2→ * Domain entity types — REWRITTEN to match updated API.md (July 2025).
+     3→ *
+     4→ * KEY CHANGES:
+     5→ *   - All IDs are now `number` (integer auto-increment), NOT string (cuid).
+     6→ *   - Products use `basePrice` + `priceAdjustment` model (not per-variant price).
+     7→ *   - Discount is at product level, not variant level.
+     8→ *   - View tracking is automatic (no POST /:id/view).
+     9→ *   - GET /by-id/:id added for frontend ID-based routes.
+    10→ *   - Image management via PUT /:id (multipart), no separate image endpoints.
+    11→ *   - Comparison: only GET /?productIds=1,2,3 — no add/remove/clear.
+    12→ *   - Media: inline uploads with entityType, usage tracking, download.
+    13→ *   - New: Stories, Newsletter, Search, Landing Page, Admin Notifications, Withdrawals.
+    14→ *   - Comments: authorId/authorName, isLiked, commentableType, blog post comments.
+    15→ *   - Orders: CUSTOMER-only checkout, trackingCode/packageNumber, detailed returns.
+    16→ *   - Attributes: isDisplay field added.
+    17→ */
+    18→
+    19→import type { PaginationMeta } from "./api";
+    20→
+    21→// Re-export for convenience
+    22→export type { PaginatedData, PaginationMeta } from "./api";
+    23→
+    24→/* ──────────────────────────────────────────────────────────────────────────
+    25→   1. Auth
+    26→   ────────────────────────────────────────────────────────────────────────── */
+    27→
+    28→export type UserRole = "CUSTOMER" | "EDITOR" | "SUPPORT" | "ADMIN";
+    29→
+    30→export interface User {
+    31→  id: number;
+    32→  fullName: string;
+    33→  email: string | null;
+    34→  phone: string | null;
+    35→  role: UserRole;
+    36→  avatarUrl?: string | null;
+    37→  emailVerifiedAt?: string | null;
+    38→  phoneVerifiedAt?: string | null;
+    39→  isBlocked?: boolean;
+    40→  blockedReason?: string | null;
+    41→  blockedAt?: string | null;
+    42→  lastLoginAt?: string | null;
+    43→  lastLoginIp?: string | null;
+    44→  createdAt: string;
+    45→  updatedAt?: string;
+    46→}
+    47→
+    48→export interface AuthSession {
+    49→  user: User;
+    50→  accessToken: string;
+    51→  refreshToken: string;
+    52→  sessionId: number;
+    53→}
+    54→
+    55→export type OtpChannel = "SMS" | "EMAIL";
+    56→
+    57→export interface OtpRequestResult {
+    58→  identifier: string;
+    59→  channel: OtpChannel;
+    60→  expiresAt: string;
+    61→}
+    62→
+    63→/* ──────────────────────────────────────────────────────────────────────────
+    64→   2. Media — centralized model
+    65→   ────────────────────────────────────────────────────────────────────────── */
+    66→
+    67→export type MediaType = "IMAGE" | "VIDEO" | "DOCUMENT" | "OTHER";
+    68→
+    69→export interface Media {
+    70→  id: number;
+    71→  fileName: string;
+    72→  originalName: string;
+    73→  url: string;
+    74→  mimeType: string;
+    75→  size: number;
+    76→  type: MediaType;
+    77→  entityType?: string;
+    78→  createdAt: string;
+    79→}
+    80→
+    81→export interface MediaUsage {
+    82→  entityType: string;
+    83→  entityId: number;
+    84→  entityName: string;
+    85→}
+    86→
+    87→/* ──────────────────────────────────────────────────────────────────────────
+    88→   3. Categories
+    89→   ────────────────────────────────────────────────────────────────────────── */
+    90→
+    91→export interface Category {
+    92→  id: number;
+    93→  name: string;
+    94→  slug: string;
+    95→  description?: string | null;
+    96→  imageMediaId?: number | null;
+    97→  imageUrl?: string | null;
+    98→  parentId?: number | null;
+    99→  order: number;
+   100→  isActive: boolean;
+   101→  metaTitle?: string | null;
+   102→  metaDescription?: string | null;
+   103→  canonicalUrl?: string | null;
+   104→  children?: Category[];
+   105→  createdAt: string;
+   106→  updatedAt?: string;
+   107→}
+   108→
+   109→/* ──────────────────────────────────────────────────────────────────────────
+   110→   4. Brands
+   111→   ────────────────────────────────────────────────────────────────────────── */
+   112→
+   113→export interface Brand {
+   114→  id: number;
+   115→  name: string;
+   116→  slug: string;
+   117→  description?: string | null;
+   118→  logoMediaId?: number | null;
+   119→  logoUrl?: string | null;
+   120→  isActive: boolean;
+   121→  metaTitle?: string | null;
+   122→  metaDescription?: string | null;
+   123→  productCount?: number;
+   124→  createdAt: string;
+   125→  updatedAt?: string;
+   126→}
+   127→
+   128→/* ──────────────────────────────────────────────────────────────────────────
+   129→   5. Attributes
+   130→   ────────────────────────────────────────────────────────────────────────── */
+   131→
+   132→export type AttributeInputType = "TEXT" | "COLOR" | "SELECT";
+   133→
+   134→export interface AttributeValue {
+   135→  id: number;
+   136→  attributeId: number;
+   137→  value: string;
+   138→  colorHex?: string | null;
+   139→  order: number;
+   140→}
+   141→
+   142→export interface Attribute {
+   143→  id: number;
+   144→  name: string;
+   145→  slug: string;
+   146→  inputType: AttributeInputType;
+   147→  isFilterable: boolean;
+   148→  isVariant: boolean;
+   149→  isDisplay: boolean;
+   150→  values: AttributeValue[];
+   151→  createdAt: string;
+   152→  updatedAt?: string;
+   153→}
+   154→
+   155→/* ──────────────────────────────────────────────────────────────────────────
+   156→   6. Products — NEW STRUCTURE (basePrice + priceAdjustment)
+   157→   ────────────────────────────────────────────────────────────────────────── */
+   158→
+   159→export type ProductStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
+   160→
+   161→export type DiscountType = "PERCENT" | "FIXED";
+   162→
+   163→export type ProductSortOption =
+   164→  | "newest"
+   165→  | "price_asc"
+   166→  | "price_desc"
+   167→  | "popular"
+   168→  | "bestselling"
+   169→  | "most_viewed"
+   170→  | "most_popular";
+   171→
+   172→export interface ProductImage {
+   173→  id: number;
+   174→  mediaId: number;
+   175→  url?: string;
+   176→  alt?: string | null;
+   177→  media?: Media;
+   178→  order: number;
+   179→  isMain: boolean;
+   180→}
+   181→
+   182→export interface ProductVariant {
+   183→  id: number;
+   184→  sku: string;
+   185→  priceAdjustment: number;
+   186→  stock: number;
+   187→  isDefault: boolean;
+   188→  isActive: boolean;
+   189→  effectivePrice?: number;
+   190→  attributeValueIds: number[];
+   191→  attributeValues?: AttributeValue[];
+   192→}
+   193→
+   194→export interface DisplayAttribute {
+   195→  attributeId: number;
+   196→  value: string;
+   197→  attribute?: Pick<Attribute, "id" | "name" | "slug">;
+   198→}
+   199→
+   200→export interface Product {
+   201→  id: number;
+   202→  name: string;
+   203→  slug: string;
+   204→  shortDescription?: string | null;
+   205→  description?: string | null;
+   206→  status: ProductStatus;
+   207→  isFeatured: boolean;
+   208→  brandId?: number | null;
+   209→  brand?: Brand | null;
+   210→  categories?: Category[] | Array<{ productId: number; categoryId: number; category: Category }>;
+   211→  images?: ProductImage[];
+   212→  variants?: ProductVariant[];
+   213→  displayAttributes?: DisplayAttribute[];
+   214→  displayAttributeValues?: DisplayAttribute[];
+   215→  basePrice: number;
+   216→  discountType?: DiscountType | null;
+   217→  discountValue?: number | null;
+   218→  minPrice: number;
+   219→  maxPrice: number;
+   220→  isInStock: boolean;
+   221→  hasActiveDiscount: boolean;
+   222→  avgRating?: number | null;
+   223→  reviewCount?: number;
+   224→  totalSold?: number;
+   225→  viewCount?: number;
+   226→  isWish?: boolean;
+   227→  relatedProducts?: Product[];
+   228→  alsoBoughtProducts?: Product[];
+   229→  relatedBlogPosts?: BlogPost[];
+   230→  createdAt: string;
+   231→  updatedAt?: string;
+   232→}
+   233→
+   234→export interface ProductFilterMetadata {
+   235→  brands: Pick<Brand, "id" | "name" | "slug">[];
+   236→  priceRange: { min: number; max: number };
+   237→  attributes: Array<
+   238→    Pick<Attribute, "id" | "name" | "slug" | "inputType"> & {
+   239→      values: Pick<AttributeValue, "id" | "value" | "colorHex">[];
+   240→    }
+   241→  >;
+   242→}
+   243→
+   244→export interface ProductListQuery {
+   245→  page?: number;
+   246→  limit?: number;
+   247→  categorySlug?: string;
+   248→  brandIds?: string;
+   249→  attributeValueIds?: string;
+   250→  minPrice?: number;
+   251→  maxPrice?: number;
+   252→  inStock?: boolean;
+   253→  hasDiscount?: boolean;
+   254→  isFeatured?: boolean;
+   255→  search?: string;
+   256→  sort?: ProductSortOption;
+   257→  status?: ProductStatus;
+   258→}
+   259→
+   260→/* ──────────────────────────────────────────────────────────────────────────
+   261→   7. Cart
+   262→   ────────────────────────────────────────────────────────────────────────── */
+   263→
+   264→export interface CartItem {
+   265→  id: number;
+   266→  variantId: number;
+   267→  productName: string;
+   268→  productSlug: string;
+   269→  image?: string | null;
+   270→  attributesLabel: string;
+   271→  quantity: number;
+   272→  unitPrice: number;
+   273→  originalPrice: number;
+   274→  lineTotal: number;
+   275→  isAvailable: boolean;
+   276→  availableStock: number;
+   277→}
+   278→
+   279→export interface Cart {
+   280→  id: number | null;
+   281→  itemCount: number;
+   282→  subtotal: number;
+   283→  totalDiscount: number;
+   284→  total: number;
+   285→  items: CartItem[];
+   286→}
+   287→
+   288→export interface CartResponse {
+   289→  cart: Cart;
+   290→  wasAdjusted?: boolean;
+   291→  guestToken?: string;
+   292→}
+   293→
+   294→/* ──────────────────────────────────────────────────────────────────────────
+   295→   8. Wishlist
+   296→   ────────────────────────────────────────────────────────────────────────── */
+   297→
+   298→export interface WishlistItem {
+   299→  id: number;
+   300→  productId: number;
+   301→  product: Pick<
+   302→    Product,
+   303→    "id" | "name" | "slug" | "minPrice" | "maxPrice" | "isInStock" | "hasActiveDiscount"
+   304→  > & { image?: string | null; brand?: Pick<Brand, "id" | "name"> | null };
+   305→  createdAt: string;
+   306→}
+   307→
+   308→/* ──────────────────────────────────────────────────────────────────────────
+   309→   9. Comparison — simplified (GET only)
+   310→   ────────────────────────────────────────────────────────────────────────── */
+   311→
+   312→export interface ComparisonResponse {
+   313→  items: Array<{ product: Product }>;
+   314→}
+   315→
+   316→/* ──────────────────────────────────────────────────────────────────────────
+   317→   10. Discount Codes
+   318→   ────────────────────────────────────────────────────────────────────────── */
+   319→
+   320→export interface DiscountCode {
+   321→  id: number;
+   322→  code: string;
+   323→  type: DiscountType;
+   324→  value: number;
+   325→  maxDiscountAmount?: number | null;
+   326→  minCartAmount?: number | null;
+   327→  maxUsage?: number | null;
+   328→  maxUsagePerUser?: number | null;
+   329→  usedCount?: number;
+   330→  startsAt?: string | null;
+   331→  expiresAt?: string | null;
+   332→  isActive: boolean;
+   333→  productIds?: number[];
+   334→  categoryIds?: number[];
+   335→  userIds?: number[];
+   336→  createdAt: string;
+   337→  updatedAt?: string;
+   338→}
+   339→
+   340→export interface DiscountApplyResult {
+   341→  discountCodeId: number;
+   342→  code: string;
+   343→  type: DiscountType;
+   344→  value: number;
+   345→  cartTotal: number;
+   346→  eligibleSubtotal: number;
+   347→  discountAmount: number;
+   348→  payableTotal: number;
+   349→  eligibleVariantIds: number[];
+   350→  guestToken?: string;
+   351→}
+   352→
+   353→/* ──────────────────────────────────────────────────────────────────────────
+   354→   11. Addresses
+   355→   ────────────────────────────────────────────────────────────────────────── */
+   356→
+   357→export interface Address {
+   358→  id: number;
+   359→  title: string;
+   360→  receiverName: string;
+   361→  receiverPhone: string;
+   362→  province: string;
+   363→  city: string;
+   364→  postalCode: string;
+   365→  fullAddress: string;
+   366→  lat: number;
+   367→  lng: number;
+   368→  isDefault: boolean;
+   369→  createdAt: string;
+   370→  updatedAt?: string;
+   371→}
+   372→
+   373→/* ──────────────────────────────────────────────────────────────────────────
+   374→   12. Shipping Companies
+   375→   ────────────────────────────────────────────────────────────────────────── */
+   376→
+   377→export interface ShippingCompany {
+   378→  id: number;
+   379→  name: string;
+   380→  logoUrl?: string | null;
+   381→  logoMediaId?: number | null;
+   382→  description?: string | null;
+   383→  baseCost: number;
+   384→  estimatedDaysMin?: number | null;
+   385→  estimatedDaysMax?: number | null;
+   386→  isActive: boolean;
+   387→  createdAt: string;
+   388→  updatedAt?: string;
+   389→}
+   390→
+   391→/* ──────────────────────────────────────────────────────────────────────────
+   392→   13. Payment Gateways
+   393→   ────────────────────────────────────────────────────────────────────────── */
+   394→
+   395→export interface PaymentGateway {
+   396→  id: number;
+   397→  name: string;
+   398→  slug: string;
+   399→  isActive: boolean;
+   400→  config?: Record<string, unknown>;
+   401→  createdAt: string;
+   402→  updatedAt?: string;
+   403→}
+   404→
+   405→/* ──────────────────────────────────────────────────────────────────────────
+   406→   14. Wallet
+   407→   ────────────────────────────────────────────────────────────────────────── */
+   408→
+   409→export type WalletTransactionType =
+   410→  | "DEPOSIT"
+   411→  | "WITHDRAW"
+   412→  | "PURCHASE"
+   413→  | "REFUND"
+   414→  | "ADMIN_ADJUST"
+   415→  | "WITHDRAWAL_REQUEST";
+   416→
+   417→export interface WalletTransaction {
+   418→  id: number;
+   419→  type: WalletTransactionType;
+   420→  amount: number;
+   421→  description?: string | null;
+   422→  orderId?: number | null;
+   423→  createdAt: string;
+   424→}
+   425→
+   426→export interface WalletData {
+   427→  balance: number;
+   428→  transactions: WalletTransaction[];
+   429→  meta: PaginationMeta;
+   430→}
+   431→
+   432→export interface WithdrawalRequest {
+   433→  id: number;
+   434→  userId: number;
+   435→  user?: { id: number; fullName: string; email?: string | null; phone?: string | null };
+   436→  amount: number;
+   437→  status: "PENDING" | "APPROVED" | "REJECTED";
+   438→  description?: string | null;
+   439→  adminNote?: string | null;
+   440→  createdAt: string;
+   441→  updatedAt?: string;
+   442→}
+   443→
+   444→/* ──────────────────────────────────────────────────────────────────────────
+   445→   15. Orders
+   446→   ────────────────────────────────────────────────────────────────────────── */
+   447→
+   448→export type OrderStatus =
+   449→  | "PENDING_PAYMENT"
+   450→  | "PROCESSING"
+   451→  | "SHIPPED"
+   452→  | "DELIVERED"
+   453→  | "CANCELLED"
+   454→  | "RETURN_REQUESTED"
+   455→  | "RETURNED"
+   456→  | "REFUNDED"
+   457→  | "FAILED";
+   458→
+   459→export type PaymentMethod = "WALLET" | "GATEWAY" | "MIXED";
+   460→
+   461→export interface OrderItem {
+   462→  id: number;
+   463→  productName: string;
+   464→  variantAttributes: string;
+   465→  price: number;
+   466→  quantity: number;
+   467→  discountAmount: number;
+   468→  image?: string | null;
+   469→}
+   470→
+   471→export interface OrderStatusHistoryEntry {
+   472→  id?: number;
+   473→  status: OrderStatus;
+   474→  note?: string | null;
+   475→  createdAt: string;
+   476→}
+   477→
+   478→export interface OrderCancellation {
+   479→  reason: string;
+   480→  createdAt: string;
+   481→}
+   482→
+   483→export interface OrderReturn {
+   484→  id: number;
+   485→  orderItemId?: number | null;
+   486→  reason: string;
+   487→  status: "PENDING" | "APPROVED" | "RECEIVED" | "REFUNDED" | "REJECTED";
+   488→  refundAmount?: number | null;
+   489→  adminNote?: string | null;
+   490→  imageMediaIds?: number[];
+   491→  createdAt: string;
+   492→  updatedAt?: string;
+   493→}
+   494→
+   495→export interface Order {
+   496→  id: number;
+   497→  orderNumber: string;
+   498→  status: OrderStatus;
+   499→  paymentMethod: PaymentMethod;
+   500→  paidAt?: string | null;
+   501→  subtotal: number;
+   502→  shippingCost: number;
+   503→  discountAmount: number;
+   504→  taxAmount: number;
+   505→  totalAmount: number;
+   506→  trackingCode?: string | null;
+   507→  packageNumber?: string | null;
+   508→  shippingAddress?: Partial<Address>;
+   509→  address?: Address;
+   510→  items: OrderItem[];
+   511→  statusHistory: OrderStatusHistoryEntry[];
+   512→  shippingCompany?: Pick<ShippingCompany, "id" | "name">;
+   513→  discountCode?: { id: number; code: string } | null;
+   514→  transactions?: WalletTransaction[];
+   515→  cancellation?: OrderCancellation | null;
+   516→  returns?: OrderReturn[];
+   517→  user?: Pick<User, "id" | "fullName">;
+   518→  createdAt: string;
+   519→  updatedAt?: string;
+   520→}
+   521→
+   522→export interface CreateOrderBody {
+   523→  addressId: number;
+   524→  shippingCompanyId: number;
+   525→  paymentMethod: PaymentMethod;
+   526→  gatewaySlug?: string;
+   527→  discountCode?: string;
+   528→}
+   529→
+   530→/* ──────────────────────────────────────────────────────────────────────────
+   531→   16. Notifications
+   532→   ────────────────────────────────────────────────────────────────────────── */
+   533→
+   534→export type NotificationType =
+   535→  | "ORDER"
+   536→  | "SYSTEM"
+   537→  | "TICKET"
+   538→  | "PROMOTION"
+   539→  | "WALLET"
+   540→  | "COMMENT";
+   541→
+   542→export interface AppNotification {
+   543→  id: number;
+   544→  type: NotificationType;
+   545→  title: string;
+   546→  message: string;
+   547→  link?: string | null;
+   548→  isRead: boolean;
+   549→  createdAt: string;
+   550→}
+   551→
+   552→/* ──────────────────────────────────────────────────────────────────────────
+   553→   17. Admin Notifications (separate from user notifications)
+   554→   ────────────────────────────────────────────────────────────────────────── */
+   555→
+   556→export interface AdminNotification {
+   557→  id: number;
+   558→  type: string;
+   559→  title: string;
+   560→  message: string;
+   561→  link?: string | null;
+   562→  isRead: boolean;
+   563→  createdAt: string;
+   564→}
+   565→
+   566→/* ──────────────────────────────────────────────────────────────────────────
+   567→   18. Tickets
+   568→   ────────────────────────────────────────────────────────────────────────── */
+   569→
+   570→export type TicketStatus = "OPEN" | "ANSWERED" | "CLOSED";
+   571→export type TicketPriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
+   572→export type TicketMessageSender = "USER" | "ADMIN";
+   573→
+   574→export interface TicketDepartment {
+   575→  id: number;
+   576→  name: string;
+   577→  description?: string | null;
+   578→  isActive: boolean;
+   579→}
+   580→
+   581→export interface TicketMessage {
+   582→  id: number;
+   583→  senderType: TicketMessageSender;
+   584→  message: string;
+   585→  attachmentMediaIds?: number[];
+   586→  attachments?: Array<{ id: number; mediaId: number; media: Media }>;
+   587→  createdAt: string;
+   588→}
+   589→
+   590→export interface Ticket {
+   591→  id: number;
+   592→  subject: string;
+   593→  status: TicketStatus;
+   594→  priority: TicketPriority;
+   595→  departmentId?: number | null;
+   596→  department?: TicketDepartment | null;
+   597→  orderId?: number | null;
+   598→  userId?: number;
+   599→  user?: Pick<User, "id" | "fullName">;
+   600→  messages: TicketMessage[];
+   601→  createdAt: string;
+   602→  updatedAt?: string;
+   603→}
+   604→
+   605→/* ──────────────────────────────────────────────────────────────────────────
+   606→   19. Comments (nested) — updated with authorId/authorName/isLiked
+   607→   ────────────────────────────────────────────────────────────────────────── */
+   608→
+   609→export type CommentStatus = "PENDING" | "APPROVED" | "REJECTED";
+   610→export type CommentableType = "PRODUCT" | "BLOG_POST";
+   611→
+   612→export interface Comment {
+   613→  id: number;
+   614→  content: string;
+   615→  rating?: number | null;
+   616→  likeCount: number;
+   617→  isLiked?: boolean;
+   618→  authorId?: number;
+   619→  authorName?: string;
+   620→  attachments?: Media[];
+   621→  replies?: Comment[];
+   622→  createdAt: string;
+   623→  updatedAt?: string;
+   624→}
+   625→
+   626→export interface CommentRatingSummary {
+   627→  average: number;
+   628→  count: number;
+   629→}
+   630→
+   631→export interface ProductCommentsData {
+   632→  items: Comment[];
+   633→  meta: PaginationMeta;
+   634→  ratingSummary: CommentRatingSummary;
+   635→}
+   636→
+   637→/* ──────────────────────────────────────────────────────────────────────────
+   638→   20. Banners
+   639→   ────────────────────────────────────────────────────────────────────────── */
+   640→
+   641→export type BannerPosition = "HOME_MAIN" | "HOME_MIDDLE" | "CATEGORY_TOP" | "SIDEBAR";
+   642→
+   643→export interface Banner {
+   644→  id: number;
+   645→  title: string;
+   646→  mediaId: number;
+   647→  imageUrl: string;
+   648→  link?: string | null;
+   649→  position: BannerPosition;
+   650→  order: number;
+   651→  isActive: boolean;
+   652→  startsAt?: string | null;
+   653→  endsAt?: string | null;
+   654→}
+   655→
+   656→/* ──────────────────────────────────────────────────────────────────────────
+   657→   21. Popups
+   658→   ────────────────────────────────────────────────────────────────────────── */
+   659→
+   660→export interface Popup {
+   661→  id: number;
+   662→  title: string;
+   663→  content: string;
+   664→  mediaId?: number | null;
+   665→  imageUrl?: string | null;
+   666→  link?: string | null;
+   667→  isActive: boolean;
+   668→  startsAt?: string | null;
+   669→  endsAt?: string | null;
+   670→  showOncePerSession: boolean;
+   671→}
+   672→
+   673→/* ──────────────────────────────────────────────────────────────────────────
+   674→   22. Stories — NEW
+   675→   ────────────────────────────────────────────────────────────────────────── */
+   676→
+   677→export interface Story {
+   678→  id: number;
+   679→  title: string;
+   680→  coverImage?: { mediaId: number; url: string } | null;
+   681→  video?: { mediaId: number; url: string } | null;
+   682→  expiresAt?: string | null;
+   683→  order: number;
+   684→  nextId?: number | null;
+   685→  prevId?: number | null;
+   686→  products?: Product[];
+   687→  createdAt: string;
+   688→}
+   689→
+   690→/* ──────────────────────────────────────────────────────────────────────────
+   691→   23. Newsletter — NEW
+   692→   ────────────────────────────────────────────────────────────────────────── */
+   693→
+   694→export interface NewsletterSubscriber {
+   695→  id: number;
+   696→  email: string;
+   697→  createdAt: string;
+   698→}
+   699→
+   700→/* ──────────────────────────────────────────────────────────────────────────
+   701→   24. Search — NEW (3 types)
+   702→   ────────────────────────────────────────────────────────────────────────── */
+   703→
+   704→export interface GlobalSearchResult {
+   705→  products: Array<Pick<Product, "id" | "name" | "slug" | "minPrice" | "maxPrice">>;
+   706→  blogPosts: Array<{ id: number; title: string; slug: string; coverImageUrl?: string }>;
+   707→  categories: Array<Pick<Category, "id" | "name" | "slug">>;
+   708→  brands: Array<Pick<Brand, "id" | "name" | "slug">>;
+   709→}
+   710→
+   711→export interface QuickSearchResult {
+   712→  type: "product" | "category" | "blog_post" | "brand";
+   713→  id: number;
+   714→  title: string;
+   715→  slug: string;
+   716→}
+   717→
+   718→export interface MainSearchFilters {
+   719→  brands: Array<Pick<Brand, "id" | "name" | "slug" | "logoUrl">>;
+   720→  priceRange: { min: number; max: number };
+   721→  hasDiscount: boolean;
+   722→  inStock: boolean;
+   723→}
+   724→
+   725→export interface MainSearchResult {
+   726→  items: Product[];
+   727→  filters: MainSearchFilters;
+   728→  meta: PaginationMeta;
+   729→}
+   730→
+   731→/* ──────────────────────────────────────────────────────────────────────────
+   732→   25. Landing Page — NEW
+   733→   ────────────────────────────────────────────────────────────────────────── */
+   734→
+   735→export type LandingSectionType =
+   736→  | "banners"
+   737→  | "popups"
+   738→  | "stories"
+   739→  | "categories"
+   740→  | "featured_products"
+   741→  | "latest_products"
+   742→  | "top_rated_products"
+   743→  | "flash_sales"
+   744→  | "latest_blog_posts"
+   745→  | "popular_brands";
+   746→
+   747→export interface LandingSection {
+   748→  type: LandingSectionType;
+   749→  label?: string;
+   750→  data: unknown;
+   751→}
+   752→
+   753→export interface LandingData {
+   754→  sections: LandingSection[];
+   755→  settings: Record<string, unknown>;
+   756→}
+   757→
+   758→/* ──────────────────────────────────────────────────────────────────────────
+   759→   26. Blog — NEW (inferred from API mentions)
+   760→   ────────────────────────────────────────────────────────────────────────── */
+   761→
+   762→export type BlogPostStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
+   763→
+   764→export interface BlogPost {
+   765→  id: number;
+   766→  title: string;
+   767→  slug: string;
+   768→  excerpt: string;
+   769→  content: string;
+   770→  status: BlogPostStatus;
+   771→  coverImageMediaId?: number | null;
+   772→  coverImageUrl?: string | null;
+   773→  categoryId?: number | null;
+   774→  metaTitle?: string | null;
+   775→  metaDescription?: string | null;
+   776→  publishedAt?: string | null;
+   777→  createdAt: string;
+   778→  updatedAt?: string;
+   779→}
+   780→
+   781→export interface BlogCategory {
+   782→  id: number;
+   783→  name: string;
+   784→  slug: string;
+   785→}
+   786→
+   787→/* ──────────────────────────────────────────────────────────────────────────
+   788→   27. Settings
+   789→   ────────────────────────────────────────────────────────────────────────── */
+   790→
+   791→export type SettingType = "string" | "number" | "boolean" | "json";
+   792→
+   793→export interface Setting {
+   794→  key: string;
+   795→  value: string;
+   796→  type: SettingType;
+   797→}
+   798→
+   799→export type SettingsMap = Record<string, string | number | boolean | object>;
+   800→
+   801→/* ──────────────────────────────────────────────────────────────────────────
+   802→   28. Analytics
+   803→   ────────────────────────────────────────────────────────────────────────── */
+   804→
+   805→export type AnalyticsPeriod = "day" | "week" | "month";
+   806→
+   807→export interface AnalyticsOverview {
+   808→  totalRevenue: number;
+   809→  totalOrders: number;
+   810→  totalUsers: number;
+   811→  totalProducts: number;
+   812→  pendingOrders: number;
+   813→  todayRevenue: number;
+   814→  todayOrders: number;
+   815→}
+   816→
+   817→export interface AnalyticsSalesPoint {
+   818→  date: string;
+   819→  revenue: number;
+   820→  orderCount: number;
+   821→}
+   822→
+   823→export interface AnalyticsOrderStatusBreakdown {
+   824→  status: OrderStatus;
+   825→  count: number;
+   826→}
+   827→
+   828→export interface AnalyticsTopProduct {
+   829→  product: Pick<Product, "id" | "name" | "slug">;
+   830→  quantitySold: number;
+   831→  revenue: number;
+   832→}
+   833→
+   834→export interface AnalyticsNewUsersPoint {
+   835→  date: string;
+   836→  newUsers: number;
+   837→}
+   838→
+   839→/* ──────────────────────────────────────────────────────────────────────────
+   840→   29. Security (IP blocking)
+   841→   ────────────────────────────────────────────────────────────────────────── */
+   842→
+   843→export interface BlockedIp {
+   844→  id: number;
+   845→  ip: string;
+   846→  reason?: string | null;
+   847→  expiresAt?: string | null;
+   848→  createdAt: string;
+   849→}
+   850→
+   851→/* ──────────────────────────────────────────────────────────────────────────
+   852→   30. Users Admin (extended)
+   853→   ────────────────────────────────────────────────────────────────────────── */
+   854→
+   855→export interface AdminUserDetail extends User {
+   856→  activeSessionCount: number;
+   857→  orderCount: number;
+   858→  walletBalance: number;
+   859→  recentOrders?: Order[];
+   860→}
+   861→
+   862→export interface UserSession {
+   863→  id: number;
+   864→  deviceName?: string | null;
+   865→  ip?: string | null;
+   866→  isActive: boolean;
+   867→  createdAt: string;
+   868→  lastUsedAt?: string | null;
+   869→}
+   870→
+   871→/* ──────────────────────────────────────────────────────────────────────────
+   872→   Helper: flatten product categories
+   873→   ────────────────────────────────────────────────────────────────────────── */
+   874→
+   875→export interface ProductCategoryLink {
+   876→  productId: number;
+   877→  categoryId: number;
+   878→  category: Category;
+   879→}
+   880→
+   881→export function getProductCategories(
+   882→  product: Pick<Product, "categories">,
+   883→): Category[] {
+   884→  if (!product.categories) return [];
+   885→  if (product.categories.length === 0) return [];
+   886→  const first = product.categories[0] as unknown;
+   887→  if (first && typeof first === "object" && "category" in first) {
+   888→    return (product.categories as ProductCategoryLink[]).map((c) => c.category);
+   889→  }
+   890→  return product.categories as Category[];
+   891→}
+   892→
+   893→export function getProductImageUrl(img: ProductImage): string {
+   894→  return img.url ?? img.media?.url ?? "";
+   895→}
+   896→
+   897→export function getProductImageAlt(img: ProductImage, fallback = ""): string {
+   898→  return img.alt ?? img.media?.originalName ?? fallback;
+   899→}
+   900→
+   901→export function getVariantAttributeValues(
+   902→  variant: Pick<ProductVariant, "attributeValues">,
+   903→): AttributeValue[] {
+   904→  return variant.attributeValues ?? [];
+   905→}
+   906→
+   907→/* ──────────────────────────────────────────────────────────────────────────
+   908→   Query/Body types (used by services)
+   909→   ────────────────────────────────────────────────────────────────────────── */
+   910→
+   911→export interface OrderListQuery {
+   912→  page?: number;
+   913→  limit?: number;
+   914→  status?: OrderStatus;
+   915→  search?: string;
+   916→}
+   917→
+   918→export interface AdminOrderListQuery extends OrderListQuery {
+   919→  userId?: number;
+   920→}
+   921→
+   922→export interface AdminReturnsQuery {
+   923→  page?: number;
+   924→  limit?: number;
+   925→  status?: OrderReturn["status"];
+   926→  orderId?: number;
+   927→  userId?: number;
+   928→}
+   929→
+   930→export interface ReviewReturnBody {
+   931→  status: "RECEIVED" | "REFUNDED" | "REJECTED" | "APPROVED";
+   932→  refundAmount?: number;
+   933→  adminNote?: string;
+   934→}
+   935→
+   936→export interface RequestReturnBody {
+   937→  orderItemId?: number;
+   938→  reason: string;
+   939→  imageMediaIds?: number[];
+   940→}
+   941→
+   942→export interface NotificationListQuery {
+   943→  page?: number;
+   944→  limit?: number;
+   945→  isRead?: boolean;
+   946→}
+   947→
+   948→export interface BroadcastBody {
+   949→  userIds?: number[];
+   950→  type: NotificationType;
+   951→  title: string;
+   952→  message: string;
+   953→  link?: string;
+   954→}
+   955→
+   956→export interface TicketListQuery {
+   957→  page?: number;
+   958→  limit?: number;
+   959→  status?: TicketStatus;
+   960→  departmentId?: number;
+   961→  priority?: TicketPriority;
+   962→  search?: string;
+   963→  userId?: number;
+   964→}
+   965→
+   966→export interface CreateTicketBody {
+   967→  subject: string;
+   968→  departmentId?: number;
+   969→  priority?: TicketPriority;
+   970→  orderId?: number;
+   971→  message: string;
+   972→  attachmentMediaIds?: number[];
+   973→}
+   974→
+   975→export interface AddTicketMessageBody {
+   976→  message: string;
+   977→  attachmentMediaIds?: number[];
+   978→}
+   979→
+   980→export interface UpsertDepartmentBody {
+   981→  name: string;
+   982→  description?: string;
+   983→  isActive?: boolean;
+   984→}
+   985→
+   986→export interface AdminUpdateTicketBody {
+   987→  status?: TicketStatus;
+   988→  priority?: TicketPriority;
+   989→  departmentId?: number;
+   990→}
+   991→
+   992→export interface CreateCommentBody {
+   993→  content: string;
+   994→  parentId?: number;
+   995→  rating?: number;
+   996→  attachmentMediaIds?: number[];
+   997→}
+   998→
+   999→export interface AdminUserListQuery {
+  1000→  page?: number;
+  1001→  limit?: number;
+  1002→  role?: UserRole;
+  1003→  isBlocked?: boolean;
+  1004→  search?: string;
+  1005→}
+  1006→
+  1007→export interface BlockIpBody {
+  1008→  ip: string;
+  1009→  reason?: string;
+  1010→  expiresAt?: string | null;
+  1011→}
+  1012→
+  1013→export interface UpsertAddressBody {
+  1014→  title: string;
+  1015→  receiverName: string;
+  1016→  receiverPhone: string;
+  1017→  province: string;
+  1018→  city: string;
+  1019→  postalCode: string;
+  1020→  fullAddress: string;
+  1021→  lat: number;
+  1022→  lng: number;
+  1023→  isDefault?: boolean;
+  1024→}
+  1025→
+  1026→export interface UpsertShippingCompanyBody {
+  1027→  name: string;
+  1028→  logoMediaId?: number;
+  1029→  description?: string;
+  1030→  baseCost: number;
+  1031→  estimatedDaysMin?: number;
+  1032→  estimatedDaysMax?: number;
+  1033→  isActive?: boolean;
+  1034→}
+  1035→
+  1036→export interface UpsertPaymentGatewayBody {
+  1037→  name: string;
+  1038→  slug: string;
+  1039→  isActive?: boolean;
+  1040→  config?: Record<string, unknown>;
+  1041→}
+  1042→
+  1043→export interface UpdateOrderStatusBody {
+  1044→  status: OrderStatus;
+  1045→  note?: string;
+  1046→  trackingCode?: string;
+  1047→  packageNumber?: string;
+  1048→}
+  1049→
+  1050→export interface CreateDiscountCodeBody {
+  1051→  code: string;
+  1052→  type: DiscountType;
+  1053→  value: number;
+  1054→  maxDiscountAmount?: number | null;
+  1055→  minCartAmount?: number | null;
+  1056→  maxUsage?: number | null;
+  1057→  maxUsagePerUser?: number | null;
+  1058→  startsAt?: string | null;
+  1059→  expiresAt?: string | null;
+  1060→  isActive?: boolean;
+  1061→  productIds?: number[];
+  1062→  categoryIds?: number[];
+  1063→  userIds?: number[];
+  1064→}
+  1065→
+  1066→export interface UpsertBannerBody {
+  1067→  title: string;
+  1068→  mediaId: number;
+  1069→  link?: string;
+  1070→  position: BannerPosition;
+  1071→  order?: number;
+  1072→  isActive?: boolean;
+  1073→  startsAt?: string | null;
+  1074→  endsAt?: string | null;
+  1075→}
+  1076→
+  1077→export interface UpsertPopupBody {
+  1078→  title: string;
+  1079→  content: string;
+  1080→  mediaId?: number | null;
+  1081→  link?: string;
+  1082→  isActive?: boolean;
+  1083→  startsAt?: string | null;
+  1084→  endsAt?: string | null;
+  1085→  showOncePerSession?: boolean;
+  1086→}
+  1087→

@@ -55,7 +55,7 @@ export default function AdminTicketDetailPage({ params }: { params: Promise<{ id
 
   const load = React.useCallback(() => {
     setLoading(true);
-    ticketsService.adminById(id).then(setTicket).finally(() => setLoading(false));
+    ticketsService.adminById(Number(id)).then(setTicket).finally(() => setLoading(false));
   }, [id]);
 
   React.useEffect(() => {

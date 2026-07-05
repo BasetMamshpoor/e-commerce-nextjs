@@ -7,16 +7,16 @@ import type { Category } from "@/types/domain";
 
 interface CategoryTreeSelectProps {
   categories: Category[];
-  selectedIds: string[];
-  onChange: (ids: string[]) => void;
+  selectedIds: number[];
+  onChange: (ids: number[]) => void;
   className?: string;
   placeholder?: string;
 }
 
 export function CategoryTreeSelect({ categories, selectedIds, onChange, className, placeholder = "انتخاب دسته‌بندی‌ها..." }: CategoryTreeSelectProps) {
-  const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
-  const toggleExpand = (id: string) => setExpanded((prev) => { const n = new Set(prev); if (n.has(id)) { n.delete(id); } else { n.add(id); } return n; });
-  const toggleSelect = (id: string) => onChange(selectedIds.includes(id) ? selectedIds.filter((i) => i !== id) : [...selectedIds, id]);
+  const [expanded, setExpanded] = React.useState<Set<number>>(new Set());
+  const toggleExpand = (id: number) => setExpanded((prev) => { const n = new Set(prev); if (n.has(id)) { n.delete(id); } else { n.add(id); } return n; });
+  const toggleSelect = (id: number) => onChange(selectedIds.includes(id) ? selectedIds.filter((i) => i !== id) : [...selectedIds, id]);
 
   return (
     <div className={cn("rounded-lg border border-input bg-background p-2", className)}>
