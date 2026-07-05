@@ -1,9 +1,1 @@
-export {
-  COMPARISON_QUERY_KEY,
-  useComparison,
-  useComparisonProductIds,
-  useAddToComparison,
-  useRemoveFromComparison,
-  useClearComparison,
-  useComparisonToggle,
-} from "./use-comparison";
+export { useComparison, COMPARISON_QUERY_KEY } from "./use-comparison";

@@ -1,13 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { Scale } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
-import { useComparisonToggle } from "@/features/comparison/hooks";
 import { cn } from "@/lib/utils";
 
 interface ComparisonButtonProps {
-  productId: string;
+  productId: number;
   size?: "icon" | "sm" | "default";
   variant?: "ghost" | "outline" | "secondary";
   className?: string;
@@ -15,7 +14,8 @@ interface ComparisonButtonProps {
 }
 
 /**
- * Comparison toggle button. Works for both guest and authenticated users.
+ * Comparison button — now just a link to /comparison/{productId}.
+ * Comparison is fully URL-based (no add/remove/clear endpoints).
  */
 export function ComparisonButton({
   productId,
@@ -24,43 +24,22 @@ export function ComparisonButton({
   className,
   showLabel = false,
 }: ComparisonButtonProps) {
-  const { isInComparison, toggle, isPending } = useComparisonToggle();
-  const inComparison = isInComparison(productId);
-
-  const onClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    toggle(productId);
-  };
-
   if (showLabel) {
     return (
-      <Button
-        type="button"
-        variant={variant}
-        size="sm"
-        onClick={onClick}
-        disabled={isPending}
-        className={cn("gap-1.5", className)}
-      >
-        <Scale className={cn("size-4", inComparison && "fill-primary text-primary")} />
-        {inComparison ? "در مقایسه" : "مقایسه"}
+      <Button asChild variant={variant} size="sm" className={cn("gap-1.5", className)}>
+        <Link href={`/comparison/${productId}`}>
+          <Scale className="size-4" />
+          مقایسه
+        </Link>
       </Button>
     );
   }
 
   return (
-    <Button
-      type="button"
-      variant={variant}
-      size={size}
-      onClick={onClick}
-      disabled={isPending}
-      className={cn(className)}
-      aria-label={inComparison ? "حذف از مقایسه" : "افزودن به مقایسه"}
-      aria-pressed={inComparison}
-    >
-      <Scale className={cn("size-4", inComparison && "fill-primary text-primary")} />
+    <Button asChild variant={variant} size={size} className={className} aria-label="مقایسه">
+      <Link href={`/comparison/${productId}`}>
+        <Scale className="size-4" />
+      </Link>
     </Button>
   );
 }

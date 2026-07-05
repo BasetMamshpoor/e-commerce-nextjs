@@ -1,16 +1,13 @@
 /**
- * Centralized API endpoint paths
- * Mirrors the routes documented in api.md.
- * Base URL is configured separately (see constants/app.ts → APP_CONFIG.apiBaseUrl).
+ * Centralized API endpoint paths — REWRITTEN for updated API.md (July 2025).
+ * All IDs are now integers.
  */
 
 export const ENDPOINTS = {
-  // Health (outside /api/v1)
   health: "/health",
   sitemapXml: "/sitemap.xml",
   robotsTxt: "/robots.txt",
 
-  // 1. Auth
   auth: {
     register: "/auth/register",
     registerVerifyOtp: "/auth/register/verify-otp",
@@ -24,213 +21,239 @@ export const ENDPOINTS = {
     resetPassword: "/auth/reset-password",
   },
 
-  // 2. Categories
   categories: {
     tree: "/categories/tree",
     list: "/categories",
     bySlug: (slug: string) => `/categories/slug/${slug}`,
-    byId: (id: string) => `/categories/${id}`,
-    attributes: (id: string) => `/categories/${id}/attributes`,
-    attachAttribute: (id: string) => `/categories/${id}/attributes`,
-    detachAttribute: (id: string, attributeId: string) =>
-      `/categories/${id}/attributes/${attributeId}`,
+    byId: (id: number) => `/categories/${id}`,
+    attributes: (id: number) => `/categories/${id}/attributes`,
+    attachAttribute: (id: number) => `/categories/${id}/attributes`,
+    detachAttribute: (id: number, attributeId: number) => `/categories/${id}/attributes/${attributeId}`,
+    create: "/categories",
+    update: (id: number) => `/categories/${id}`,
+    delete: (id: number) => `/categories/${id}`,
   },
 
-  // 3. Brands
   brands: {
     list: "/brands",
     bySlug: (slug: string) => `/brands/slug/${slug}`,
-    byId: (id: string) => `/brands/${id}`,
-    root: "/brands",
+    byId: (id: number) => `/brands/${id}`,
+    create: "/brands",
+    update: (id: number) => `/brands/${id}`,
+    delete: (id: number) => `/brands/${id}`,
   },
 
-  // 4. Attributes
   attributes: {
     list: "/attributes",
-    byId: (id: string) => `/attributes/${id}`,
-    root: "/attributes",
-    addValue: (id: string) => `/attributes/${id}/values`,
-    updateValue: (valueId: string) => `/attributes/values/${valueId}`,
-    deleteValue: (valueId: string) => `/attributes/values/${valueId}`,
+    byId: (id: number) => `/attributes/${id}`,
+    create: "/attributes",
+    update: (id: number) => `/attributes/${id}`,
+    delete: (id: number) => `/attributes/${id}`,
+    addValue: (id: number) => `/attributes/${id}/values`,
+    updateValue: (valueId: number) => `/attributes/values/${valueId}`,
+    deleteValue: (valueId: number) => `/attributes/values/${valueId}`,
   },
 
-  // 5. Products
   products: {
     list: "/products",
     adminList: "/products/admin",
-    adminById: (id: string) => `/products/admin/${id}`,
+    adminById: (id: number) => `/products/admin/${id}`,
     filters: "/products/filters",
     bySlug: (slug: string) => `/products/${slug}`,
-    view: (id: string) => `/products/${id}/view`,
-    root: "/products",
-    byId: (id: string) => `/products/${id}`,
-    variants: (id: string) => `/products/${id}/variants`,
-    variant: (id: string, variantId: string) =>
-      `/products/${id}/variants/${variantId}`,
-    variantImages: (id: string, variantId: string) =>
-      `/products/${id}/variants/${variantId}/images`,
-    variantImage: (id: string, variantId: string, imageId: string) =>
-      `/products/${id}/variants/${variantId}/images/${imageId}`,
-    images: (id: string) => `/products/${id}/images`,
-    image: (id: string, imageId: string) => `/products/${id}/images/${imageId}`,
+    byId: (id: number) => `/products/by-id/${id}`,
+    create: "/products",
+    update: (id: number) => `/products/${id}`,
+    delete: (id: number) => `/products/${id}`,
+    addVariant: (id: number) => `/products/${id}/variants`,
+    updateVariant: (id: number, variantId: number) => `/products/${id}/variants/${variantId}`,
+    deleteVariant: (id: number, variantId: number) => `/products/${id}/variants/${variantId}`,
   },
 
-  // 6. Cart
   cart: {
     get: "/cart",
     addItem: "/cart/items",
-    updateItem: (itemId: string) => `/cart/items/${itemId}`,
-    deleteItem: (itemId: string) => `/cart/items/${itemId}`,
+    updateItem: (itemId: number) => `/cart/items/${itemId}`,
+    deleteItem: (itemId: number) => `/cart/items/${itemId}`,
     clear: "/cart",
     merge: "/cart/merge",
   },
 
-  // 7. Wishlist
   wishlist: {
     list: "/wishlist",
     add: "/wishlist",
-    remove: (productId: string) => `/wishlist/${productId}`,
+    remove: (productId: number) => `/wishlist/${productId}`,
   },
 
-  // 8. Comparison
   comparison: {
     get: "/comparison",
-    add: "/comparison",
-    remove: (productId: string) => `/comparison/${productId}`,
-    clear: "/comparison",
   },
 
-  // 9. Discount Codes
   discountCodes: {
     apply: "/discount-codes/apply",
     list: "/discount-codes",
-    byId: (id: string) => `/discount-codes/${id}`,
-    root: "/discount-codes",
+    byId: (id: number) => `/discount-codes/${id}`,
+    create: "/discount-codes",
+    update: (id: number) => `/discount-codes/${id}`,
+    delete: (id: number) => `/discount-codes/${id}`,
   },
 
-  // 10. Addresses
   addresses: {
     list: "/addresses",
-    byId: (id: string) => `/addresses/${id}`,
-    root: "/addresses",
+    byId: (id: number) => `/addresses/${id}`,
+    create: "/addresses",
+    update: (id: number) => `/addresses/${id}`,
+    delete: (id: number) => `/addresses/${id}`,
   },
 
-  // 11. Shipping Companies
   shippingCompanies: {
     list: "/shipping-companies",
-    byId: (id: string) => `/shipping-companies/${id}`,
-    root: "/shipping-companies",
+    byId: (id: number) => `/shipping-companies/${id}`,
+    create: "/shipping-companies",
+    update: (id: number) => `/shipping-companies/${id}`,
+    delete: (id: number) => `/shipping-companies/${id}`,
   },
 
-  // 12. Payment Gateways
   paymentGateways: {
     list: "/payment-gateways",
-    root: "/payment-gateways",
-    byId: (id: string) => `/payment-gateways/${id}`,
+    create: "/payment-gateways",
+    update: (id: number) => `/payment-gateways/${id}`,
+    delete: (id: number) => `/payment-gateways/${id}`,
   },
 
-  // 13. Wallet
   wallet: {
     get: "/wallet",
     chargeInitiate: "/wallet/charge/initiate",
-    chargeVerify: (transactionId: string) =>
-      `/wallet/charge/${transactionId}/verify`,
+    chargeVerify: (transactionId: number) => `/wallet/charge/${transactionId}/verify`,
+    withdrawals: "/wallet/withdrawals",
+    adminWithdrawals: "/wallet/admin/withdrawals",
+    adminReviewWithdrawal: (id: number) => `/wallet/admin/withdrawals/${id}`,
   },
 
-  // 14. Orders
   orders: {
     list: "/orders",
     adminList: "/orders/admin",
     adminReturns: "/orders/admin/returns",
-    adminReturn: (returnId: string) => `/orders/admin/returns/${returnId}`,
-    adminById: (id: string) => `/orders/admin/${id}`,
-    adminStatus: (id: string) => `/orders/admin/${id}/status`,
+    adminReturnDetail: (returnId: number) => `/orders/admin/returns/${returnId}`,
+    adminById: (id: number) => `/orders/admin/${id}`,
+    adminStatus: (id: number) => `/orders/admin/${id}/status`,
     create: "/orders",
-    byId: (id: string) => `/orders/${id}`,
-    cancel: (id: string) => `/orders/${id}/cancel`,
-    return: (id: string) => `/orders/${id}/return`,
-    paymentInitiate: (id: string) => `/orders/${id}/payment/initiate`,
-    paymentVerify: (id: string) => `/orders/${id}/payment/verify`,
+    byId: (id: number) => `/orders/${id}`,
+    cancel: (id: number) => `/orders/${id}/cancel`,
+    return: (id: number) => `/orders/${id}/return`,
+    paymentInitiate: (id: number) => `/orders/${id}/payment/initiate`,
+    paymentVerify: (id: number) => `/orders/${id}/payment/verify`,
   },
 
-  // 15. Media
   media: {
     upload: "/media",
     bulkUpload: "/media/bulk",
     list: "/media",
-    byId: (id: string) => `/media/${id}`,
+    byId: (id: number) => `/media/${id}`,
+    usage: (id: number) => `/media/${id}/usage`,
+    download: (id: number) => `/media/${id}/download`,
+    delete: (id: number) => `/media/${id}`,
   },
 
-  // 16. Notifications
   notifications: {
     list: "/notifications",
     unreadCount: "/notifications/unread-count",
     readAll: "/notifications/read-all",
-    read: (id: string) => `/notifications/${id}/read`,
-    byId: (id: string) => `/notifications/${id}`,
+    read: (id: number) => `/notifications/${id}/read`,
+    delete: (id: number) => `/notifications/${id}`,
     broadcast: "/notifications/admin/broadcast",
   },
 
-  // 17. Tickets
+  adminNotifications: {
+    list: "/admin/notifications",
+    unreadCount: "/admin/notifications/unread-count",
+    read: (id: number) => `/admin/notifications/${id}/read`,
+    readAll: "/admin/notifications/read-all",
+  },
+
   tickets: {
     departments: "/tickets/departments",
-    departmentById: (id: string) => `/tickets/departments/${id}`,
+    departmentById: (id: number) => `/tickets/departments/${id}`,
     list: "/tickets",
     create: "/tickets",
-    byId: (id: string) => `/tickets/${id}`,
-    addMessage: (id: string) => `/tickets/${id}/messages`,
+    byId: (id: number) => `/tickets/${id}`,
+    addMessage: (id: number) => `/tickets/${id}/messages`,
     adminList: "/tickets/admin",
-    adminById: (id: string) => `/tickets/admin/${id}`,
-    adminUpdate: (id: string) => `/tickets/admin/${id}`,
-    adminAddMessage: (id: string) => `/tickets/admin/${id}/messages`,
+    adminById: (id: number) => `/tickets/admin/${id}`,
+    adminUpdate: (id: number) => `/tickets/admin/${id}`,
+    adminAddMessage: (id: number) => `/tickets/admin/${id}/messages`,
+    createDepartment: "/tickets/departments",
+    updateDepartment: (id: number) => `/tickets/departments/${id}`,
+    deleteDepartment: (id: number) => `/tickets/departments/${id}`,
   },
 
-  // 18. Comments
   comments: {
-    byProduct: (productId: string) => `/comments/product/${productId}`,
-    create: (productId: string) => `/comments/product/${productId}`,
-    byId: (id: string) => `/comments/${id}`,
-    like: (id: string) => `/comments/${id}/like`,
+    byProduct: (productId: number) => `/comments/product/${productId}`,
+    create: (productId: number) => `/comments/product/${productId}`,
+    byBlogPost: (postId: number) => `/comments/blog/${postId}`,
+    createBlog: (postId: number) => `/comments/blog/${postId}`,
+    byId: (id: number) => `/comments/${id}`,
+    like: (id: number) => `/comments/${id}/like`,
     adminList: "/comments/admin",
-    adminUpdate: (id: string) => `/comments/admin/${id}`,
+    adminUpdate: (id: number) => `/comments/admin/${id}`,
   },
 
-  // 19. Banners
   banners: {
     list: "/banners",
     adminList: "/banners/admin",
-    root: "/banners",
-    byId: (id: string) => `/banners/${id}`,
+    create: "/banners",
+    update: (id: number) => `/banners/${id}`,
+    delete: (id: number) => `/banners/${id}`,
   },
 
-  // 20. Popups
   popups: {
     list: "/popups",
     adminList: "/popups/admin",
-    root: "/popups",
-    byId: (id: string) => `/popups/${id}`,
+    create: "/popups",
+    update: (id: number) => `/popups/${id}`,
+    delete: (id: number) => `/popups/${id}`,
   },
 
-  // 21. Users Admin
+  stories: {
+    list: "/stories",
+    adminList: "/stories/admin",
+    create: "/stories",
+    update: (id: number) => `/stories/${id}`,
+    delete: (id: number) => `/stories/${id}`,
+  },
+
+  newsletter: {
+    subscribe: "/newsletter/subscribe",
+    unsubscribe: "/newsletter/unsubscribe",
+    adminSubscribers: "/newsletter/admin/subscribers",
+  },
+
+  search: {
+    global: "/search",
+    quick: "/search/quick",
+    main: "/search/main",
+  },
+
+  landing: {
+    get: "/landing",
+  },
+
   usersAdmin: {
     list: "/users/admin",
-    byId: (id: string) => `/users/admin/${id}`,
-    block: (id: string) => `/users/admin/${id}/block`,
-    unblock: (id: string) => `/users/admin/${id}/unblock`,
-    role: (id: string) => `/users/admin/${id}/role`,
-    sessions: (id: string) => `/users/admin/${id}/sessions`,
-    session: (id: string, sessionId: string) =>
-      `/users/admin/${id}/sessions/${sessionId}`,
-    sessionsAll: (id: string) => `/users/admin/${id}/sessions`,
+    byId: (id: number) => `/users/admin/${id}`,
+    block: (id: number) => `/users/admin/${id}/block`,
+    unblock: (id: number) => `/users/admin/${id}/unblock`,
+    role: (id: number) => `/users/admin/${id}/role`,
+    walletAdjust: (id: number) => `/users/admin/${id}/wallet/adjust`,
+    sessions: (id: number) => `/users/admin/${id}/sessions`,
+    session: (id: number, sessionId: number) => `/users/admin/${id}/sessions/${sessionId}`,
+    sessionsAll: (id: number) => `/users/admin/${id}/sessions`,
   },
 
-  // 22. Security
   security: {
     blockedIps: "/security/blocked-ips",
-    blockedIp: (id: string) => `/security/blocked-ips/${id}`,
+    blockedIp: (id: number) => `/security/blocked-ips/${id}`,
   },
 
-  // 23. Analytics
   analytics: {
     overview: "/analytics/overview",
     salesOverTime: "/analytics/sales-over-time",
@@ -239,20 +262,26 @@ export const ENDPOINTS = {
     newUsersOverTime: "/analytics/new-users-over-time",
   },
 
-  // 24. Users Me
   usersMe: {
     get: "/users/me",
     update: "/users/me",
-    avatar: "/users/me/avatar",
     password: "/users/me/password",
     changeIdentifierRequest: "/users/me/change-identifier/request",
     changeIdentifierVerify: "/users/me/change-identifier/verify",
   },
 
-  // 25. Settings
   settings: {
     public: "/settings",
     admin: "/settings/admin",
     byKey: (key: string) => `/settings/admin/${key}`,
+  },
+
+  blog: {
+    list: "/blog/posts",
+    bySlug: (slug: string) => `/blog/posts/slug/${slug}`,
+    create: "/blog/posts",
+    update: (id: number) => `/blog/posts/${id}`,
+    delete: (id: number) => `/blog/posts/${id}`,
+    categories: "/blog/categories",
   },
 } as const;

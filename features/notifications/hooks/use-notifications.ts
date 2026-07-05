@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { notificationsService } from "@/services";
-import type { NotificationListQuery } from "@/services/notifications.service";
+import type { NotificationListQuery } from "@/services";
 import { ApiError } from "@/types/api";
 import type {
   AppNotification,

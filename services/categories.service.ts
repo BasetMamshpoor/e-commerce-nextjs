@@ -1,5 +1,5 @@
 /**
- * Categories API service (section 2 of api.md)
+ * Categories API service — IDs are now integers, imageMediaId instead of imageId.
  */
 
 import { http } from "@/lib/api-client";
@@ -10,8 +10,8 @@ export interface UpsertCategoryBody {
   name: string;
   slug?: string;
   description?: string;
-  imageId?: string;
-  parentId?: string;
+  imageMediaId?: number;
+  parentId?: number;
   order?: number;
   isActive?: boolean;
   metaTitle?: string;
@@ -21,31 +21,13 @@ export interface UpsertCategoryBody {
 
 export const categoriesService = {
   tree: () => http.get<Category[]>(ENDPOINTS.categories.tree),
-
-  list: (params?: { includeInactive?: boolean }) =>
-    http.get<Category[]>(ENDPOINTS.categories.list, params),
-
-  bySlug: (slug: string) =>
-    http.get<Category>(ENDPOINTS.categories.bySlug(slug)),
-
-  byId: (id: string) =>
-    http.get<Category>(ENDPOINTS.categories.byId(id)),
-
-  attributes: (id: string) =>
-    http.get<Attribute[]>(ENDPOINTS.categories.attributes(id)),
-
-  create: (body: UpsertCategoryBody) =>
-    http.post<Category>(ENDPOINTS.categories.list, body),
-
-  update: (id: string, body: Partial<UpsertCategoryBody>) =>
-    http.put<Category>(ENDPOINTS.categories.byId(id), body),
-
-  delete: (id: string) =>
-    http.delete<void>(ENDPOINTS.categories.byId(id)),
-
-  attachAttribute: (id: string, attributeId: string) =>
-    http.post<void>(ENDPOINTS.categories.attachAttribute(id), { attributeId }),
-
-  detachAttribute: (id: string, attributeId: string) =>
-    http.delete<void>(ENDPOINTS.categories.detachAttribute(id, attributeId)),
+  list: (params?: { includeInactive?: boolean }) => http.get<Category[]>(ENDPOINTS.categories.list, params),
+  bySlug: (slug: string) => http.get<Category>(ENDPOINTS.categories.bySlug(slug)),
+  byId: (id: number) => http.get<Category>(ENDPOINTS.categories.byId(id)),
+  attributes: (id: number) => http.get<Attribute[]>(ENDPOINTS.categories.attributes(id)),
+  create: (body: UpsertCategoryBody) => http.post<Category>(ENDPOINTS.categories.create, body),
+  update: (id: number, body: Partial<UpsertCategoryBody>) => http.put<Category>(ENDPOINTS.categories.update(id), body),
+  delete: (id: number) => http.delete<void>(ENDPOINTS.categories.delete(id)),
+  attachAttribute: (id: number, attributeId: number) => http.post<void>(ENDPOINTS.categories.attachAttribute(id), { attributeId }),
+  detachAttribute: (id: number, attributeId: number) => http.delete<void>(ENDPOINTS.categories.detachAttribute(id, attributeId)),
 };

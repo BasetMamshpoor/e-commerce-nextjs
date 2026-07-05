@@ -1,5 +1,5 @@
 /**
- * Cart API service (section 6 of api.md)
+ * Cart API service — IDs are now integers.
  */
 
 import { http } from "@/lib/api-client";
@@ -9,13 +9,13 @@ import type { Cart, CartResponse } from "@/types/domain";
 export const cartService = {
   get: () => http.get<CartResponse>(ENDPOINTS.cart.get),
 
-  addItem: (body: { variantId: string; quantity: number }) =>
+  addItem: (body: { variantId: number; quantity: number }) =>
     http.post<CartResponse>(ENDPOINTS.cart.addItem, body),
 
-  updateItem: (itemId: string, body: { quantity: number }) =>
+  updateItem: (itemId: number, body: { quantity: number }) =>
     http.patch<CartResponse>(ENDPOINTS.cart.updateItem(itemId), body),
 
-  deleteItem: (itemId: string) =>
+  deleteItem: (itemId: number) =>
     http.delete<CartResponse>(ENDPOINTS.cart.deleteItem(itemId)),
 
   clear: () => http.delete<CartResponse>(ENDPOINTS.cart.clear),

@@ -1,5 +1,7 @@
 /**
- * Products API service (section 5 of api.md)
+ * Products API service — REWRITTEN for new API structure.
+ * Key changes: basePrice + priceAdjustment, discount at product level,
+ * no separate image endpoints, no POST /:id/view.
  */
 
 import { http } from "@/lib/api-client";
@@ -11,53 +13,52 @@ import type {
   ProductListQuery,
   ProductStatus,
   ProductVariant,
-  ProductImage,
 } from "@/types/domain";
 
 export interface CreateProductBody {
   name: string;
-  brandId?: string;
+  brandId?: number;
   shortDescription?: string;
   description?: string;
+  basePrice: number;
+  discountType?: "PERCENT" | "FIXED";
+  discountValue?: number;
   status?: ProductStatus;
   isFeatured?: boolean;
-  categoryIds: string[];
-  images?: Array<{ mediaId: string; order: number; isMain?: boolean }>;
+  categoryIds: number[];
+  images?: Array<{ mediaId: number; order: number; isMain?: boolean }>;
   variants: Array<{
     sku: string;
-    price: number;
-    compareAtPrice?: number;
-    discountType?: "PERCENT" | "FIXED";
-    discountValue?: number;
-    discountStartAt?: string;
-    discountEndAt?: string;
+    priceAdjustment: number;
     stock: number;
     isDefault?: boolean;
-    attributeValueIds: string[];
+    attributeValueIds: number[];
   }>;
+  displayAttributes?: Array<{ attributeId: number; value: string }>;
 }
 
 export interface UpdateProductBody {
   name?: string;
-  brandId?: string | null;
+  brandId?: number | null;
   shortDescription?: string;
   description?: string;
+  basePrice?: number;
+  discountType?: "PERCENT" | "FIXED" | null;
+  discountValue?: number | null;
   status?: ProductStatus;
   isFeatured?: boolean;
-  categoryIds?: string[];
+  categoryIds?: number[];
+  deletedImages?: number[];
+  displayAttributes?: Array<{ attributeId: number; value: string }>;
 }
 
 export interface UpdateVariantBody {
   sku?: string;
-  price?: number;
-  compareAtPrice?: number | null;
-  discountType?: "PERCENT" | "FIXED" | null;
-  discountValue?: number | null;
-  discountStartAt?: string | null;
-  discountEndAt?: string | null;
+  priceAdjustment?: number;
   stock?: number;
   isDefault?: boolean;
-  attributeValueIds?: string[];
+  isActive?: boolean;
+  attributeValueIds?: number[];
 }
 
 export const productsService = {
@@ -67,7 +68,7 @@ export const productsService = {
   adminList: (query?: ProductListQuery) =>
     http.get<PaginatedData<Product>>(ENDPOINTS.products.adminList, query),
 
-  adminById: (id: string) =>
+  adminById: (id: number) =>
     http.get<Product>(ENDPOINTS.products.adminById(id)),
 
   filters: (categorySlug?: string) =>
@@ -76,35 +77,33 @@ export const productsService = {
   bySlug: (slug: string) =>
     http.get<Product>(ENDPOINTS.products.bySlug(slug)),
 
-  trackView: (id: string) =>
-    http.post<void>(ENDPOINTS.products.view(id)),
+  byId: (id: number) =>
+    http.get<Product>(ENDPOINTS.products.byId(id)),
 
   create: (body: CreateProductBody) =>
-    http.post<Product>(ENDPOINTS.products.root, body),
+    http.post<Product>(ENDPOINTS.products.create, body),
 
-  update: (id: string, body: UpdateProductBody) =>
-    http.put<Product>(ENDPOINTS.products.byId(id), body),
+  /** Update product — supports JSON-only or multipart (for inline image upload). */
+  update: (id: number, body: UpdateProductBody) =>
+    http.put<Product>(ENDPOINTS.products.update(id), body),
 
-  delete: (id: string) => http.delete<void>(ENDPOINTS.products.byId(id)),
+  /** Update product with inline images (multipart/form-data). */
+  updateWithImages: (id: number, bodyJson: string, images: File[]) => {
+    const fd = new FormData();
+    fd.append("body", bodyJson);
+    for (const f of images) fd.append("images", f);
+    return http.upload<Product>(ENDPOINTS.products.update(id), fd);
+  },
 
-  addVariant: (id: string, body: UpdateVariantBody) =>
-    http.post<ProductVariant>(ENDPOINTS.products.variants(id), body),
+  delete: (id: number) =>
+    http.delete<void>(ENDPOINTS.products.delete(id)),
 
-  updateVariant: (id: string, variantId: string, body: UpdateVariantBody) =>
-    http.put<ProductVariant>(ENDPOINTS.products.variant(id, variantId), body),
+  addVariant: (id: number, body: UpdateVariantBody) =>
+    http.post<ProductVariant>(ENDPOINTS.products.addVariant(id), body),
 
-  deleteVariant: (id: string, variantId: string) =>
-    http.delete<void>(ENDPOINTS.products.variant(id, variantId)),
+  updateVariant: (id: number, variantId: number, body: UpdateVariantBody) =>
+    http.put<ProductVariant>(ENDPOINTS.products.updateVariant(id, variantId), body),
 
-  addVariantImage: (id: string, variantId: string, body: { mediaId: string; order?: number; isMain?: boolean }) =>
-    http.post<ProductImage>(ENDPOINTS.products.variantImages(id, variantId), body),
-
-  deleteVariantImage: (id: string, variantId: string, imageId: string) =>
-    http.delete<void>(ENDPOINTS.products.variantImage(id, variantId, imageId)),
-
-  addImage: (id: string, body: { mediaId: string; order?: number; isMain?: boolean }) =>
-    http.post<ProductImage>(ENDPOINTS.products.images(id), body),
-
-  deleteImage: (id: string, imageId: string) =>
-    http.delete<void>(ENDPOINTS.products.image(id, imageId)),
+  deleteVariant: (id: number, variantId: number) =>
+    http.delete<void>(ENDPOINTS.products.deleteVariant(id, variantId)),
 };

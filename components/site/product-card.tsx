@@ -167,14 +167,14 @@ export function ProductCard({
         </Link>
 
         {/* Rating */}
-        {product.ratingAverage != null && product.ratingCount! > 0 && (
+        {product.avgRating != null && product.reviewCount! > 0 && (
           <div className="flex items-center gap-1 text-xs">
             <Star className="size-3.5 fill-warning text-warning" />
             <span className="font-medium text-foreground nums-fa">
-              {toPersianDigits(product.ratingAverage.toFixed(1))}
+              {toPersianDigits(product.avgRating.toFixed(1))}
             </span>
             <span className="text-muted-foreground nums-fa">
-              ({toPersianDigits(product.ratingCount!)})
+              ({toPersianDigits(product.reviewCount!)})
             </span>
           </div>
         )}
@@ -301,11 +301,11 @@ function ProductCardList({
           {product.name}
         </Link>
 
-        {product.ratingAverage != null && product.ratingCount! > 0 && (
+        {product.avgRating != null && product.reviewCount! > 0 && (
           <div className="mt-1 flex items-center gap-1 text-xs">
             <Star className="size-3 fill-warning text-warning" />
-            <span className="font-medium nums-fa">{toPersianDigits(product.ratingAverage.toFixed(1))}</span>
-            <span className="text-muted-foreground nums-fa">({toPersianDigits(product.ratingCount!)})</span>
+            <span className="font-medium nums-fa">{toPersianDigits(product.avgRating.toFixed(1))}</span>
+            <span className="text-muted-foreground nums-fa">({toPersianDigits(product.reviewCount!)})</span>
           </div>
         )}
 

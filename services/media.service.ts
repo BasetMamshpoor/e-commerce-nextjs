@@ -1,16 +1,17 @@
 /**
- * Media API service (section 15 of api.md)
+ * Media API service — REWRITTEN.
+ * Media is now only uploaded by ADMIN/EDITOR via media manager,
+ * OR inline with entity forms (products, banners, tickets, etc.) via multipart.
  */
 
 import { http } from "@/lib/api-client";
 import { ENDPOINTS } from "@/api/endpoints";
-import type { Media, PaginatedData } from "@/types/domain";
+import type { Media, MediaUsage, PaginatedData } from "@/types/domain";
 
 export const mediaService = {
-  upload: (file: File, alt?: string) => {
+  upload: (file: File) => {
     const fd = new FormData();
     fd.append("file", file);
-    if (alt) fd.append("alt", alt);
     return http.upload<Media>(ENDPOINTS.media.upload, fd);
   },
 
@@ -20,10 +21,14 @@ export const mediaService = {
     return http.upload<Media[]>(ENDPOINTS.media.bulkUpload, fd);
   },
 
-  list: (params?: { page?: number; limit?: number; type?: string; uploadedById?: string }) =>
+  list: (params?: { page?: number; limit?: number; type?: string; entityType?: string; search?: string }) =>
     http.get<PaginatedData<Media>>(ENDPOINTS.media.list, params),
 
-  byId: (id: string) => http.get<Media>(ENDPOINTS.media.byId(id)),
+  byId: (id: number) => http.get<Media>(ENDPOINTS.media.byId(id)),
 
-  delete: (id: string) => http.delete<void>(ENDPOINTS.media.byId(id)),
+  usage: (id: number) => http.get<{ usage: MediaUsage[] }>(ENDPOINTS.media.usage(id)),
+
+  downloadUrl: (id: number) => ENDPOINTS.media.download(id),
+
+  delete: (id: number) => http.delete<void>(ENDPOINTS.media.delete(id)),
 };

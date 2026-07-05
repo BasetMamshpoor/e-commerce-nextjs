@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { ordersService } from "@/services";
-import type { OrderListQuery, RequestReturnBody } from "@/services/orders.service";
+import type { OrderListQuery, RequestReturnBody } from "@/services";
 import { ApiError } from "@/types/api";
 import type {
   CreateOrderBody,

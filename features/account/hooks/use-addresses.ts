@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { addressesService } from "@/services";
-import type { UpsertAddressBody } from "@/services/addresses.service";
+import type { UpsertAddressBody } from "@/services";
 import { ApiError } from "@/types/api";
 import type { Address } from "@/types/domain";
 

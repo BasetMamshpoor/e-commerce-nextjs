@@ -1,11 +1,24 @@
 /**
- * Domain entity types — generated from API.md
- * Each interface maps to a backend resource documented in api.md.
+ * Domain entity types — REWRITTEN to match updated API.md (July 2025).
+ *
+ * KEY CHANGES:
+ *   - All IDs are now `number` (integer auto-increment), NOT string (cuid).
+ *   - Products use `basePrice` + `priceAdjustment` model (not per-variant price).
+ *   - Discount is at product level, not variant level.
+ *   - View tracking is automatic (no POST /:id/view).
+ *   - GET /by-id/:id added for frontend ID-based routes.
+ *   - Image management via PUT /:id (multipart), no separate image endpoints.
+ *   - Comparison: only GET /?productIds=1,2,3 — no add/remove/clear.
+ *   - Media: inline uploads with entityType, usage tracking, download.
+ *   - New: Stories, Newsletter, Search, Landing Page, Admin Notifications, Withdrawals.
+ *   - Comments: authorId/authorName, isLiked, commentableType, blog post comments.
+ *   - Orders: CUSTOMER-only checkout, trackingCode/packageNumber, detailed returns.
+ *   - Attributes: isDisplay field added.
  */
 
 import type { PaginationMeta } from "./api";
 
-// Re-export for convenience so services can import both from "@/types/domain".
+// Re-export for convenience
 export type { PaginatedData, PaginationMeta } from "./api";
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -15,7 +28,7 @@ export type { PaginatedData, PaginationMeta } from "./api";
 export type UserRole = "CUSTOMER" | "EDITOR" | "SUPPORT" | "ADMIN";
 
 export interface User {
-  id: string;
+  id: number;
   fullName: string;
   email: string | null;
   phone: string | null;
@@ -24,6 +37,10 @@ export interface User {
   emailVerifiedAt?: string | null;
   phoneVerifiedAt?: string | null;
   isBlocked?: boolean;
+  blockedReason?: string | null;
+  blockedAt?: string | null;
+  lastLoginAt?: string | null;
+  lastLoginIp?: string | null;
   createdAt: string;
   updatedAt?: string;
 }
@@ -32,7 +49,7 @@ export interface AuthSession {
   user: User;
   accessToken: string;
   refreshToken: string;
-  sessionId: string;
+  sessionId: number;
 }
 
 export type OtpChannel = "SMS" | "EMAIL";
@@ -44,17 +61,41 @@ export interface OtpRequestResult {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   2. Categories (multi-level tree)
+   2. Media — centralized model
+   ────────────────────────────────────────────────────────────────────────── */
+
+export type MediaType = "IMAGE" | "VIDEO" | "DOCUMENT" | "OTHER";
+
+export interface Media {
+  id: number;
+  fileName: string;
+  originalName: string;
+  url: string;
+  mimeType: string;
+  size: number;
+  type: MediaType;
+  entityType?: string;
+  createdAt: string;
+}
+
+export interface MediaUsage {
+  entityType: string;
+  entityId: number;
+  entityName: string;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   3. Categories
    ────────────────────────────────────────────────────────────────────────── */
 
 export interface Category {
-  id: string;
+  id: number;
   name: string;
   slug: string;
   description?: string | null;
-  imageId?: string | null;
+  imageMediaId?: number | null;
   imageUrl?: string | null;
-  parentId?: string | null;
+  parentId?: number | null;
   order: number;
   isActive: boolean;
   metaTitle?: string | null;
@@ -66,15 +107,15 @@ export interface Category {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   3. Brands
+   4. Brands
    ────────────────────────────────────────────────────────────────────────── */
 
 export interface Brand {
-  id: string;
+  id: number;
   name: string;
   slug: string;
   description?: string | null;
-  logoId?: string | null;
+  logoMediaId?: number | null;
   logoUrl?: string | null;
   isActive: boolean;
   metaTitle?: string | null;
@@ -85,173 +126,111 @@ export interface Brand {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   4. Attributes
+   5. Attributes
    ────────────────────────────────────────────────────────────────────────── */
 
 export type AttributeInputType = "TEXT" | "COLOR" | "SELECT";
 
 export interface AttributeValue {
-  id: string;
-  attributeId: string;
+  id: number;
+  attributeId: number;
   value: string;
   colorHex?: string | null;
   order: number;
-  /** Nested attribute reference (returned by backend in variant context). */
-  attribute?: Pick<Attribute, "id" | "name" | "slug">;
 }
 
 export interface Attribute {
-  id: string;
+  id: number;
   name: string;
   slug: string;
   inputType: AttributeInputType;
   isFilterable: boolean;
   isVariant: boolean;
+  isDisplay: boolean;
   values: AttributeValue[];
   createdAt: string;
   updatedAt?: string;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   5. Products (variable products)
+   6. Products — NEW STRUCTURE (basePrice + priceAdjustment)
    ────────────────────────────────────────────────────────────────────────── */
 
 export type ProductStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
+
+export type DiscountType = "PERCENT" | "FIXED";
 
 export type ProductSortOption =
   | "newest"
   | "price_asc"
   | "price_desc"
-  | "popular";
-
-/** Embedded media object returned by the backend inside ProductImage. */
-export interface ProductImageMedia {
-  id: string;
-  url: string;
-  type?: string;
-  mimeType?: string;
-  size?: number;
-  alt?: string | null;
-  createdAt?: string;
-}
+  | "popular"
+  | "bestselling"
+  | "most_viewed"
+  | "most_popular";
 
 export interface ProductImage {
-  id: string;
-  mediaId: string;
-  /** Backend nests the media under `media`. We expose both flat + nested for safety. */
-  media?: ProductImageMedia;
+  id: number;
+  mediaId: number;
   url?: string;
   alt?: string | null;
+  media?: Media;
   order: number;
   isMain: boolean;
 }
 
-/** Helper to extract url+alt from either flat or nested shape. */
-export function getProductImageUrl(img: ProductImage): string {
-  return img.url ?? img.media?.url ?? "";
-}
-
-export function getProductImageAlt(img: ProductImage, fallback = ""): string {
-  return img.alt ?? img.media?.alt ?? fallback;
-}
-
-export type DiscountType = "PERCENT" | "FIXED";
-
-/** Junction-row form returned by backend in ProductVariant.attributeValues. */
-export interface VariantAttributeValueLink {
-  id: string;
-  variantId: string;
-  attributeValueId: string;
-  attributeValue: AttributeValue;
-}
-
 export interface ProductVariant {
-  id: string;
+  id: number;
   sku: string;
-  price: number;
-  compareAtPrice?: number | null;
-  discountType?: DiscountType | null;
-  discountValue?: number | null;
-  discountStartAt?: string | null;
-  discountEndAt?: string | null;
+  priceAdjustment: number;
   stock: number;
   isDefault: boolean;
   isActive: boolean;
   effectivePrice?: number;
-  attributeValueIds: string[];
-  /** Backend returns junction rows: [{ id, variantId, attributeValueId, attributeValue }]. */
-  attributeValues?: VariantAttributeValueLink[] | AttributeValue[];
-  images?: ProductImage[];
+  attributeValueIds: number[];
+  attributeValues?: AttributeValue[];
 }
 
-/** Junction-row form returned by backend in Product.categories. */
-export interface ProductCategoryLink {
-  productId: string;
-  categoryId: string;
-  category: Category;
+export interface DisplayAttribute {
+  attributeId: number;
+  value: string;
+  attribute?: Pick<Attribute, "id" | "name" | "slug">;
 }
 
 export interface Product {
-  id: string;
+  id: number;
   name: string;
   slug: string;
   shortDescription?: string | null;
   description?: string | null;
   status: ProductStatus;
   isFeatured: boolean;
-  brandId?: string | null;
+  brandId?: number | null;
   brand?: Brand | null;
-  /** Backend returns junction rows: [{ productId, categoryId, category }]. */
-  categories?: ProductCategoryLink[] | Category[];
+  categories?: Category[] | Array<{ productId: number; categoryId: number; category: Category }>;
   images?: ProductImage[];
   variants?: ProductVariant[];
-  /** Denormalized from variants for fast filtering/sorting. */
+  displayAttributes?: DisplayAttribute[];
+  displayAttributeValues?: DisplayAttribute[];
+  basePrice: number;
+  discountType?: DiscountType | null;
+  discountValue?: number | null;
   minPrice: number;
   maxPrice: number;
   isInStock: boolean;
   hasActiveDiscount: boolean;
-  ratingAverage?: number | null;
-  ratingCount?: number;
+  avgRating?: number | null;
+  reviewCount?: number;
+  totalSold?: number;
   viewCount?: number;
+  isWish?: boolean;
+  relatedProducts?: Product[];
+  alsoBoughtProducts?: Product[];
+  relatedBlogPosts?: BlogPost[];
   createdAt: string;
   updatedAt?: string;
 }
 
-/**
- * Normalize product.categories into a flat Category[] regardless of whether the
- * backend returned junction rows or a flat list.
- */
-export function getProductCategories(
-  product: Pick<Product, "categories">,
-): Category[] {
-  if (!product.categories) return [];
-  if (product.categories.length === 0) return [];
-  const first = product.categories[0] as any;
-  if (first && "category" in first) {
-    return (product.categories as ProductCategoryLink[]).map((c) => c.category);
-  }
-  return product.categories as Category[];
-}
-
-/**
- * Normalize variant.attributeValues into a flat AttributeValue[] regardless
- * of whether the backend returned junction rows or a flat list.
- */
-export function getVariantAttributeValues(
-  variant: Pick<ProductVariant, "attributeValues">,
-): AttributeValue[] {
-  if (!variant.attributeValues) return [];
-  if (variant.attributeValues.length === 0) return [];
-  const first = variant.attributeValues[0] as any;
-  if (first && "attributeValue" in first) {
-    return (variant.attributeValues as VariantAttributeValueLink[]).map(
-      (av) => av.attributeValue,
-    );
-  }
-  return variant.attributeValues as AttributeValue[];
-}
-
-/** Filter metadata returned by `GET /products/filters`. */
 export interface ProductFilterMetadata {
   brands: Pick<Brand, "id" | "name" | "slug">[];
   priceRange: { min: number; max: number };
@@ -266,8 +245,8 @@ export interface ProductListQuery {
   page?: number;
   limit?: number;
   categorySlug?: string;
-  brandIds?: string;          // comma-separated
-  attributeValueIds?: string; // comma-separated
+  brandIds?: string;
+  attributeValueIds?: string;
   minPrice?: number;
   maxPrice?: number;
   inStock?: boolean;
@@ -275,16 +254,16 @@ export interface ProductListQuery {
   isFeatured?: boolean;
   search?: string;
   sort?: ProductSortOption;
-  status?: ProductStatus;     // admin only
+  status?: ProductStatus;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   6. Cart
+   7. Cart
    ────────────────────────────────────────────────────────────────────────── */
 
 export interface CartItem {
-  id: string;
-  variantId: string;
+  id: number;
+  variantId: number;
   productName: string;
   productSlug: string;
   image?: string | null;
@@ -298,17 +277,12 @@ export interface CartItem {
 }
 
 export interface Cart {
-  id: string | null;
+  id: number | null;
   itemCount: number;
   subtotal: number;
   totalDiscount: number;
   total: number;
   items: CartItem[];
-}
-
-export interface AddCartItemBody {
-  variantId: string;
-  quantity: number;
 }
 
 export interface CartResponse {
@@ -318,12 +292,12 @@ export interface CartResponse {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   7. Wishlist
+   8. Wishlist
    ────────────────────────────────────────────────────────────────────────── */
 
 export interface WishlistItem {
-  id: string;
-  productId: string;
+  id: number;
+  productId: number;
   product: Pick<
     Product,
     "id" | "name" | "slug" | "minPrice" | "maxPrice" | "isInStock" | "hasActiveDiscount"
@@ -332,31 +306,19 @@ export interface WishlistItem {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   8. Comparison
+   9. Comparison — simplified (GET only)
    ────────────────────────────────────────────────────────────────────────── */
 
-export interface ComparisonItem {
-  id: string;
-  productId: string;
-  product: Product & { brand?: Pick<Brand, "id" | "name"> | null };
-}
-
-export interface Comparison {
-  id: string | null;
-  items: ComparisonItem[];
-}
-
 export interface ComparisonResponse {
-  comparison: Comparison;
-  guestToken?: string;
+  items: Array<{ product: Product }>;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   9. Discount Codes
+   10. Discount Codes
    ────────────────────────────────────────────────────────────────────────── */
 
 export interface DiscountCode {
-  id: string;
+  id: number;
   code: string;
   type: DiscountType;
   value: number;
@@ -368,15 +330,15 @@ export interface DiscountCode {
   startsAt?: string | null;
   expiresAt?: string | null;
   isActive: boolean;
-  productIds?: string[];
-  categoryIds?: string[];
-  userIds?: string[];
+  productIds?: number[];
+  categoryIds?: number[];
+  userIds?: number[];
   createdAt: string;
   updatedAt?: string;
 }
 
 export interface DiscountApplyResult {
-  discountCodeId: string;
+  discountCodeId: number;
   code: string;
   type: DiscountType;
   value: number;
@@ -384,16 +346,16 @@ export interface DiscountApplyResult {
   eligibleSubtotal: number;
   discountAmount: number;
   payableTotal: number;
-  eligibleVariantIds: string[];
+  eligibleVariantIds: number[];
   guestToken?: string;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   10. Addresses
+   11. Addresses
    ────────────────────────────────────────────────────────────────────────── */
 
 export interface Address {
-  id: string;
+  id: number;
   title: string;
   receiverName: string;
   receiverPhone: string;
@@ -409,13 +371,14 @@ export interface Address {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   11. Shipping Companies
+   12. Shipping Companies
    ────────────────────────────────────────────────────────────────────────── */
 
 export interface ShippingCompany {
-  id: string;
+  id: number;
   name: string;
   logoUrl?: string | null;
+  logoMediaId?: number | null;
   description?: string | null;
   baseCost: number;
   estimatedDaysMin?: number | null;
@@ -426,11 +389,11 @@ export interface ShippingCompany {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   12. Payment Gateways
+   13. Payment Gateways
    ────────────────────────────────────────────────────────────────────────── */
 
 export interface PaymentGateway {
-  id: string;
+  id: number;
   name: string;
   slug: string;
   isActive: boolean;
@@ -439,7 +402,7 @@ export interface PaymentGateway {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   13. Wallet
+   14. Wallet
    ────────────────────────────────────────────────────────────────────────── */
 
 export type WalletTransactionType =
@@ -447,14 +410,15 @@ export type WalletTransactionType =
   | "WITHDRAW"
   | "PURCHASE"
   | "REFUND"
-  | "ADMIN_ADJUST";
+  | "ADMIN_ADJUST"
+  | "WITHDRAWAL_REQUEST";
 
 export interface WalletTransaction {
-  id: string;
+  id: number;
   type: WalletTransactionType;
   amount: number;
   description?: string | null;
-  orderId?: string | null;
+  orderId?: number | null;
   createdAt: string;
 }
 
@@ -464,8 +428,18 @@ export interface WalletData {
   meta: PaginationMeta;
 }
 
+export interface WithdrawalRequest {
+  id: number;
+  userId: number;
+  amount: number;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  description?: string | null;
+  adminNote?: string | null;
+  createdAt: string;
+}
+
 /* ──────────────────────────────────────────────────────────────────────────
-   14. Orders
+   15. Orders
    ────────────────────────────────────────────────────────────────────────── */
 
 export type OrderStatus =
@@ -482,7 +456,7 @@ export type OrderStatus =
 export type PaymentMethod = "WALLET" | "GATEWAY" | "MIXED";
 
 export interface OrderItem {
-  id: string;
+  id: number;
   productName: string;
   variantAttributes: string;
   price: number;
@@ -492,7 +466,7 @@ export interface OrderItem {
 }
 
 export interface OrderStatusHistoryEntry {
-  id?: string;
+  id?: number;
   status: OrderStatus;
   note?: string | null;
   createdAt: string;
@@ -504,19 +478,19 @@ export interface OrderCancellation {
 }
 
 export interface OrderReturn {
-  id: string;
-  orderItemId?: string | null;
+  id: number;
+  orderItemId?: number | null;
   reason: string;
   status: "PENDING" | "APPROVED" | "RECEIVED" | "REFUNDED" | "REJECTED";
   refundAmount?: number | null;
   adminNote?: string | null;
-  imageMediaIds?: string[];
+  imageMediaIds?: number[];
   createdAt: string;
   updatedAt?: string;
 }
 
 export interface Order {
-  id: string;
+  id: number;
   orderNumber: string;
   status: OrderStatus;
   paymentMethod: PaymentMethod;
@@ -526,42 +500,28 @@ export interface Order {
   discountAmount: number;
   taxAmount: number;
   totalAmount: number;
-  shippingAddress?: Address;
+  trackingCode?: string | null;
+  packageNumber?: string | null;
+  shippingAddress?: Partial<Address>;
   address?: Address;
   items: OrderItem[];
   statusHistory: OrderStatusHistoryEntry[];
   shippingCompany?: Pick<ShippingCompany, "id" | "name">;
-  discountCode?: { id: string; code: string } | null;
+  discountCode?: { id: number; code: string } | null;
   transactions?: WalletTransaction[];
   cancellation?: OrderCancellation | null;
   returns?: OrderReturn[];
+  user?: Pick<User, "id" | "fullName">;
   createdAt: string;
   updatedAt?: string;
 }
 
 export interface CreateOrderBody {
-  addressId: string;
-  shippingCompanyId: string;
+  addressId: number;
+  shippingCompanyId: number;
   paymentMethod: PaymentMethod;
   gatewaySlug?: string;
   discountCode?: string;
-}
-
-/* ──────────────────────────────────────────────────────────────────────────
-   15. Media
-   ────────────────────────────────────────────────────────────────────────── */
-
-export type MediaType = "IMAGE" | "PDF" | "OTHER";
-
-export interface Media {
-  id: string;
-  url: string;
-  type: MediaType;
-  mimeType: string;
-  size: number;
-  alt?: string | null;
-  uploadedById: string;
-  createdAt: string;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -577,7 +537,7 @@ export type NotificationType =
   | "COMMENT";
 
 export interface AppNotification {
-  id: string;
+  id: number;
   type: NotificationType;
   title: string;
   message: string;
@@ -587,7 +547,21 @@ export interface AppNotification {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   17. Tickets
+   17. Admin Notifications (separate from user notifications)
+   ────────────────────────────────────────────────────────────────────────── */
+
+export interface AdminNotification {
+  id: number;
+  type: string;
+  title: string;
+  message: string;
+  link?: string | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   18. Tickets
    ────────────────────────────────────────────────────────────────────────── */
 
 export type TicketStatus = "OPEN" | "ANSWERED" | "CLOSED";
@@ -595,53 +569,52 @@ export type TicketPriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
 export type TicketMessageSender = "USER" | "ADMIN";
 
 export interface TicketDepartment {
-  id: string;
+  id: number;
   name: string;
   description?: string | null;
   isActive: boolean;
 }
 
 export interface TicketMessage {
-  id: string;
+  id: number;
   senderType: TicketMessageSender;
   message: string;
-  attachmentMediaIds?: string[];
-  attachments?: Media[];
+  attachmentMediaIds?: number[];
+  attachments?: Array<{ id: number; mediaId: number; media: Media }>;
   createdAt: string;
 }
 
 export interface Ticket {
-  id: string;
+  id: number;
   subject: string;
   status: TicketStatus;
   priority: TicketPriority;
-  departmentId?: string | null;
+  departmentId?: number | null;
   department?: TicketDepartment | null;
-  orderId?: string | null;
+  orderId?: number | null;
+  userId?: number;
+  user?: Pick<User, "id" | "fullName">;
   messages: TicketMessage[];
   createdAt: string;
   updatedAt?: string;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   18. Comments (nested)
+   19. Comments (nested) — updated with authorId/authorName/isLiked
    ────────────────────────────────────────────────────────────────────────── */
 
 export type CommentStatus = "PENDING" | "APPROVED" | "REJECTED";
+export type CommentableType = "PRODUCT" | "BLOG_POST";
 
 export interface Comment {
-  id: string;
-  /** User ID (returned by backend; useful for "is this my comment?" checks). */
-  userId?: string;
+  id: number;
   content: string;
   rating?: number | null;
-  /** Approval status (returned by admin list endpoint). */
-  status?: CommentStatus;
   likeCount: number;
-  likedByMe?: boolean;
+  isLiked?: boolean;
+  authorId?: number;
+  authorName?: string;
   attachments?: Media[];
-  /** Nested user object (NOT currently returned by backend — see BACKEND-ISSUES.md). */
-  user?: Pick<User, "id" | "fullName" | "avatarUrl">;
   replies?: Comment[];
   createdAt: string;
   updatedAt?: string;
@@ -659,19 +632,15 @@ export interface ProductCommentsData {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   19. Banners
+   20. Banners
    ────────────────────────────────────────────────────────────────────────── */
 
-export type BannerPosition =
-  | "HOME_MAIN"
-  | "HOME_MIDDLE"
-  | "CATEGORY_TOP"
-  | "SIDEBAR";
+export type BannerPosition = "HOME_MAIN" | "HOME_MIDDLE" | "CATEGORY_TOP" | "SIDEBAR";
 
 export interface Banner {
-  id: string;
+  id: number;
   title: string;
-  mediaId: string;
+  mediaId: number;
   imageUrl: string;
   link?: string | null;
   position: BannerPosition;
@@ -682,14 +651,14 @@ export interface Banner {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   20. Popups
+   21. Popups
    ────────────────────────────────────────────────────────────────────────── */
 
 export interface Popup {
-  id: string;
+  id: number;
   title: string;
   content: string;
-  mediaId?: string | null;
+  mediaId?: number | null;
   imageUrl?: string | null;
   link?: string | null;
   isActive: boolean;
@@ -699,7 +668,121 @@ export interface Popup {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   21. Settings
+   22. Stories — NEW
+   ────────────────────────────────────────────────────────────────────────── */
+
+export interface Story {
+  id: number;
+  title: string;
+  coverImage?: { mediaId: number; url: string } | null;
+  video?: { mediaId: number; url: string } | null;
+  expiresAt?: string | null;
+  order: number;
+  nextId?: number | null;
+  prevId?: number | null;
+  products?: Product[];
+  createdAt: string;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   23. Newsletter — NEW
+   ────────────────────────────────────────────────────────────────────────── */
+
+export interface NewsletterSubscriber {
+  id: number;
+  email: string;
+  createdAt: string;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   24. Search — NEW (3 types)
+   ────────────────────────────────────────────────────────────────────────── */
+
+export interface GlobalSearchResult {
+  products: Array<Pick<Product, "id" | "name" | "slug" | "minPrice" | "maxPrice">>;
+  blogPosts: Array<{ id: number; title: string; slug: string; coverImageUrl?: string }>;
+  categories: Array<Pick<Category, "id" | "name" | "slug">>;
+  brands: Array<Pick<Brand, "id" | "name" | "slug">>;
+}
+
+export interface QuickSearchResult {
+  type: "product" | "category" | "blog_post" | "brand";
+  id: number;
+  title: string;
+  slug: string;
+}
+
+export interface MainSearchFilters {
+  brands: Array<Pick<Brand, "id" | "name" | "slug" | "logoUrl">>;
+  priceRange: { min: number; max: number };
+  hasDiscount: boolean;
+  inStock: boolean;
+}
+
+export interface MainSearchResult {
+  items: Product[];
+  filters: MainSearchFilters;
+  meta: PaginationMeta;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   25. Landing Page — NEW
+   ────────────────────────────────────────────────────────────────────────── */
+
+export type LandingSectionType =
+  | "banners"
+  | "popups"
+  | "stories"
+  | "categories"
+  | "featured_products"
+  | "latest_products"
+  | "top_rated_products"
+  | "flash_sales"
+  | "latest_blog_posts"
+  | "popular_brands";
+
+export interface LandingSection {
+  type: LandingSectionType;
+  label?: string;
+  data: unknown;
+}
+
+export interface LandingData {
+  sections: LandingSection[];
+  settings: Record<string, unknown>;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   26. Blog — NEW (inferred from API mentions)
+   ────────────────────────────────────────────────────────────────────────── */
+
+export type BlogPostStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
+
+export interface BlogPost {
+  id: number;
+  title: string;
+  slug: string;
+  excerpt: string;
+  content: string;
+  status: BlogPostStatus;
+  coverImageMediaId?: number | null;
+  coverImageUrl?: string | null;
+  categoryId?: number | null;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  publishedAt?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface BlogCategory {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   27. Settings
    ────────────────────────────────────────────────────────────────────────── */
 
 export type SettingType = "string" | "number" | "boolean" | "json";
@@ -713,7 +796,7 @@ export interface Setting {
 export type SettingsMap = Record<string, string | number | boolean | object>;
 
 /* ──────────────────────────────────────────────────────────────────────────
-   23. Analytics
+   28. Analytics
    ────────────────────────────────────────────────────────────────────────── */
 
 export type AnalyticsPeriod = "day" | "week" | "month";
@@ -751,13 +834,250 @@ export interface AnalyticsNewUsersPoint {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   22. Security (IP blocking)
+   29. Security (IP blocking)
    ────────────────────────────────────────────────────────────────────────── */
 
 export interface BlockedIp {
-  id: string;
+  id: number;
   ip: string;
   reason?: string | null;
   expiresAt?: string | null;
   createdAt: string;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   30. Users Admin (extended)
+   ────────────────────────────────────────────────────────────────────────── */
+
+export interface AdminUserDetail extends User {
+  activeSessionCount: number;
+  orderCount: number;
+  walletBalance: number;
+  recentOrders?: Order[];
+}
+
+export interface UserSession {
+  id: number;
+  deviceName?: string | null;
+  ip?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  lastUsedAt?: string | null;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Helper: flatten product categories
+   ────────────────────────────────────────────────────────────────────────── */
+
+export interface ProductCategoryLink {
+  productId: number;
+  categoryId: number;
+  category: Category;
+}
+
+export function getProductCategories(
+  product: Pick<Product, "categories">,
+): Category[] {
+  if (!product.categories) return [];
+  if (product.categories.length === 0) return [];
+  const first = product.categories[0] as unknown;
+  if (first && typeof first === "object" && "category" in first) {
+    return (product.categories as ProductCategoryLink[]).map((c) => c.category);
+  }
+  return product.categories as Category[];
+}
+
+export function getProductImageUrl(img: ProductImage): string {
+  return img.url ?? img.media?.url ?? "";
+}
+
+export function getProductImageAlt(img: ProductImage, fallback = ""): string {
+  return img.alt ?? img.media?.originalName ?? fallback;
+}
+
+export function getVariantAttributeValues(
+  variant: Pick<ProductVariant, "attributeValues">,
+): AttributeValue[] {
+  return variant.attributeValues ?? [];
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Query/Body types (used by services)
+   ────────────────────────────────────────────────────────────────────────── */
+
+export interface OrderListQuery {
+  page?: number;
+  limit?: number;
+  status?: OrderStatus;
+  search?: string;
+}
+
+export interface AdminOrderListQuery extends OrderListQuery {
+  userId?: number;
+}
+
+export interface AdminReturnsQuery {
+  page?: number;
+  limit?: number;
+  status?: OrderReturn["status"];
+  orderId?: number;
+  userId?: number;
+}
+
+export interface ReviewReturnBody {
+  status: "RECEIVED" | "REFUNDED" | "REJECTED" | "APPROVED";
+  refundAmount?: number;
+  adminNote?: string;
+}
+
+export interface RequestReturnBody {
+  orderItemId?: number;
+  reason: string;
+  imageMediaIds?: number[];
+}
+
+export interface NotificationListQuery {
+  page?: number;
+  limit?: number;
+  isRead?: boolean;
+}
+
+export interface BroadcastBody {
+  userIds?: number[];
+  type: NotificationType;
+  title: string;
+  message: string;
+  link?: string;
+}
+
+export interface TicketListQuery {
+  page?: number;
+  limit?: number;
+  status?: TicketStatus;
+  departmentId?: number;
+  priority?: TicketPriority;
+  search?: string;
+  userId?: number;
+}
+
+export interface CreateTicketBody {
+  subject: string;
+  departmentId?: number;
+  priority?: TicketPriority;
+  orderId?: number;
+  message: string;
+  attachmentMediaIds?: number[];
+}
+
+export interface AddTicketMessageBody {
+  message: string;
+  attachmentMediaIds?: number[];
+}
+
+export interface UpsertDepartmentBody {
+  name: string;
+  description?: string;
+  isActive?: boolean;
+}
+
+export interface AdminUpdateTicketBody {
+  status?: TicketStatus;
+  priority?: TicketPriority;
+  departmentId?: number;
+}
+
+export interface CreateCommentBody {
+  content: string;
+  parentId?: number;
+  rating?: number;
+  attachmentMediaIds?: number[];
+}
+
+export interface AdminUserListQuery {
+  page?: number;
+  limit?: number;
+  role?: UserRole;
+  isBlocked?: boolean;
+  search?: string;
+}
+
+export interface BlockIpBody {
+  ip: string;
+  reason?: string;
+  expiresAt?: string | null;
+}
+
+export interface UpsertAddressBody {
+  title: string;
+  receiverName: string;
+  receiverPhone: string;
+  province: string;
+  city: string;
+  postalCode: string;
+  fullAddress: string;
+  lat: number;
+  lng: number;
+  isDefault?: boolean;
+}
+
+export interface UpsertShippingCompanyBody {
+  name: string;
+  logoMediaId?: number;
+  description?: string;
+  baseCost: number;
+  estimatedDaysMin?: number;
+  estimatedDaysMax?: number;
+  isActive?: boolean;
+}
+
+export interface UpsertPaymentGatewayBody {
+  name: string;
+  slug: string;
+  isActive?: boolean;
+  config?: Record<string, unknown>;
+}
+
+export interface UpdateOrderStatusBody {
+  status: OrderStatus;
+  note?: string;
+  trackingCode?: string;
+  packageNumber?: string;
+}
+
+export interface CreateDiscountCodeBody {
+  code: string;
+  type: DiscountType;
+  value: number;
+  maxDiscountAmount?: number | null;
+  minCartAmount?: number | null;
+  maxUsage?: number | null;
+  maxUsagePerUser?: number | null;
+  startsAt?: string | null;
+  expiresAt?: string | null;
+  isActive?: boolean;
+  productIds?: number[];
+  categoryIds?: number[];
+  userIds?: number[];
+}
+
+export interface UpsertBannerBody {
+  title: string;
+  mediaId: number;
+  link?: string;
+  position: BannerPosition;
+  order?: number;
+  isActive?: boolean;
+  startsAt?: string | null;
+  endsAt?: string | null;
+}
+
+export interface UpsertPopupBody {
+  title: string;
+  content: string;
+  mediaId?: number | null;
+  link?: string;
+  isActive?: boolean;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  showOncePerSession?: boolean;
 }

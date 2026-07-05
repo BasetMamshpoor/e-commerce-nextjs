@@ -1,5 +1,7 @@
 /**
- * Comparison API service (section 8 of api.md)
+ * Comparison API service — SIMPLIFIED.
+ * Only GET /?productIds=1,2,3 — no add/remove/clear endpoints.
+ * Frontend handles everything via URL.
  */
 
 import { http } from "@/lib/api-client";
@@ -7,13 +9,6 @@ import { ENDPOINTS } from "@/api/endpoints";
 import type { ComparisonResponse } from "@/types/domain";
 
 export const comparisonService = {
-  get: () => http.get<ComparisonResponse>(ENDPOINTS.comparison.get),
-
-  add: (productId: string) =>
-    http.post<ComparisonResponse>(ENDPOINTS.comparison.add, { productId }),
-
-  remove: (productId: string) =>
-    http.delete<ComparisonResponse>(ENDPOINTS.comparison.remove(productId)),
-
-  clear: () => http.delete<ComparisonResponse>(ENDPOINTS.comparison.clear),
+  get: (productIds: number[]) =>
+    http.get<ComparisonResponse>(ENDPOINTS.comparison.get, { productIds: productIds.join(",") }),
 };

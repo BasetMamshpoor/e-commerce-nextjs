@@ -388,15 +388,15 @@ function ProductInfo({
       <div>
         <h1 className="text-xl font-bold leading-tight text-foreground sm:text-2xl">{product.name}</h1>
         {product.shortDescription && <p className="mt-2 text-sm text-muted-foreground">{product.shortDescription}</p>}
-        {product.ratingAverage != null && product.ratingCount! > 0 && (
+        {product.avgRating != null && product.reviewCount! > 0 && (
           <div className="mt-2 flex items-center gap-2 text-sm">
             <div className="flex items-center gap-0.5">
               {Array.from({ length: 5 }).map((_, i) => (
-                <Star key={i} className={cn("size-4", i < Math.round(product.ratingAverage!) ? "fill-warning text-warning" : "fill-muted text-muted")} />
+                <Star key={i} className={cn("size-4", i < Math.round(product.avgRating!) ? "fill-warning text-warning" : "fill-muted text-muted")} />
               ))}
             </div>
-            <span className="font-medium nums-fa">{product.ratingAverage.toFixed(1)}</span>
-            <span className="text-muted-foreground nums-fa">({toPersianDigits(product.ratingCount!)})</span>
+            <span className="font-medium nums-fa">{product.avgRating.toFixed(1)}</span>
+            <span className="text-muted-foreground nums-fa">({toPersianDigits(product.reviewCount!)})</span>
           </div>
         )}
       </div>

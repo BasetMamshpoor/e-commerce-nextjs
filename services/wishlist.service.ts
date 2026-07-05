@@ -1,5 +1,5 @@
 /**
- * Wishlist API service (section 7 of api.md)
+ * Wishlist API service — IDs are now integers.
  */
 
 import { http } from "@/lib/api-client";
@@ -10,9 +10,9 @@ export const wishlistService = {
   list: (params?: { page?: number; limit?: number }) =>
     http.get<PaginatedData<WishlistItem>>(ENDPOINTS.wishlist.list, params),
 
-  add: (productId: string) =>
+  add: (productId: number) =>
     http.post<WishlistItem>(ENDPOINTS.wishlist.add, { productId }),
 
-  remove: (productId: string) =>
+  remove: (productId: number) =>
     http.delete<void>(ENDPOINTS.wishlist.remove(productId)),
 };

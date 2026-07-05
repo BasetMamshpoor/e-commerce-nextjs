@@ -58,7 +58,6 @@ export default async function ProductDetailPage({ params }: PageProps) {
   }
 
   // Track view (fire and forget, no await needed)
-  productsService.trackView(product.id).catch(() => {});
 
   return (
     <>

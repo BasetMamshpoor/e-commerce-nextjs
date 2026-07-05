@@ -8,7 +8,7 @@ import type {
   CreateTicketBody,
   AddTicketMessageBody,
   TicketListQuery,
-} from "@/services/tickets.service";
+} from "@/services";
 import { ApiError } from "@/types/api";
 import type {
   Ticket,
