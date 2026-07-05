@@ -12,11 +12,18 @@ import { APP_CONFIG } from "@/constants/app";
  *
  * Pass `pageKey` to keep separate cache entries for different filter combinations.
  * e.g. `["products", "list", query]` will dedupe identical queries.
+ *
+ * Pass `options.enabled = false` to skip fetching (e.g. when backend already
+ * provided relatedProducts).
  */
-export function useProducts(query: ProductListQuery = {}) {
+export function useProducts(
+  query: ProductListQuery = {},
+  options?: { enabled?: boolean },
+) {
   return useQuery<PaginatedData<Product>>({
     queryKey: ["products", "list", query],
     queryFn: () => productsService.list({ limit: APP_CONFIG.defaultPageSize, ...query }),
     placeholderData: (prev) => prev, // keep previous data while fetching next page
+    enabled: options?.enabled ?? true,
   });
 }

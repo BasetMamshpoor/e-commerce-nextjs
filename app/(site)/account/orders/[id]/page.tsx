@@ -177,6 +177,41 @@ function OrderDetailContent({ id }: { id: number }) {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
+          {/* Shipping info — tracking code + package number (when shipped) */}
+          {(order.trackingCode || order.packageNumber) && (
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="p-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Truck className="size-5 text-primary" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">اطلاعات ارسال</p>
+                      <p className="text-sm font-medium text-foreground">
+                        {order.shippingCompany?.name ?? "ارسال پستی"}
+                      </p>
+                    </div>
+                  </div>
+                  {order.trackingCode && (
+                    <div className="flex flex-col gap-0.5">
+                      <p className="text-xs text-muted-foreground">کد رهگیری</p>
+                      <p className="font-mono text-sm font-bold text-foreground nums-fa" dir="ltr">
+                        {order.trackingCode}
+                      </p>
+                    </div>
+                  )}
+                  {order.packageNumber && (
+                    <div className="flex flex-col gap-0.5">
+                      <p className="text-xs text-muted-foreground">شماره بسته</p>
+                      <p className="font-mono text-sm font-bold text-foreground nums-fa" dir="ltr">
+                        {order.packageNumber}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Status timeline */}
           <Card>
             <CardHeader>

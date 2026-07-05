@@ -43,6 +43,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { usersAdminService } from "@/services";
 import type { UserRole } from "@/types/domain";
@@ -64,6 +65,10 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
   const [blockOpen, setBlockOpen] = React.useState(false);
   const [blockReason, setBlockReason] = React.useState("");
   const [roleChange, setRoleChange] = React.useState<UserRole | null>(null);
+  const [walletAdjustOpen, setWalletAdjustOpen] = React.useState(false);
+  const [walletAmount, setWalletAmount] = React.useState("");
+  const [walletDescription, setWalletDescription] = React.useState("");
+  const [walletProcessing, setWalletProcessing] = React.useState(false);
 
   const load = React.useCallback(() => {
     setLoading(true);
@@ -255,10 +260,18 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
                 </div>
                 <div className="flex items-center gap-2">
                   <Wallet className="size-4 text-muted-foreground" />
-                  <div>
+                  <div className="flex-1">
                     <p className="text-xs text-muted-foreground">موجودی کیف پول</p>
                     <p className="font-medium nums-fa">{formatPrice(user.walletBalance ?? 0)} تومان</p>
                   </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setWalletAdjustOpen(true)}
+                  >
+                    تعدیل
+                  </Button>
                 </div>
                 <div className="flex items-center gap-2">
                   <ShoppingCart className="size-4 text-muted-foreground" />
@@ -375,6 +388,67 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
           <AlertDialogFooter>
             <AlertDialogCancel>انصراف</AlertDialogCancel>
             <AlertDialogAction onClick={handleRoleChange}>تأیید</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Wallet adjust dialog */}
+      <AlertDialog open={walletAdjustOpen} onOpenChange={setWalletAdjustOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>تعدیل موجودی کیف پول</AlertDialogTitle>
+            <AlertDialogDescription>
+              موجودی فعلی: <span className="font-bold nums-fa">{formatPrice(user?.walletBalance ?? 0)}</span> تومان.
+              مقدار مثبت = افزایش، مقدار منفی = کاهش.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="mb-1 block text-sm font-medium">مبلغ (تومان)</Label>
+              <Input
+                type="number"
+                dir="ltr"
+                className="text-left"
+                placeholder="مثال: 50000 یا -50000"
+                value={walletAmount}
+                onChange={(e) => setWalletAmount(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label className="mb-1 block text-sm font-medium">توضیحات (اختیاری)</Label>
+              <Input
+                placeholder="مثال: افزودن اعتبار هدیه"
+                value={walletDescription}
+                onChange={(e) => setWalletDescription(e.target.value)}
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>انصراف</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!walletAmount) return;
+                setWalletProcessing(true);
+                try {
+                  await usersAdminService.walletAdjust(user.id, {
+                    amount: Number(walletAmount),
+                    description: walletDescription.trim() || undefined,
+                  });
+                  toast.success("موجودی کیف پول با موفقیت تعدیل شد");
+                  setWalletAdjustOpen(false);
+                  setWalletAmount("");
+                  setWalletDescription("");
+                  load();
+                } catch {
+                  toast.error("تعدیل موجودی ناموفق بود");
+                } finally {
+                  setWalletProcessing(false);
+                }
+              }}
+              disabled={walletProcessing || !walletAmount}
+            >
+              {walletProcessing ? "در حال..." : "تأیید"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

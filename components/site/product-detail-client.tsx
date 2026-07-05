@@ -20,6 +20,7 @@ import {
   ChevronLeft as ChevronLeftIcon,
   Check,
   Trash2,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -28,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -118,7 +120,12 @@ export function ProductDetailClient({ product: initialProduct }: { product: Prod
             <ProductDescription html={product.description} />
           </TabsContent>
           <TabsContent value="specs" className="mt-4">
-            <ProductSpecs variant={selectedVariant} categories={categories} brand={product.brand ?? null} />
+            <ProductSpecs
+              variant={selectedVariant}
+              categories={categories}
+              brand={product.brand ?? null}
+              displayAttributes={product.displayAttributeValues}
+            />
           </TabsContent>
           <TabsContent value="shipping" className="mt-4">
             <ShippingInfo />
@@ -129,8 +136,14 @@ export function ProductDetailClient({ product: initialProduct }: { product: Prod
       {/* Comments */}
       <CommentSectionLazy productId={product.id} productName={product.name} />
 
-      {/* Related products */}
+      {/* Related products — prefer backend-provided list, fall back to category-based fetch */}
       <RelatedProducts product={product} />
+
+      {/* Also bought products (from backend — "users who bought this also bought") */}
+      <AlsoBoughtProducts product={product} />
+
+      {/* Related blog posts */}
+      <RelatedBlogPosts product={product} />
 
       {/* Lightbox */}
       <Lightbox
@@ -510,11 +523,12 @@ function ProductDescription({ html }: { html?: string | null }) {
 }
 
 function ProductSpecs({
-  variant, categories, brand,
+  variant, categories, brand, displayAttributes,
 }: {
   variant: ProductVariant | null;
   categories: ReturnType<typeof getProductCategories>;
   brand: ProductDetailProduct["brand"];
+  displayAttributes?: ProductDetailProduct["displayAttributeValues"];
 }) {
   const rows: { label: string; value: string }[] = [];
   if (brand) rows.push({ label: "برند", value: brand.name });
@@ -524,6 +538,15 @@ function ProductSpecs({
     const avs = getVariantAttributeValues(variant);
     for (const av of avs) {
       rows.push({ label: "ویژگی", value: av.value });
+    }
+  }
+  // Display attributes (isDisplay=true) from backend
+  if (displayAttributes && displayAttributes.length > 0) {
+    for (const da of displayAttributes) {
+      if (da.value) {
+        const label = da.attribute?.name ?? "ویژگی";
+        rows.push({ label, value: da.value });
+      }
     }
   }
   if (rows.length === 0) return <p className="text-sm text-muted-foreground">مشخصاتی ثبت نشده است.</p>;
@@ -560,9 +583,15 @@ function ShippingInfo() {
 
 function RelatedProducts({ product }: { product: ProductDetailProduct }) {
   const firstCategory = getProductCategories(product)[0];
-  const { data, isLoading } = useProducts({ categorySlug: firstCategory?.slug, limit: 5 });
-  const related = (data?.items ?? []).filter((p) => p.id !== product.id).slice(0, 4);
-  if (isLoading || related.length === 0) return null;
+  // Prefer backend-provided relatedProducts; fall back to fetching by category.
+  const { data, isLoading } = useProducts(
+    { categorySlug: firstCategory?.slug, limit: 5 },
+    { enabled: !product.relatedProducts || product.relatedProducts.length < 4 }
+  );
+  const backendRelated = product.relatedProducts ?? [];
+  const fetchedRelated = (data?.items ?? []).filter((p) => p.id !== product.id).slice(0, 4);
+  const related = backendRelated.length >= 1 ? backendRelated.filter((p) => p.id !== product.id).slice(0, 4) : fetchedRelated;
+  if ((!product.relatedProducts || product.relatedProducts.length === 0) && (isLoading || related.length === 0)) return null;
   return (
     <section className="mt-12">
       <div className="mb-4 flex items-center justify-between">
@@ -576,6 +605,60 @@ function RelatedProducts({ product }: { product: ProductDetailProduct }) {
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
         {related.map((p) => <ProductCard key={p.id} product={p} />)}
+      </div>
+    </section>
+  );
+}
+
+/* ───────── Also Bought Products (backend-provided) ───────── */
+function AlsoBoughtProducts({ product }: { product: ProductDetailProduct }) {
+  const items = product.alsoBoughtProducts ?? [];
+  if (items.length === 0) return null;
+  return (
+    <section className="mt-12">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-bold text-foreground">خریداران این محصول، این‌ها را هم خریده‌اند</h2>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+        {items.slice(0, 4).map((p) => <ProductCard key={p.id} product={p} />)}
+      </div>
+    </section>
+  );
+}
+
+/* ───────── Related Blog Posts (backend-provided) ───────── */
+function RelatedBlogPosts({ product }: { product: ProductDetailProduct }) {
+  const items = product.relatedBlogPosts ?? [];
+  if (items.length === 0) return null;
+  return (
+    <section className="mt-12">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-bold text-foreground">مقالات مرتبط</h2>
+        <Link href="/blog" className="flex items-center gap-1 text-sm text-primary hover:underline">
+          مشاهده همه
+          <ChevronLeft className="size-4" />
+        </Link>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {items.slice(0, 3).map((p) => (
+          <Link key={p.id} href={`/blog/${p.slug}`}>
+            <Card className="group h-full overflow-hidden border-border/40 card-hover">
+              <div className="relative aspect-[16/9] w-full bg-muted">
+                {p.coverImageUrl ? (
+                  <img src={p.coverImageUrl} alt={p.title} className="size-full object-cover transition-transform group-hover:scale-105" />
+                ) : (
+                  <div className="flex size-full items-center justify-center bg-gradient-to-br from-primary/10 to-primary/5 text-primary/40">
+                    <Sparkles className="size-8" />
+                  </div>
+                )}
+              </div>
+              <CardContent className="p-3">
+                <p className="line-clamp-2 text-sm font-semibold text-foreground">{p.title}</p>
+                {p.excerpt && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{p.excerpt}</p>}
+              </CardContent>
+            </Card>
+          </Link>
+        ))}
       </div>
     </section>
   );

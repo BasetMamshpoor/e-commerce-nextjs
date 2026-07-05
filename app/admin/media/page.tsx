@@ -1,21 +1,32 @@
 "use client";
 
 import * as React from "react";
-import { Upload, Trash2, Copy, Loader2, Image as ImageIcon, FileText } from "lucide-react";
+import { Upload, Trash2, Copy, Loader2, Image as ImageIcon, FileText, Info } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { EmptyState } from "@/components/common/empty-state";
 import { mediaService } from "@/services";
-import type { PaginatedData, Media } from "@/types/domain";
+import type { PaginatedData, Media, MediaUsage } from "@/types/domain";
 import { cn } from "@/lib/utils";
 
 export default function AdminMediaPage() {
   const [data, setData] = React.useState<PaginatedData<Media> | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [uploading, setUploading] = React.useState(false);
+  const [usageTarget, setUsageTarget] = React.useState<Media | null>(null);
+  const [usageData, setUsageData] = React.useState<MediaUsage[] | null>(null);
+  const [usageLoading, setUsageLoading] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const load = React.useCallback(() => {
@@ -61,6 +72,21 @@ export default function AdminMediaPage() {
       load();
     } catch {
       toast.error("حذف ناموفق بود —可能在 جایی استفاده شده");
+    }
+  };
+
+  const onShowUsage = async (m: Media) => {
+    setUsageTarget(m);
+    setUsageData(null);
+    setUsageLoading(true);
+    try {
+      const result = await mediaService.usage(m.id);
+      setUsageData(result.usage);
+    } catch {
+      toast.error("بارگذاری محل استفاده ناموفق بود");
+      setUsageTarget(null);
+    } finally {
+      setUsageLoading(false);
     }
   };
 
@@ -130,7 +156,17 @@ export default function AdminMediaPage() {
                     size="icon"
                     variant="secondary"
                     className="size-8"
+                    onClick={() => onShowUsage(m)}
+                    aria-label="محل استفاده"
+                  >
+                    <Info className="size-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="secondary"
+                    className="size-8"
                     onClick={() => onCopyUrl(m.url)}
+                    aria-label="کپی آدرس"
                   >
                     <Copy className="size-4" />
                   </Button>
@@ -139,6 +175,7 @@ export default function AdminMediaPage() {
                     variant="destructive"
                     className="size-8"
                     onClick={() => onDelete(m.id)}
+                    aria-label="حذف"
                   >
                     <Trash2 className="size-4" />
                   </Button>
@@ -153,6 +190,42 @@ export default function AdminMediaPage() {
           ))}
         </div>
       )}
+
+      {/* Usage dialog — shows where this media is used */}
+      <Dialog open={!!usageTarget} onOpenChange={(open) => !open && setUsageTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>محل استفاده از فایل</DialogTitle>
+            <DialogDescription>
+              {usageTarget?.originalName} — لیست موجودیت‌هایی که از این رسانه استفاده می‌کنند.
+            </DialogDescription>
+          </DialogHeader>
+          {usageLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="size-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : !usageData || usageData.length === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              این فایل در هیچ‌کجا استفاده نشده است.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {usageData.map((u, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between rounded-lg border border-border/40 p-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-[10px]">{u.entityType}</Badge>
+                    <span className="text-sm text-foreground">{u.entityName}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground nums-fa">#{u.entityId}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
