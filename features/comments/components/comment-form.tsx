@@ -4,7 +4,7 @@ import * as React from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, Send } from "lucide-react";
+import { Loader2, Send, Paperclip, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import {
 import { StarRating } from "./star-rating";
 import { useCreateComment } from "@/features/comments/hooks";
 import { useAuth } from "@/providers/auth-context";
+import { mediaService } from "@/services";
 
 const commentSchema = z.object({
   content: z
@@ -54,6 +55,9 @@ export function CommentForm({
   const createComment = useCreateComment();
   const [rating, setRating] = React.useState(0);
   const [ratingTouched, setRatingTouched] = React.useState(false);
+  const [attachments, setAttachments] = React.useState<File[]>([]);
+  const [uploading, setUploading] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const form = useForm<CommentFormValues>({
     resolver: zodResolver(commentSchema),
@@ -63,12 +67,32 @@ export function CommentForm({
   const isReply = !!parentId;
   const contentLength = useWatch({ control: form.control, name: "content" })?.length ?? 0;
 
-  const onSubmit = (values: CommentFormValues) => {
+  const onSubmit = async (values: CommentFormValues) => {
     // For top-level comments, rating is required (1-5).
     if (!isReply && (rating < 1 || rating > 5)) {
       setRatingTouched(true);
       toast.error("لطفاً امتیاز خود را انتخاب کنید");
       return;
+    }
+
+    // Upload attachments to media service first, then pass IDs.
+    let attachmentMediaIds: number[] | undefined;
+    if (attachments.length > 0) {
+      setUploading(true);
+      try {
+        const uploadedIds: number[] = [];
+        for (const file of attachments) {
+          const media = await mediaService.upload(file);
+          uploadedIds.push(media.id);
+        }
+        attachmentMediaIds = uploadedIds;
+      } catch {
+        toast.error("آپلود فایل‌ها ناموفق بود");
+        setUploading(false);
+        return;
+      } finally {
+        setUploading(false);
+      }
     }
 
     createComment.mutate(
@@ -77,12 +101,15 @@ export function CommentForm({
         content: values.content,
         parentId,
         rating: isReply ? undefined : rating,
+        attachmentMediaIds,
       },
       {
         onSuccess: () => {
           form.reset();
           setRating(0);
           setRatingTouched(false);
+          setAttachments([]);
+          if (fileInputRef.current) fileInputRef.current.value = "";
           onSuccess?.();
         },
       },
@@ -151,6 +178,53 @@ export function CommentForm({
           )}
         />
 
+        {/* File attachments */}
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*"
+            onChange={(e) => {
+              const newFiles = Array.from(e.target.files ?? []);
+              setAttachments((prev) => [...prev, ...newFiles]);
+            }}
+            className="hidden"
+            id={`comment-file-${productId}-${parentId ?? "root"}`}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={createComment.isPending || uploading}
+          >
+            <Paperclip className="size-4" />
+            پیوست
+          </Button>
+          {attachments.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {attachments.map((f, i) => (
+                <span
+                  key={i}
+                  className="flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs"
+                >
+                  <span className="max-w-20 truncate">{f.name}</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setAttachments((prev) => prev.filter((_, idx) => idx !== i))
+                    }
+                    className="text-destructive hover:text-destructive/80"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="flex items-center justify-between">
           <p className="text-xs text-muted-foreground">
             {contentLength} / ۲۰۰۰
@@ -170,14 +244,14 @@ export function CommentForm({
             <Button
               type="submit"
               size={compact ? "sm" : "default"}
-              disabled={createComment.isPending}
+              disabled={createComment.isPending || uploading}
             >
-              {createComment.isPending ? (
+              {createComment.isPending || uploading ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
                 <Send className="size-4" />
               )}
-              {isReply ? "ارسال پاسخ" : "ثبت نظر"}
+              {uploading ? "در حال آپلود..." : isReply ? "ارسال پاسخ" : "ثبت نظر"}
             </Button>
           </div>
         </div>

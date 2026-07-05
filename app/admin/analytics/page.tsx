@@ -75,23 +75,34 @@ const ORDER_STATUS_COLOR: Record<OrderStatus, string> = {
 
 export default function AdminAnalyticsPage() {
   const [period, setPeriod] = React.useState<AnalyticsPeriod>("day");
-  const today = new Date();
-  const from = new Date(today);
-  from.setDate(today.getDate() - 30);
+
+  // Fix date range ONCE on mount. Using useState (not useMemo) ensures
+  // the value never changes even if the component re-renders.
+  // Without this, `new Date()` creates a new value each render →
+  // new query key → refetch → re-render → infinite loop.
+  const [dateRange] = React.useState(() => {
+    const today = new Date();
+    const from = new Date(today);
+    from.setDate(today.getDate() - 30);
+    return { from: from.toISOString(), to: today.toISOString() };
+  });
+
+  // Build stable query objects with useMemo so React Query sees the same
+  // reference and doesn't refetch.
+  const salesQuery = React.useMemo(
+    () => ({ ...dateRange, period }),
+    [dateRange, period],
+  );
+  const newUsersQuery = React.useMemo(
+    () => ({ ...dateRange, period }),
+    [dateRange, period],
+  );
 
   const { data: overview, isLoading: overviewLoading } = useAnalyticsOverview();
-  const { data: sales, isLoading: salesLoading } = useAnalyticsSalesOverTime({
-    from: from.toISOString(),
-    to: today.toISOString(),
-    period,
-  });
+  const { data: sales, isLoading: salesLoading } = useAnalyticsSalesOverTime(salesQuery);
   const { data: statusBreakdown, isLoading: statusLoading } = useAnalyticsOrderStatus();
   const { data: topProducts, isLoading: topLoading } = useAnalyticsTopProducts({ limit: 10 });
-  const { data: newUsers, isLoading: usersLoading } = useAnalyticsNewUsers({
-    from: from.toISOString(),
-    to: today.toISOString(),
-    period,
-  });
+  const { data: newUsers, isLoading: usersLoading } = useAnalyticsNewUsers(newUsersQuery);
 
   return (
     <div className="space-y-5">

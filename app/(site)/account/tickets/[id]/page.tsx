@@ -46,6 +46,8 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
   const { data: ticket, isLoading } = useTicketDetail(numericId);
   const addMessage = useAddTicketMessage();
   const [reply, setReply] = React.useState("");
+  const [files, setFiles] = React.useState<File[]>([]);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new messages.
@@ -77,11 +79,19 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
 
   const onSend = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!reply.trim()) return;
+    if (!reply.trim() && files.length === 0) return;
     addMessage.mutate(
-      { id: numericId, body: { message: reply.trim() } },
       {
-        onSuccess: () => setReply(""),
+        id: numericId,
+        body: { message: reply.trim() || "(فایل پیوست)" },
+        files: files.length > 0 ? files : undefined,
+      },
+      {
+        onSuccess: () => {
+          setReply("");
+          setFiles([]);
+          if (fileInputRef.current) fileInputRef.current.value = "";
+        },
         onError: () => {
           // Keep the reply text so user can retry.
         },
@@ -161,6 +171,39 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                     )}
                   >
                     <p className="whitespace-pre-wrap text-sm">{msg.message}</p>
+                    {/* Attachments */}
+                    {msg.attachments && msg.attachments.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {msg.attachments.map((att) => {
+                          const isImage = att.media?.mimeType?.startsWith("image/");
+                          return (
+                            <a
+                              key={att.id}
+                              href={att.media?.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={cn(
+                                "flex items-center gap-2 rounded-lg p-1.5 text-xs transition-colors",
+                                isUser
+                                  ? "bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                                  : "bg-background/50 text-foreground hover:bg-background",
+                              )}
+                            >
+                              {isImage ? (
+                                <img
+                                  src={att.media?.url}
+                                  alt={att.media?.originalName ?? "image"}
+                                  className="size-8 rounded object-cover"
+                                />
+                              ) : (
+                                <Paperclip className="size-4 shrink-0" />
+                              )}
+                              <span className="truncate">{att.media?.originalName ?? "فایل"}</span>
+                            </a>
+                          );
+                        })}
+                      </div>
+                    )}
                     <p
                       className={cn(
                         "mt-1 text-[10px]",
@@ -192,13 +235,56 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
             rows={3}
             disabled={addMessage.isPending}
           />
+          {/* File attachment */}
+          <div className="flex items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={(e) => {
+                const newFiles = Array.from(e.target.files ?? []);
+                setFiles((prev) => [...prev, ...newFiles]);
+              }}
+              className="hidden"
+              id="ticket-file-input"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={addMessage.isPending}
+            >
+              <Paperclip className="size-4" />
+              پیوست
+            </Button>
+            {files.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {files.map((f, i) => (
+                  <span
+                    key={i}
+                    className="flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs"
+                  >
+                    {f.name}
+                    <button
+                      type="button"
+                      onClick={() => setFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                      className="text-destructive hover:text-destructive/80"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground">
               پاسخ شما پس از ارسال، تیکت دوباره باز می‌شود
             </p>
             <Button
               type="submit"
-              disabled={addMessage.isPending || !reply.trim()}
+              disabled={addMessage.isPending || (!reply.trim() && files.length === 0)}
             >
               {addMessage.isPending ? (
                 <Loader2 className="size-4 animate-spin" />

@@ -1,5 +1,9 @@
 "use client";
 
+// Opt out of static prerendering — page uses useSearchParams.
+export const dynamic = "force-dynamic";
+
+
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -16,6 +20,7 @@ import {
   RotateCcw,
   AlertCircle,
   Loader2,
+  Paperclip,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -31,6 +36,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -410,7 +422,7 @@ function OrderDetailContent({ id }: { id: number }) {
           <Card>
             <CardContent className="space-y-2 p-4">
               {canCancel && <CancelOrderButton orderId={order.id} />}
-              {canReturn && <ReturnRequestButton orderId={order.id} />}
+              {canReturn && <ReturnRequestButton orderId={order.id} orderItems={order.items ?? []} />}
             </CardContent>
           </Card>
         </div>
@@ -621,19 +633,60 @@ function CancelOrderButton({ orderId }: { orderId: number }) {
   );
 }
 
-function ReturnRequestButton({ orderId }: { orderId: number }) {
+function ReturnRequestButton({ orderId, orderItems }: { orderId: number; orderItems: Array<{ id: number; productName: string; variantAttributes?: string }> }) {
   const [open, setOpen] = React.useState(false);
   const [reason, setReason] = React.useState("");
+  const [orderItemId, setOrderItemId] = React.useState<number | "">("");
+  const [images, setImages] = React.useState<File[]>([]);
+  const [uploading, setUploading] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const requestReturn = useRequestReturn();
 
-  const onConfirm = () => {
+  const onConfirm = async () => {
     if (!reason.trim()) {
       toast.error("دلیل مرجوعی را وارد کنید");
       return;
     }
+
+    // Upload images to media service first.
+    let imageMediaIds: number[] | undefined;
+    if (images.length > 0) {
+      setUploading(true);
+      try {
+        const { mediaService } = await import("@/services");
+        const ids: number[] = [];
+        for (const img of images) {
+          const media = await mediaService.upload(img);
+          ids.push(media.id);
+        }
+        imageMediaIds = ids;
+      } catch {
+        toast.error("آپلود تصاویر ناموفق بود");
+        setUploading(false);
+        return;
+      } finally {
+        setUploading(false);
+      }
+    }
+
     requestReturn.mutate(
-      { id: orderId, body: { reason } },
-      { onSuccess: () => setOpen(false) },
+      {
+        id: orderId,
+        body: {
+          reason,
+          orderItemId: orderItemId === "" ? undefined : Number(orderItemId),
+          imageMediaIds,
+        },
+      },
+      {
+        onSuccess: () => {
+          setOpen(false);
+          setReason("");
+          setOrderItemId("");
+          setImages([]);
+          if (fileInputRef.current) fileInputRef.current.value = "";
+        },
+      },
     );
   };
 
@@ -648,13 +701,39 @@ function ReturnRequestButton({ orderId }: { orderId: number }) {
         درخواست مرجوعی
       </Button>
       <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-h-[90vh] overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle>درخواست مرجوعی</AlertDialogTitle>
             <AlertDialogDescription>
               درخواست شما برای بررسی به پشتیبانی ارسال می‌شود. در صورت تأیید، مبلغ به کیف پول شما بازمی‌گردد.
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          {/* Item selector */}
+          {orderItems.length > 0 && (
+            <div className="space-y-2 py-2">
+              <Label className="text-sm font-medium">آیتم مرجوعی (اختیاری)</Label>
+              <Select
+                value={orderItemId === "" ? "" : String(orderItemId)}
+                onValueChange={(v) => setOrderItemId(v ? Number(v) : "")}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="انتخاب آیتم (یا کل سفارش)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">کل سفارش</SelectItem>
+                  {orderItems.map((item) => (
+                    <SelectItem key={item.id} value={String(item.id)}>
+                      {item.productName}
+                      {item.variantAttributes ? ` (${item.variantAttributes})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Reason */}
           <div className="space-y-2 py-2">
             <Label htmlFor="return-reason" className="text-sm font-medium">
               دلیل مرجوعی
@@ -667,14 +746,63 @@ function ReturnRequestButton({ orderId }: { orderId: number }) {
               rows={3}
             />
           </div>
+
+          {/* Image attachments */}
+          <div className="space-y-2 py-2">
+            <Label className="text-sm font-medium">تصاویر مرجوعی (اختیاری)</Label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={(e) => {
+                const newFiles = Array.from(e.target.files ?? []);
+                setImages((prev) => [...prev, ...newFiles]);
+              }}
+              className="hidden"
+              id="return-images"
+            />
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={requestReturn.isPending || uploading}
+              >
+                <Paperclip className="size-4" />
+                افزودن تصویر
+              </Button>
+              {images.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {images.map((f, i) => (
+                    <span
+                      key={i}
+                      className="flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs"
+                    >
+                      <span className="max-w-20 truncate">{f.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setImages((prev) => prev.filter((_, idx) => idx !== i))}
+                        className="text-destructive hover:text-destructive/80"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
           <AlertDialogFooter>
             <AlertDialogCancel>انصراف</AlertDialogCancel>
             <AlertDialogAction
               onClick={onConfirm}
-              disabled={requestReturn.isPending || !reason.trim()}
+              disabled={requestReturn.isPending || uploading || !reason.trim()}
             >
-              {requestReturn.isPending && <Loader2 className="size-4 animate-spin" />}
-              ارسال درخواست
+              {(requestReturn.isPending || uploading) && <Loader2 className="size-4 animate-spin" />}
+              {uploading ? "در حال آپلود..." : "ارسال درخواست"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -3,13 +3,15 @@
 import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Flame, Star, Truck, ShieldCheck, Headphones, CreditCard, Sparkles } from "lucide-react";
+import { ArrowLeft, Flame, Star, Truck, ShieldCheck, Headphones, CreditCard, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductCard } from "@/components/site/product-card";
 import { SectionHeader } from "@/components/site/section-header";
+import { StoryViewer } from "@/components/site/story-viewer";
 import { useLanding } from "@/features/catalog/hooks";
+import { cn } from "@/lib/utils";
 import type {
   Banner,
   Category,
@@ -190,34 +192,159 @@ function LandingSectionRenderer({ section }: { section: LandingSection }) {
 
 function BannersSection({ banners }: { banners: Banner[] }) {
   if (!banners || banners.length === 0) return null;
+
+  // Separate HOME_MAIN banners (hero carousel) from other positions.
+  const heroBanners = banners.filter((b) => b.position === "HOME_MAIN");
+  const sideBanners = banners.filter((b) => b.position !== "HOME_MAIN").slice(0, 4);
+
   return (
     <section className="mb-8" aria-label="بنرها">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {banners.slice(0, 6).map((b) => (
-          <BannerTile key={b.id} banner={b} />
-        ))}
-      </div>
+      {heroBanners.length > 0 ? (
+        <div className={cn("grid gap-3", sideBanners.length > 0 ? "lg:grid-cols-[1fr_280px]" : "")}>
+          {/* Hero carousel */}
+          <HeroCarousel banners={heroBanners} />
+          {/* Side banners (small promotional cards) */}
+          {sideBanners.length > 0 && (
+            <div className="hidden gap-3 lg:grid lg:grid-rows-2">
+              {sideBanners.slice(0, 2).map((b) => (
+                <BannerTile key={b.id} banner={b} compact />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        // No hero banners — show grid of all banners
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {banners.slice(0, 6).map((b) => (
+            <BannerTile key={b.id} banner={b} />
+          ))}
+        </div>
+      )}
     </section>
   );
 }
 
-function BannerTile({ banner }: { banner: Banner }) {
+/** Auto-rotating hero carousel for HOME_MAIN banners. */
+function HeroCarousel({ banners }: { banners: Banner[] }) {
+  const [activeIdx, setActiveIdx] = React.useState(0);
+  const [paused, setPaused] = React.useState(false);
+
+  // Auto-advance every 5s
+  React.useEffect(() => {
+    if (paused || banners.length <= 1) return;
+    const timer = setInterval(() => {
+      setActiveIdx((i) => (i + 1) % banners.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [paused, banners.length]);
+
+  const active = banners[activeIdx];
+  if (!active) return null;
+  const imageUrl = active.media?.url ?? active.imageUrl;
+
+  return (
+    <div
+      className="relative aspect-[16/6] overflow-hidden rounded-2xl bg-muted"
+      onPointerEnter={() => setPaused(true)}
+      onPointerLeave={() => setPaused(false)}
+    >
+      {/* Slides */}
+      {banners.map((b, i) => {
+        const url = b.media?.url ?? b.imageUrl;
+        return (
+          <Link
+            key={b.id}
+            href={b.link ?? "#"}
+            aria-label={b.title}
+            className={cn(
+              "absolute inset-0 transition-opacity duration-700",
+              i === activeIdx ? "opacity-100" : "pointer-events-none opacity-0",
+            )}
+          >
+            {url ? (
+               
+              <img
+                src={url}
+                alt={b.title}
+                className="size-full object-cover"
+              />
+            ) : (
+              <div className="flex size-full items-center justify-center bg-gradient-to-l from-primary/30 to-primary/5">
+                <Sparkles className="size-12 text-primary" />
+              </div>
+            )}
+            {/* Title overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+            <div className="absolute bottom-0 right-0 p-5">
+              <p className="text-lg font-bold text-white drop-shadow-md sm:text-2xl">
+                {b.title}
+              </p>
+              {b.link && (
+                <span className="mt-1 inline-flex items-center gap-1 text-sm text-white/80">
+                  مشاهده
+                  <ChevronLeft className="size-4" />
+                </span>
+              )}
+            </div>
+          </Link>
+        );
+      })}
+
+      {/* Dots */}
+      {banners.length > 1 && (
+        <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
+          {banners.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setActiveIdx(i)}
+              className={cn(
+                "h-2 rounded-full transition-all",
+                i === activeIdx ? "w-6 bg-white" : "w-2 bg-white/50 hover:bg-white/80",
+              )}
+              aria-label={`اسلاید ${i + 1}`}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Arrow nav (desktop) */}
+      {banners.length > 1 && (
+        <>
+          <button
+            onClick={() => setActiveIdx((i) => (i - 1 + banners.length) % banners.length)}
+            className="absolute left-2 top-1/2 hidden size-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-sm transition-colors hover:bg-white/40 lg:flex"
+            aria-label="قبلی"
+          >
+            <ChevronLeft className="size-5" />
+          </button>
+          <button
+            onClick={() => setActiveIdx((i) => (i + 1) % banners.length)}
+            className="absolute right-2 top-1/2 hidden size-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-sm transition-colors hover:bg-white/40 lg:flex"
+            aria-label="بعدی"
+          >
+            <ChevronRight className="size-5" />
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function BannerTile({ banner, compact = false }: { banner: Banner; compact?: boolean }) {
   const image = banner.media?.url ?? banner.imageUrl;
   return (
     <Link
       href={banner.link ?? "#"}
-      className="group relative block overflow-hidden rounded-2xl border border-border/40 bg-muted"
+      className="group relative block h-full overflow-hidden rounded-2xl border border-border/40 bg-muted"
       aria-label={banner.title}
     >
-      <div className="relative aspect-[16/7] w-full sm:aspect-[16/6]">
+      <div className={cn("relative w-full", compact ? "h-full min-h-[120px]" : "aspect-[16/7] sm:aspect-[16/6]")}>
         {image ? (
-          <Image
+           
+          <img
             src={image}
             alt={banner.title}
-            fill
-            sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
-            priority
+            className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
           <div className="flex size-full items-center justify-center bg-gradient-to-l from-primary/20 to-primary/5 text-primary">
@@ -226,39 +353,66 @@ function BannerTile({ banner }: { banner: Banner }) {
         )}
       </div>
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3">
-        <p className="text-sm font-bold text-white sm:text-base">{banner.title}</p>
+        <p className={cn("font-bold text-white", compact ? "text-xs" : "text-sm sm:text-base")}>
+          {banner.title}
+        </p>
       </div>
     </Link>
   );
 }
 
 function StoriesSection({ stories }: { stories: Story[] }) {
+  const [viewerIndex, setViewerIndex] = React.useState<number | null>(null);
   if (!stories || stories.length === 0) return null;
+
   return (
     <section className="mb-8" aria-label="استوری‌ها">
       <div className="flex gap-3 overflow-x-auto pb-2">
-        {stories.map((s) => {
+        {stories.map((s, idx) => {
           const coverUrl = s.coverImage?.url ?? s.coverImageUrl;
+          const hasVideo = !!(s.video?.url ?? s.videoUrl);
           return (
-            <Link
+            <button
               key={s.id}
-              href={`/products?story=${s.id}`}
+              onClick={() => setViewerIndex(idx)}
               className="group flex w-20 shrink-0 flex-col items-center gap-1.5"
+              aria-label={`استوری ${s.title}`}
             >
-              <div className="relative size-20 overflow-hidden rounded-full ring-2 ring-primary/40 ring-offset-2 ring-offset-background transition-all group-hover:ring-primary">
-                {coverUrl ? (
-                  <img src={coverUrl} alt={s.title} className="size-full object-cover" />
-                ) : (
-                  <div className="flex size-full items-center justify-center bg-muted text-xs text-muted-foreground">
-                    {s.title.slice(0, 1)}
+              <div className="relative size-20 overflow-hidden rounded-full p-0.5 bg-gradient-to-tr from-primary to-primary/40 transition-transform group-hover:scale-105">
+                <div className="size-full overflow-hidden rounded-full ring-2 ring-background">
+                  {coverUrl ? (
+                    <img
+                      src={coverUrl}
+                      alt={s.title}
+                      className="size-full object-cover transition-transform group-hover:scale-110"
+                    />
+                  ) : (
+                    <div className="flex size-full items-center justify-center bg-muted text-xs text-muted-foreground">
+                      {s.title.slice(0, 1)}
+                    </div>
+                  )}
+                </div>
+                {hasVideo && (
+                  <div className="absolute bottom-0 left-0 m-0.5 flex size-4 items-center justify-center rounded-full bg-black/70">
+                    <svg viewBox="0 0 24 24" fill="white" className="size-2.5">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
                   </div>
                 )}
               </div>
               <span className="line-clamp-1 text-[10px] text-foreground">{s.title}</span>
-            </Link>
+            </button>
           );
         })}
       </div>
+
+      {/* Full-screen Instagram-style story viewer */}
+      <StoryViewer
+        stories={stories}
+        initialIndex={viewerIndex ?? 0}
+        open={viewerIndex !== null}
+        onClose={() => setViewerIndex(null)}
+      />
     </section>
   );
 }
@@ -323,7 +477,15 @@ function ProductsSection({
         }
         href={href}
       />
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      {/* Horizontal scroll rail on mobile, grid on desktop */}
+      <div className="flex gap-3 overflow-x-auto pb-2 lg:hidden">
+        {products.slice(0, 10).map((p) => (
+          <div key={p.id} className="w-44 shrink-0">
+            <ProductCard product={p} />
+          </div>
+        ))}
+      </div>
+      <div className="hidden gap-3 lg:grid lg:grid-cols-5">
         {products.slice(0, 10).map((p) => (
           <ProductCard key={p.id} product={p} />
         ))}

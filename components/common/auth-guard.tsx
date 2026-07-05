@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 import { useAuth } from "@/providers/auth-context";
@@ -31,7 +31,6 @@ export function AuthGuard({
 }) {
   const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   React.useEffect(() => {
     if (isLoading) return;
@@ -101,15 +100,16 @@ export function GuestOnly({
 }) {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   React.useEffect(() => {
     if (isLoading) return;
     if (isAuthenticated) {
-      const redirect = searchParams.get("redirect");
+      // Read redirect param directly from URL (avoids useSearchParams Suspense requirement).
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get("redirect");
       router.replace(redirect ?? redirectTo);
     }
-  }, [isAuthenticated, isLoading, router, redirectTo, searchParams]);
+  }, [isAuthenticated, isLoading, router, redirectTo]);
 
   if (isLoading || isAuthenticated) {
     return (

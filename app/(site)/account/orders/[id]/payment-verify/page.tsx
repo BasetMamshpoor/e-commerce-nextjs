@@ -1,5 +1,9 @@
 "use client";
 
+// Opt out of static prerendering — page uses useSearchParams.
+export const dynamic = "force-dynamic";
+
+
 import * as React from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";

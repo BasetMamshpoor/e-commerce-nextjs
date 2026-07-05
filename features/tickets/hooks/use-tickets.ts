@@ -45,12 +45,15 @@ export function useTicketDetail(id: number | undefined) {
   });
 }
 
-/** Create a new ticket with first message. */
+/** Create a new ticket with first message and optional file attachments. */
 export function useCreateTicket() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (body: CreateTicketBody) => ticketsService.create(body),
+    mutationFn: ({ body, files }: { body: CreateTicketBody; files?: File[] }) =>
+      files && files.length > 0
+        ? ticketsService.createWithAttachments(body, files)
+        : ticketsService.create(body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...TICKETS_QUERY_KEY, "list"] });
       toast.success("تیکت شما ثبت شد", {
@@ -64,13 +67,23 @@ export function useCreateTicket() {
   });
 }
 
-/** Add a message to a ticket (user side). */
+/** Add a message to a ticket (user side) with optional file attachments. */
 export function useAddTicketMessage() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, body }: { id: number; body: AddTicketMessageBody }) =>
-      ticketsService.addMessage(id, body),
+    mutationFn: ({
+      id,
+      body,
+      files,
+    }: {
+      id: number;
+      body: AddTicketMessageBody;
+      files?: File[];
+    }) =>
+      files && files.length > 0
+        ? ticketsService.addMessageWithAttachments(id, body, files)
+        : ticketsService.addMessage(id, body),
     onSuccess: (ticket) => {
       queryClient.setQueryData(
         [...TICKETS_QUERY_KEY, "detail", ticket.id],

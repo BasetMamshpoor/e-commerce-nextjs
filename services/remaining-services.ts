@@ -121,8 +121,22 @@ export const ticketsService = {
   departments: () => http.get<TicketDepartment[]>(ENDPOINTS.tickets.departments),
   list: (query?: TicketListQuery) => http.get<PaginatedData<Ticket>>(ENDPOINTS.tickets.list, query),
   create: (body: CreateTicketBody) => http.post<Ticket>(ENDPOINTS.tickets.create, body),
+  /** Create ticket with inline file attachments (multipart/form-data). */
+  createWithAttachments: (body: CreateTicketBody, files: File[]) => {
+    const fd = new FormData();
+    fd.append("body", JSON.stringify(body));
+    for (const f of files) fd.append("attachments", f);
+    return http.upload<Ticket>(ENDPOINTS.tickets.create, fd);
+  },
   byId: (id: number) => http.get<Ticket>(ENDPOINTS.tickets.byId(id)),
   addMessage: (id: number, body: AddTicketMessageBody) => http.post<Ticket>(ENDPOINTS.tickets.addMessage(id), body),
+  /** Add message with inline file attachments (multipart/form-data). */
+  addMessageWithAttachments: (id: number, body: AddTicketMessageBody, files: File[]) => {
+    const fd = new FormData();
+    fd.append("body", JSON.stringify(body));
+    for (const f of files) fd.append("attachments", f);
+    return http.upload<Ticket>(ENDPOINTS.tickets.addMessage(id), fd);
+  },
   createDepartment: (body: UpsertDepartmentBody) => http.post<TicketDepartment>(ENDPOINTS.tickets.createDepartment, body),
   updateDepartment: (id: number, body: Partial<UpsertDepartmentBody>) => http.put<TicketDepartment>(ENDPOINTS.tickets.updateDepartment(id), body),
   deleteDepartment: (id: number) => http.delete<void>(ENDPOINTS.tickets.deleteDepartment(id)),
@@ -130,6 +144,13 @@ export const ticketsService = {
   adminById: (id: number) => http.get<Ticket>(ENDPOINTS.tickets.adminById(id)),
   adminUpdate: (id: number, body: AdminUpdateTicketBody) => http.put<Ticket>(ENDPOINTS.tickets.adminUpdate(id), body),
   adminAddMessage: (id: number, body: AddTicketMessageBody) => http.post<Ticket>(ENDPOINTS.tickets.adminAddMessage(id), body),
+  /** Admin reply with inline file attachments (multipart/form-data). */
+  adminAddMessageWithAttachments: (id: number, body: AddTicketMessageBody, files: File[]) => {
+    const fd = new FormData();
+    fd.append("body", JSON.stringify(body));
+    for (const f of files) fd.append("attachments", f);
+    return http.upload<Ticket>(ENDPOINTS.tickets.adminAddMessage(id), fd);
+  },
 };
 
 /* ───────── Comments ───────── */

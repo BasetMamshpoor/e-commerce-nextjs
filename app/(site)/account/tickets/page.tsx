@@ -163,16 +163,21 @@ function CreateTicketDialog({
   const [departmentId, setDepartmentId] = React.useState<number | "">("");
   const [priority, setPriority] = React.useState<TicketPriority>("NORMAL");
   const [message, setMessage] = React.useState("");
+  const [files, setFiles] = React.useState<File[]>([]);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!subject.trim() || !message.trim()) return;
     create.mutate(
       {
-        subject,
-        departmentId: departmentId === "" ? undefined : Number(departmentId),
-        priority,
-        message,
+        body: {
+          subject,
+          departmentId: departmentId === "" ? undefined : Number(departmentId),
+          priority,
+          message,
+        },
+        files: files.length > 0 ? files : undefined,
       },
       {
         onSuccess: () => {
@@ -181,6 +186,8 @@ function CreateTicketDialog({
           setDepartmentId("");
           setPriority("NORMAL");
           setMessage("");
+          setFiles([]);
+          if (fileInputRef.current) fileInputRef.current.value = "";
         },
       },
     );
@@ -250,6 +257,43 @@ function CreateTicketDialog({
               rows={5}
               required
             />
+          </div>
+
+          {/* File attachments */}
+          <div className="space-y-2">
+            <Label>فایل‌های پیوست (اختیاری)</Label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={(e) => {
+                const newFiles = Array.from(e.target.files ?? []);
+                setFiles((prev) => [...prev, ...newFiles]);
+              }}
+              className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
+            />
+            {files.length > 0 && (
+              <div className="space-y-1">
+                {files.map((f, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between rounded-lg border border-border/40 px-2 py-1 text-xs"
+                  >
+                    <span className="truncate" title={f.name}>{f.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFiles((prev) => prev.filter((_, idx) => idx !== i));
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                      }}
+                      className="text-destructive hover:text-destructive/80"
+                    >
+                      حذف
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <DialogFooter>
