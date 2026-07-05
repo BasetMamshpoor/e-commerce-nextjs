@@ -646,6 +646,7 @@ export interface Banner {
   title: string;
   mediaId: number;
   imageUrl: string;
+  media?: { id: number; url: string } | null;
   link?: string | null;
   position: BannerPosition;
   order: number;
@@ -679,13 +680,19 @@ export interface Story {
   id: number;
   title: string;
   coverImage?: { mediaId: number; url: string } | null;
+  coverImageMediaId?: number | null;
+  coverImageUrl?: string | null;
   video?: { mediaId: number; url: string } | null;
+  videoMediaId?: number | null;
+  videoUrl?: string | null;
   expiresAt?: string | null;
   order: number;
+  isActive?: boolean;
   nextId?: number | null;
   prevId?: number | null;
   products?: Product[];
   createdAt: string;
+  updatedAt?: string;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────

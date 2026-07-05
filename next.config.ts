@@ -2,6 +2,17 @@ import type { NextConfig } from "next";
 
 const backendRoot = process.env.NEXT_PUBLIC_BACKEND_ROOT_URL ?? "http://localhost:4000";
 
+// Parse hostname from backend root URL for image remotePatterns.
+let backendHost = "localhost";
+let backendPort: string | undefined = "4000";
+try {
+  const u = new URL(backendRoot);
+  backendHost = u.hostname;
+  backendPort = u.port || undefined;
+} catch {
+  // ignore parse errors
+}
+
 const nextConfig: NextConfig = {
   output: "standalone",
   reactStrictMode: false,
@@ -10,14 +21,26 @@ const nextConfig: NextConfig = {
   },
   images: {
     remotePatterns: [
+      // Backend (uploads + media URLs)
       {
         protocol: "http",
-        hostname: "localhost",
-        port: "4000",
+        hostname: backendHost,
+        port: backendPort,
       },
       {
         protocol: "https",
+        hostname: backendHost,
+        port: backendPort,
+      },
+      // Allow any HTTPS image (for external CDNs / OG images)
+      {
+        protocol: "https",
         hostname: "**",
+      },
+      // Allow localhost for development
+      {
+        protocol: "http",
+        hostname: "localhost",
       },
     ],
   },

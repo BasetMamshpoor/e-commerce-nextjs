@@ -704,3 +704,59 @@ Stage Summary:
 - ESLint: 0 errors, 0 warnings
 - All new routes verified via curl: HTTP 200 (/, /search, /admin/withdrawals, /admin/analytics, /admin/stories, /admin/notifications, /admin/newsletter, /admin/payment-gateways, /account/wallet)
 - Admin sidebar now exposes all 22 admin pages organized by group with role-based visibility.
+
+---
+Task ID: landing-page-integration
+Agent: main (Super Z)
+Task: Integrate the unified /landing endpoint as the single source of home page sections, replace orphaned per-section components, and verify against live backend.
+
+Work Log:
+- Created features/catalog/hooks/use-landing.ts → useLanding() hook fetching /api/v1/landing.
+- Built components/site/home-landing-sections.tsx as a unified renderer:
+  - Feature strip (4 cards)
+  - BannerSection (grid of banners with cover image + link)
+  - StoriesSection (horizontal scroll of circular story thumbnails)
+  - CategoriesSection (grid of category tiles)
+  - ProductsSection (reusable; used by featured_products, latest_products, top_rated_products, flash_sales with custom titles + icons)
+  - BrandsSection (horizontal scroll of brand logos)
+  - BlogSection (3-card grid of latest posts)
+  - Newsletter inline widget (frontend-only, not part of /landing)
+  - SettingsFooter (store name + social links from settings)
+  - HomeSkeleton fallback during loading
+- Each section uses SectionHeader from new components/site/section-header.tsx.
+- Replaced app/(site)/page.tsx to use HomeLandingSections + PopupDisplay (overlay) + JsonLd.
+- Extracted SectionHeader into dedicated file (components/site/section-header.tsx) so old home-*.tsx files no longer needed.
+- Removed orphaned components:
+  - components/site/home-categories-grid.tsx (SectionHeader moved out)
+  - components/site/home-hero-slider.tsx
+  - components/site/home-stories.tsx
+  - components/site/home-products.tsx
+  - components/site/home-top-brands.tsx
+  - components/site/home-middle-banners.tsx
+  - components/site/home-blog-section.tsx
+  - components/site/home-newsletter.tsx
+- Added optional flat fields to Story type (coverImageUrl, coverImageMediaId, videoUrl, videoMediaId, isActive, updatedAt) since backend returns both nested (coverImage object) and flat URLs.
+- Updated StoriesSection + admin stories page to fall back to flat coverImageUrl/videoUrl when nested objects are null.
+- Updated .env to point at live backend (http://mrkafshdoz.com:4000/api/v1) with localhost fallback commented out.
+- Updated next.config.ts images.remotePatterns to dynamically include backend host (parses NEXT_PUBLIC_BACKEND_ROOT_URL).
+- Removed conflicting public/robots.txt (was overriding app/robots.ts → 500 error). Native app/robots.ts now serves /robots.txt correctly.
+- Verified all 10 key routes return HTTP 200 against live backend:
+  - /, /search?q=test, /admin/withdrawals, /admin/analytics, /admin/stories, /admin/notifications, /admin/newsletter, /admin/payment-gateways, /admin/orders/returns/1, /account/wallet
+- Verified /robots.txt returns 200 with proper disallow rules + Host directive.
+- Verified /sitemap.xml returns 200 (proxied to backend, 3358 bytes with real product/category/brand URLs).
+- Verified live backend endpoints work:
+  - GET /api/v1/landing → returns sections array (banners, stories, categories, products, brands, blog posts)
+  - GET /api/v1/search/main?q=کفش → returns Product[] with avgRating, totalSold, etc.
+  - GET /api/v1/search?q=کفش → returns global results (products, blogPosts, categories, brands)
+  - GET /api/v1/stories → returns stories with coverImage + flat coverImageUrl
+  - GET /api/v1/products?limit=2 → returns paginated products
+  - Auth-protected endpoints (newsletter/admin/subscribers, admin/notifications, wallet/admin/withdrawals) correctly return 401 without auth.
+
+Stage Summary:
+- Home page now uses single /landing endpoint (1 HTTP call instead of 6 separate ones).
+- All 10 section types from api.md handled (banners, popups, stories, categories, featured_products, latest_products, top_rated_products, flash_sales, latest_blog_posts, popular_brands).
+- TypeScript: 0 errors
+- ESLint: 0 errors, 0 warnings
+- 8 orphaned components removed (~800 lines of dead code eliminated).
+- Live backend integration verified end-to-end.
+- Next.js config auto-detects backend host for image optimization + proxies.

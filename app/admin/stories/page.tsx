@@ -113,10 +113,9 @@ function StoryCard({ story, onEdit }: { story: Story; onEdit: () => void }) {
   return (
     <Card className="overflow-hidden">
       <div className="relative aspect-[9/16] w-full bg-muted">
-        {story.coverImage?.url ? (
-           
+        {(story.coverImage?.url ?? story.coverImageUrl) ? (
           <img
-            src={story.coverImage.url}
+            src={story.coverImage?.url ?? story.coverImageUrl ?? ""}
             alt={story.title}
             className="size-full object-cover"
           />
@@ -130,7 +129,7 @@ function StoryCard({ story, onEdit }: { story: Story; onEdit: () => void }) {
             <Badge variant="destructive">منقضی</Badge>
           </div>
         )}
-        {story.video && (
+        {(story.video || story.videoUrl) && (
           <div className="absolute right-2 top-2">
             <Badge className="bg-black/60 text-white">
               <Eye className="size-3" />

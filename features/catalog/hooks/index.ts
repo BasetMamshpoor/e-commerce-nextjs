@@ -7,3 +7,4 @@ export { useProductBySlug } from "./use-product-by-slug";
 export { useProductFilters } from "./use-product-filters";
 export { useBanners } from "./use-banners";
 export { usePopups } from "./use-popups";
+export { LANDING_QUERY_KEY, useLanding } from "./use-landing";
