@@ -243,13 +243,26 @@ export const http = {
   delete: <T>(url: string, config?: AxiosRequestConfig) =>
     request<T>({ url, method: "DELETE", ...config }),
 
-  /** Raw axios access for multipart uploads (caller builds FormData). */
+  /** Raw axios access for multipart uploads (caller builds FormData). Uses POST by default. */
   upload: async <T>(
     url: string,
     formData: FormData,
     config?: AxiosRequestConfig,
   ): Promise<T> => {
     const res = await apiClient.post<ApiSuccessResponse<T>>(url, formData, {
+      ...config,
+      headers: { "Content-Type": "multipart/form-data", ...(config?.headers ?? {}) },
+    });
+    return res.data.data;
+  },
+
+  /** Multipart upload with PUT method (for updating resources with files). */
+  uploadPut: async <T>(
+    url: string,
+    formData: FormData,
+    config?: AxiosRequestConfig,
+  ): Promise<T> => {
+    const res = await apiClient.put<ApiSuccessResponse<T>>(url, formData, {
       ...config,
       headers: { "Content-Type": "multipart/form-data", ...(config?.headers ?? {}) },
     });

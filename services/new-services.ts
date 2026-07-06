@@ -70,8 +70,12 @@ export const blogService = {
   list: (params?: { page?: number; limit?: number; category?: string; search?: string }) =>
     http.get<PaginatedData<BlogPost>>(ENDPOINTS.blog.list, params),
   bySlug: (slug: string) => http.get<BlogPost>(ENDPOINTS.blog.bySlug(slug)),
+  adminList: (params?: { page?: number; limit?: number; status?: string; search?: string }) =>
+    http.get<PaginatedData<BlogPost>>(ENDPOINTS.blog.adminList, params),
   create: (body: Partial<BlogPost>) => http.post<BlogPost>(ENDPOINTS.blog.create, body),
   update: (id: number, body: Partial<BlogPost>) => http.put<BlogPost>(ENDPOINTS.blog.update(id), body),
   delete: (id: number) => http.delete<void>(ENDPOINTS.blog.delete(id)),
   categories: () => http.get<BlogCategory[]>(ENDPOINTS.blog.categories),
+  createCategory: (body: { name: string; slug?: string; description?: string }) =>
+    http.post<BlogCategory>(ENDPOINTS.blog.createCategory, body),
 };

@@ -45,7 +45,6 @@ import {
   brandsService,
   categoriesService,
   attributesService,
-  mediaService,
 } from "@/services";
 import type {
   Brand,
@@ -165,30 +164,23 @@ export default function AdminProductEditPage({
 
     setSaving(true);
     try {
-      // 1. Upload new images to /media first
-      const newImageFiles = images.filter((img) => !img.id && img.file);
-      const uploadedMediaIds: number[] = [];
-      for (const img of newImageFiles) {
-        if (img.file) {
-          const media = await mediaService.upload(img.file);
-          uploadedMediaIds.push(media.id);
-        }
-      }
+      // Separate existing images (keep) from new file uploads
+      const newImageFiles = images.filter((img): img is ProductImageItem & { file: File } =>
+        !img.id && !!img.file,
+      );
 
-      // 2. Build discount fields
+      // Build discount fields
       const discountType =
         form.discountType === "NONE" ? null : (form.discountType as DiscountType);
       const discountValue =
         discountType && form.discountValue !== "" ? Number(form.discountValue) : null;
 
-      // 3. Build displayAttributes
+      // Build displayAttributes
       const displayAttributes = displayAttrs
         .filter((d) => d.attributeId !== "" && d.value.trim())
         .map((d) => ({ attributeId: Number(d.attributeId), value: d.value.trim() }));
 
-      // 4. Update product via PUT (JSON body — image upload handled via multipart separately)
-      // For new images, we need to use multipart. For now, use JSON-only update.
-      // New images will be attached in a second step if needed.
+      // Build update body — always include categoryIds (backend requires array)
       const updateBody = {
         name: form.name.trim(),
         brandId: form.brandId ? Number(form.brandId) : null,
@@ -204,17 +196,14 @@ export default function AdminProductEditPage({
         displayAttributes,
       };
 
-      // If we have new images, use multipart upload
       if (newImageFiles.length > 0) {
-        const bodyJson = JSON.stringify({
-          ...updateBody,
-          // Note: new images are uploaded via multipart, backend auto-attaches them
-        });
-        const newFileArray = newImageFiles
-          .map((img) => img.file)
-          .filter((f): f is File => !!f);
-        await productsService.updateWithImages(Number(id), bodyJson, newFileArray);
+        // Multipart: send body as JSON string + image files
+        // Backend will upload files to /media and attach them to the product
+        const bodyJson = JSON.stringify(updateBody);
+        const fileArray = newImageFiles.map((img) => img.file);
+        await productsService.updateWithImages(Number(id), bodyJson, fileArray);
       } else {
+        // JSON-only: no new images
         await productsService.update(Number(id), updateBody);
       }
 

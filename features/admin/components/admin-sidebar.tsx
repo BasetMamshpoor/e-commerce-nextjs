@@ -32,6 +32,7 @@ import {
   Truck,
   MessageCircle,
   ChevronDown,
+  FileText as FileTextIcon,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -93,6 +94,7 @@ const NAV_GROUPS: {
       { href: "/admin/banners", label: "بنرها", icon: ImageBannerIcon },
       { href: "/admin/popups", label: "پاپ‌آپ‌ها", icon: Megaphone },
       { href: "/admin/stories", label: "استوری‌ها", icon: Film },
+      { href: "/admin/blog", label: "وبلاگ", icon: FileTextIcon },
       { href: "/admin/newsletter", label: "خبرنامه", icon: Mail },
     ],
   },
@@ -293,6 +295,7 @@ export function AdminTopbar({ onMenuClick }: { onMenuClick: () => void }) {
       "payment-gateways": "درگاه‌های پرداخت",
       "shipping-companies": "شرکت‌های ارسال",
       broadcast: "ارسال اعلان گروهی",
+      blog: "وبلاگ",
     };
     return map[parts[1]] ?? "پنل مدیریت";
   }, [pathname]);

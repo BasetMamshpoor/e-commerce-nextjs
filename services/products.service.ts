@@ -87,12 +87,12 @@ export const productsService = {
   update: (id: number, body: UpdateProductBody) =>
     http.put<Product>(ENDPOINTS.products.update(id), body),
 
-  /** Update product with inline images (multipart/form-data). */
+  /** Update product with inline images (multipart/form-data, PUT method). */
   updateWithImages: (id: number, bodyJson: string, images: File[]) => {
     const fd = new FormData();
     fd.append("body", bodyJson);
     for (const f of images) fd.append("images", f);
-    return http.upload<Product>(ENDPOINTS.products.update(id), fd);
+    return http.uploadPut<Product>(ENDPOINTS.products.update(id), fd);
   },
 
   delete: (id: number) =>

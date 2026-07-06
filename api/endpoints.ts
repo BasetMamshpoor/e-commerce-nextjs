@@ -277,11 +277,13 @@ export const ENDPOINTS = {
   },
 
   blog: {
-    list: "/blog/posts",
-    bySlug: (slug: string) => `/blog/posts/slug/${slug}`,
-    create: "/blog/posts",
-    update: (id: number) => `/blog/posts/${id}`,
-    delete: (id: number) => `/blog/posts/${id}`,
+    list: "/blog",
+    bySlug: (slug: string) => `/blog/slug/${slug}`,
+    adminList: "/blog/admin",
+    create: "/blog",
+    update: (id: number) => `/blog/${id}`,
+    delete: (id: number) => `/blog/${id}`,
     categories: "/blog/categories",
+    createCategory: "/blog/categories",
   },
 } as const;
