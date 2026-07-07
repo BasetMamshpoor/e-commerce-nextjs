@@ -61,10 +61,12 @@ export function VariantManagerModal({
   React.useEffect(() => {
     if (open && !initializedRef.current) {
       const formData: VariantFormData[] = existingVariants.map((v) => {
-        // Extract attributeValueIds: backend returns [] but attributeValues has the data.
+        // Extract attributeValueIds: backend may return undefined or [] but
+        // attributeValues array always has the data.
+        const rawIds = v.attributeValueIds ?? [];
         const avIds =
-          v.attributeValueIds.length > 0
-            ? v.attributeValueIds
+          rawIds.length > 0
+            ? rawIds
             : (v.attributeValues ?? []).map((av) => av.id);
         return {
           id: v.id,

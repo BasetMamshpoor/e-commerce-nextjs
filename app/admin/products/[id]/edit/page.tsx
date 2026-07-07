@@ -382,10 +382,7 @@ export default function AdminProductEditPage({
             <CardHeader><CardTitle className="text-base">ویژگی‌های نمایشی</CardTitle></CardHeader>
             <CardContent>
               <DisplayAttributesEditor attributes={displayAttrs} onChange={setDisplayAttrs} availableAttributes={attributes} />
-              <p className="mt-2 text-xs text-amber-600">
-                ⚠ ویژگی‌های نمایشی در زمان ویرایش محصول قابل تغییر نیستند (محدودیت بک‌اند).
-                برای تغییر، محصول را حذف و مجدداً با ویژگی‌های دلخواه ایجاد کنید.
-              </p>
+              <p className="mt-2 text-xs text-muted-foreground">ویژگی‌های نمایشی با دکمه «ذخیره تغییرات» در پایین صفحه ذخیره می‌شوند.</p>
             </CardContent>
           </Card>
         </div>
