@@ -57,3 +57,12 @@ server.log
 /tool-results/
 /dev.log
 /server.log
+
+# Skills (not part of project)
+/skills/
+# Build artifacts
+/tsconfig.tsbuildinfo
+
+# Skills (not part of project)
+/skills/
+/tsconfig.tsbuildinfo
