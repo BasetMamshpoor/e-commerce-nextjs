@@ -222,7 +222,9 @@ export default function AdminProductEditPage({
     sku: string;
     priceAdjustment: number;
     stock: number;
+    weight?: number;
     isDefault: boolean;
+    isActive: boolean;
     attributeValueIds: number[];
   }) => {
     try {
@@ -242,6 +244,7 @@ export default function AdminProductEditPage({
       sku: string;
       priceAdjustment: number;
       stock: number;
+      weight?: number;
       isDefault: boolean;
       isActive: boolean;
       attributeValueIds: number[];
@@ -524,6 +527,11 @@ export default function AdminProductEditPage({
                         <span className="nums-fa">
                           قیمت: {formatPrice(basePriceNum + v.priceAdjustment)} تومان
                         </span>
+                        {v.weight != null && (
+                          <span className="nums-fa text-muted-foreground">
+                            وزن: {toPersianDigits(v.weight)} kg
+                          </span>
+                        )}
                         {v.attributeValues && v.attributeValues.length > 0 && (
                           <span className="text-muted-foreground">
                             {v.attributeValues.map((av) => av.value).join("، ")}
@@ -653,7 +661,9 @@ function VariantDialog({
     sku: string;
     priceAdjustment: number;
     stock: number;
+    weight?: number;
     isDefault: boolean;
+    isActive: boolean;
     attributeValueIds: number[];
   }) => void;
 }) {
@@ -662,7 +672,11 @@ function VariantDialog({
     variant?.priceAdjustment ?? 0,
   );
   const [stock, setStock] = React.useState(variant?.stock ?? 0);
+  const [weight, setWeight] = React.useState<string>(
+    variant?.weight != null ? String(variant.weight) : "",
+  );
   const [isDefault, setIsDefault] = React.useState(variant?.isDefault ?? false);
+  const [isActive, setIsActive] = React.useState(variant?.isActive ?? true);
   const [attributeValueIds, setAttributeValueIds] = React.useState<number[]>(
     variant?.attributeValueIds ?? [],
   );
@@ -678,7 +692,9 @@ function VariantDialog({
       sku: sku.trim(),
       priceAdjustment: Number(priceAdjustment) || 0,
       stock: Number(stock) || 0,
+      weight: weight ? Number(weight) : undefined,
       isDefault,
+      isActive,
       attributeValueIds,
     });
   };
@@ -753,7 +769,7 @@ function VariantDialog({
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">موجودی</Label>
               <Input
@@ -764,7 +780,28 @@ function VariantDialog({
                 onChange={(e) => setStock(Number(e.target.value))}
               />
             </div>
-            <div className="flex items-end pb-1.5">
+            <div className="space-y-1.5">
+              <Label className="text-xs">وزن (kg)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                dir="ltr"
+                className="text-left"
+                value={weight}
+                onChange={(e) => setWeight(e.target.value)}
+                placeholder="—"
+              />
+            </div>
+            <div className="flex flex-col justify-end gap-2 pb-1.5">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={isActive}
+                  onChange={(e) => setIsActive(e.target.checked)}
+                  className="size-4 rounded"
+                />
+                <span className="text-xs">فعال</span>
+              </label>
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -772,7 +809,7 @@ function VariantDialog({
                   onChange={(e) => setIsDefault(e.target.checked)}
                   className="size-4 rounded"
                 />
-                <span className="text-sm">تنوع پیش‌فرض</span>
+                <span className="text-xs">پیش‌فرض</span>
               </label>
             </div>
           </div>

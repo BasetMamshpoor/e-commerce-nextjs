@@ -101,8 +101,11 @@ export default function AdminProductNewPage() {
       toast.error("قیمت پایه محصول الزامی است");
       return;
     }
-    // Variants are optional — if no variant attributes selected, product has no variants
-    // (just base price + stock managed separately).
+    // Every product must have at least 1 variant (per api.md + expl.md).
+    if (variants.length === 0) {
+      toast.error("حداقل یک تنوع (Variant) الزامی است");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -127,7 +130,18 @@ export default function AdminProductNewPage() {
         .filter((d) => d.attributeId !== "" && d.value.trim())
         .map((d) => ({ attributeId: Number(d.attributeId), value: d.value.trim() }));
 
-      // 4. Create product
+      // 4. Build variants — auto-generate SKU if empty
+      const variantsPayload = variants.map((v, i) => ({
+        sku: v.sku.trim() || `SKU-${form.name.replace(/\s+/g, "-").toUpperCase().slice(0, 8)}-${i + 1}`,
+        priceAdjustment: Number(v.priceAdjustment) || 0,
+        stock: Number(v.stock) || 0,
+        weight: v.weight,
+        isDefault: v.isDefault,
+        isActive: v.isActive,
+        attributeValueIds: v.attributeValueIds,
+      }));
+
+      // 5. Create product
       const body = {
         name: form.name.trim(),
         brandId: form.brandId ? Number(form.brandId) : undefined,
@@ -140,13 +154,7 @@ export default function AdminProductNewPage() {
         isFeatured: form.isFeatured,
         categoryIds: form.categoryIds,
         images: uploadedImages,
-        variants: variants.map((v) => ({
-          sku: v.sku || `SKU-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          priceAdjustment: Number(v.priceAdjustment) || 0,
-          stock: Number(v.stock) || 0,
-          isDefault: v.isDefault,
-          attributeValueIds: v.attributeValueIds,
-        })),
+        variants: variantsPayload,
         displayAttributes,
       };
       const product = await productsService.create(body);

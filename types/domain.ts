@@ -184,6 +184,7 @@ export interface ProductVariant {
   sku: string;
   priceAdjustment: number;
   stock: number;
+  weight?: number | null;
   isDefault: boolean;
   isActive: boolean;
   effectivePrice?: number;

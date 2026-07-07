@@ -31,7 +31,9 @@ export interface CreateProductBody {
     sku: string;
     priceAdjustment: number;
     stock: number;
+    weight?: number;
     isDefault?: boolean;
+    isActive?: boolean;
     attributeValueIds: number[];
   }>;
   displayAttributes?: Array<{ attributeId: number; value: string }>;
@@ -56,6 +58,7 @@ export interface UpdateVariantBody {
   sku?: string;
   priceAdjustment?: number;
   stock?: number;
+  weight?: number;
   isDefault?: boolean;
   isActive?: boolean;
   attributeValueIds?: number[];
