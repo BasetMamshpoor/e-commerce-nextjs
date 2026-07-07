@@ -285,5 +285,7 @@ export const ENDPOINTS = {
     delete: (id: number) => `/blog/${id}`,
     categories: "/blog/categories",
     createCategory: "/blog/categories",
+    updateCategory: (id: number) => `/blog/categories/${id}`,
+    deleteCategory: (id: number) => `/blog/categories/${id}`,
   },
 } as const;

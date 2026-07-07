@@ -72,10 +72,29 @@ export const blogService = {
   bySlug: (slug: string) => http.get<BlogPost>(ENDPOINTS.blog.bySlug(slug)),
   adminList: (params?: { page?: number; limit?: number; status?: string; search?: string }) =>
     http.get<PaginatedData<BlogPost>>(ENDPOINTS.blog.adminList, params),
-  create: (body: Partial<BlogPost>) => http.post<BlogPost>(ENDPOINTS.blog.create, body),
-  update: (id: number, body: Partial<BlogPost>) => http.put<BlogPost>(ENDPOINTS.blog.update(id), body),
+  create: (body: Partial<BlogPost> & { productIds?: number[] }) =>
+    http.post<BlogPost>(ENDPOINTS.blog.create, body),
+  /** Create blog post with cover image (multipart/form-data). */
+  createWithCover: (bodyJson: string, coverImage: File) => {
+    const fd = new FormData();
+    fd.append("body", bodyJson);
+    fd.append("coverImage", coverImage);
+    return http.upload<BlogPost>(ENDPOINTS.blog.create, fd);
+  },
+  update: (id: number, body: Partial<BlogPost> & { productIds?: number[] }) =>
+    http.put<BlogPost>(ENDPOINTS.blog.update(id), body),
+  /** Update blog post with cover image (multipart/form-data). */
+  updateWithCover: (id: number, bodyJson: string, coverImage: File) => {
+    const fd = new FormData();
+    fd.append("body", bodyJson);
+    fd.append("coverImage", coverImage);
+    return http.uploadPut<BlogPost>(ENDPOINTS.blog.update(id), fd);
+  },
   delete: (id: number) => http.delete<void>(ENDPOINTS.blog.delete(id)),
   categories: () => http.get<BlogCategory[]>(ENDPOINTS.blog.categories),
   createCategory: (body: { name: string; slug?: string; description?: string }) =>
     http.post<BlogCategory>(ENDPOINTS.blog.createCategory, body),
+  updateCategory: (id: number, body: Partial<{ name: string; slug: string; description: string }>) =>
+    http.put<BlogCategory>(ENDPOINTS.blog.updateCategory(id), body),
+  deleteCategory: (id: number) => http.delete<void>(ENDPOINTS.blog.deleteCategory(id)),
 };
