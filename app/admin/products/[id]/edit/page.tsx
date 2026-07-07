@@ -88,7 +88,7 @@ export default function AdminProductEditPage({
   const router = useRouter();
   const [brands, setBrands] = React.useState<Brand[]>([]);
   const [categoryTree, setCategoryTree] = React.useState<Category[]>([]);
-  const [categoryAttributes, setCategoryAttributes] = React.useState<Attribute[]>([]);
+  const [attributes, setAttributes] = React.useState<Attribute[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
 
@@ -118,13 +118,14 @@ export default function AdminProductEditPage({
       productsService.adminById(Number(id)),
       brandsService.list({ includeInactive: true }),
       categoriesService.tree(),
+      attributesService.list(),
     ])
-      .then(([p, b, c]) => {
+      .then(([p, b, c, a]) => {
         setBrands(b);
         setCategoryTree(c);
+        setAttributes(a);
         const product = p as Product;
         const cats = getProductCategories(product);
-        const catIds = cats.map((cat) => cat.id);
         setForm({
           name: product.name,
           brandId: product.brandId != null ? String(product.brandId) : "",
@@ -133,7 +134,7 @@ export default function AdminProductEditPage({
           basePrice: product.basePrice ?? 0,
           status: product.status,
           isFeatured: product.isFeatured,
-          categoryIds: catIds,
+          categoryIds: cats.map((cat) => cat.id),
           discountType: product.discountType ?? "NONE",
           discountValue: product.discountValue ?? "",
         });
@@ -152,42 +153,9 @@ export default function AdminProductEditPage({
             value: d.value,
           })),
         );
-        // Load category-specific attributes
-        loadCategoryAttributes(catIds);
       })
       .finally(() => setLoading(false));
   }, [id]);
-
-  const loadCategoryAttributes = (catIds: number[]) => {
-    if (catIds.length === 0) {
-      setCategoryAttributes([]);
-      return;
-    }
-    const fetches = catIds.map((cid) =>
-      categoriesService.attributes(cid).catch(() => [] as Attribute[]),
-    );
-    Promise.all(fetches).then((results) => {
-      const merged = new Map<number, Attribute>();
-      for (const attrs of results) {
-        for (const attr of attrs) {
-          if (!merged.has(attr.id)) merged.set(attr.id, attr);
-        }
-      }
-      setCategoryAttributes(Array.from(merged.values()));
-    });
-  };
-
-  // When categoryIds change → reload attributes
-  const prevCatIdsRef = React.useRef<number[]>([]);
-  React.useEffect(() => {
-    const prev = prevCatIdsRef.current;
-    const curr = form.categoryIds;
-    const changed = prev.length !== curr.length || prev.some((id) => !curr.includes(id));
-    if (changed) {
-      prevCatIdsRef.current = curr;
-      loadCategoryAttributes(curr);
-    }
-  }, [form.categoryIds]);
 
   const onSubmit = async () => {
     if (!form.name.trim()) {
@@ -273,7 +241,6 @@ export default function AdminProductEditPage({
   }
 
   const basePriceNum = Number(form.basePrice) || 0;
-  const hasCategories = form.categoryIds.length > 0;
 
   return (
     <div className="space-y-4">
@@ -411,7 +378,7 @@ export default function AdminProductEditPage({
                     key={v.id}
                     variant={v}
                     productId={Number(id)}
-                    attributes={categoryAttributes}
+                    attributes={attributes}
                     basePrice={basePriceNum}
                     onSaved={(updated) => onVariantSaved(v.id, updated)}
                     onDeleted={() => onVariantDeleted(v.id)}
@@ -426,11 +393,7 @@ export default function AdminProductEditPage({
           <Card>
             <CardHeader><CardTitle className="text-base">ویژگی‌های نمایشی</CardTitle></CardHeader>
             <CardContent>
-              {hasCategories ? (
-                <DisplayAttributesEditor attributes={displayAttrs} onChange={setDisplayAttrs} availableAttributes={categoryAttributes} />
-              ) : (
-                <p className="text-sm text-muted-foreground">دسته‌بندی انتخاب کنید.</p>
-              )}
+              <DisplayAttributesEditor attributes={displayAttrs} onChange={setDisplayAttrs} availableAttributes={attributes} />
               <p className="mt-2 text-xs text-muted-foreground">ویژگی‌های نمایشی با دکمه «ذخیره تغییرات» در پایین صفحه ذخیره می‌شوند.</p>
             </CardContent>
           </Card>
@@ -472,7 +435,7 @@ export default function AdminProductEditPage({
       {showAddVariant && (
         <AddVariantForm
           productId={Number(id)}
-          attributes={categoryAttributes}
+          attributes={attributes}
           basePrice={basePriceNum}
           onAdded={onVariantAdded}
           onCancel={() => setShowAddVariant(false)}

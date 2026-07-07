@@ -55,12 +55,9 @@ export default function AdminProductNewPage() {
   const router = useRouter();
   const [brands, setBrands] = React.useState<Brand[]>([]);
   const [categoryTree, setCategoryTree] = React.useState<Category[]>([]);
+  const [attributes, setAttributes] = React.useState<Attribute[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
-
-  // Category-specific attributes — loaded when categories are selected.
-  // These are the attributes ATTACHED to the selected categories.
-  const [categoryAttributes, setCategoryAttributes] = React.useState<Attribute[]>([]);
 
   const [form, setForm] = React.useState({
     name: "",
@@ -79,41 +76,22 @@ export default function AdminProductNewPage() {
   const [images, setImages] = React.useState<ProductImageItem[]>([]);
   const [displayAttrs, setDisplayAttrs] = React.useState<DisplayAttributeFormData[]>([]);
 
-  // Initial load: brands + category tree
+  // Initial load: brands + category tree + ALL attributes
+  // Per api.md: attributes are global, filtered by type (isVariant, isDisplay) —
+  // NOT filtered by product's categories.
   React.useEffect(() => {
     Promise.all([
       brandsService.list({ includeInactive: true }),
       categoriesService.tree(),
+      attributesService.list(),
     ])
-      .then(([b, c]) => {
+      .then(([b, c, a]) => {
         setBrands(b);
         setCategoryTree(c);
+        setAttributes(a);
       })
       .finally(() => setLoading(false));
   }, []);
-
-  // When categories change → load category-specific attributes.
-  // GET /categories/:id/attributes returns attributes attached to that category.
-  React.useEffect(() => {
-    if (form.categoryIds.length === 0) {
-      setCategoryAttributes([]);
-      return;
-    }
-
-    // Fetch attributes for ALL selected categories and merge unique ones.
-    const fetches = form.categoryIds.map((id) =>
-      categoriesService.attributes(id).catch(() => [] as Attribute[]),
-    );
-    Promise.all(fetches).then((results) => {
-      const merged = new Map<number, Attribute>();
-      for (const attrs of results) {
-        for (const attr of attrs) {
-          if (!merged.has(attr.id)) merged.set(attr.id, attr);
-        }
-      }
-      setCategoryAttributes(Array.from(merged.values()));
-    });
-  }, [form.categoryIds]);
 
   const onSubmit = async () => {
     if (!form.name.trim()) {
@@ -209,8 +187,6 @@ export default function AdminProductNewPage() {
   const effectivePrice =
     basePriceNum + (defaultVariant ? Number(defaultVariant.priceAdjustment) || 0 : 0);
 
-  const hasCategories = form.categoryIds.length > 0;
-
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
@@ -274,9 +250,6 @@ export default function AdminProductNewPage() {
               <div className="space-y-2">
                 <Label>دسته‌بندی‌ها *</Label>
                 <CategoryTreeSelect categories={categoryTree} selectedIds={form.categoryIds} onChange={(ids) => setForm({ ...form, categoryIds: ids })} />
-                {!hasCategories && (
-                  <p className="text-xs text-muted-foreground">برای فعال شدن بخش تنوع‌ها و ویژگی‌های نمایشی، حداقل یک دسته‌بندی انتخاب کنید.</p>
-                )}
               </div>
             </CardContent>
           </Card>
@@ -340,31 +313,19 @@ export default function AdminProductNewPage() {
             </CardContent>
           </Card>
 
-          {/* Variants — only show if categories are selected */}
+          {/* Variants */}
           <Card>
             <CardHeader><CardTitle className="text-base">تنوع‌ها (Variants)</CardTitle></CardHeader>
             <CardContent>
-              {hasCategories ? (
-                <VariantBuilder variants={variants} onChange={setVariants} attributes={categoryAttributes} basePrice={basePriceNum} />
-              ) : (
-                <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                  ابتدا یک دسته‌بندی انتخاب کنید تا ویژگی‌های تنوع مربوط به آن دسته بارگذاری شود.
-                </p>
-              )}
+              <VariantBuilder variants={variants} onChange={setVariants} attributes={attributes} basePrice={basePriceNum} />
             </CardContent>
           </Card>
 
-          {/* Display attributes — only show if categories are selected */}
+          {/* Display attributes */}
           <Card>
             <CardHeader><CardTitle className="text-base">ویژگی‌های نمایشی</CardTitle></CardHeader>
             <CardContent>
-              {hasCategories ? (
-                <DisplayAttributesEditor attributes={displayAttrs} onChange={setDisplayAttrs} availableAttributes={categoryAttributes} />
-              ) : (
-                <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                  ابتدا یک دسته‌بندی انتخاب کنید تا ویژگی‌های نمایشی مربوط به آن دسته بارگذاری شود.
-                </p>
-              )}
+              <DisplayAttributesEditor attributes={displayAttrs} onChange={setDisplayAttrs} availableAttributes={attributes} />
             </CardContent>
           </Card>
         </div>
