@@ -58,6 +58,11 @@ export default function AdminBlogPage() {
 
   // Categories
   const [categories, setCategories] = React.useState<BlogCategory[]>([]);
+  const [catDialogOpen, setCatDialogOpen] = React.useState(false);
+  const [newCatName, setNewCatName] = React.useState("");
+  const [newCatSlug, setNewCatSlug] = React.useState("");
+  const [newCatDesc, setNewCatDesc] = React.useState("");
+  const [catSaving, setCatSaving] = React.useState(false);
 
   const load = React.useCallback(() => {
     setLoading(true);
@@ -97,6 +102,33 @@ export default function AdminBlogPage() {
     }
   };
 
+  const onCreateCategory = async () => {
+    if (!newCatName.trim()) {
+      toast.error("نام دسته الزامی است");
+      return;
+    }
+    setCatSaving(true);
+    try {
+      await blogService.createCategory({
+        name: newCatName.trim(),
+        slug: newCatSlug.trim() || undefined,
+        description: newCatDesc.trim() || undefined,
+      });
+      toast.success("دسته‌بندی ایجاد شد");
+      setCatDialogOpen(false);
+      setNewCatName("");
+      setNewCatSlug("");
+      setNewCatDesc("");
+      // Reload categories
+      blogService.categories().then(setCategories).catch(() => {});
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "ایجاد دسته ناموفق بود");
+    } finally {
+      setCatSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -109,16 +141,37 @@ export default function AdminBlogPage() {
             مدیریت مقالات و دسته‌بندی‌های وبلاگ
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setEditing(null);
-            setDialogOpen(true);
-          }}
-        >
-          <Plus className="size-4" />
-          مقاله جدید
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setCatDialogOpen(true)}
+          >
+            <Plus className="size-4" />
+            دسته جدید
+          </Button>
+          <Button
+            onClick={() => {
+              setEditing(null);
+              setDialogOpen(true);
+            }}
+          >
+            <Plus className="size-4" />
+            مقاله جدید
+          </Button>
+        </div>
       </div>
+
+      {/* Blog categories display */}
+      {categories.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 p-3">
+          <span className="text-xs font-medium text-muted-foreground">دسته‌بندی‌ها:</span>
+          {categories.map((c) => (
+            <Badge key={c.id} variant="outline" className="text-xs">
+              {c.name}
+            </Badge>
+          ))}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
@@ -261,6 +314,55 @@ export default function AdminBlogPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Blog category create dialog */}
+      <Dialog open={catDialogOpen} onOpenChange={setCatDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>دسته‌بندی وبلاگ جدید</DialogTitle>
+            <DialogDescription>
+              دسته‌بندی‌ها برای گروه‌بندی مقالات استفاده می‌شوند.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>نام دسته *</Label>
+              <Input
+                value={newCatName}
+                onChange={(e) => setNewCatName(e.target.value)}
+                placeholder="مثال: راهنمای خرید"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>نامک (slug) — اختیاری</Label>
+              <Input
+                value={newCatSlug}
+                onChange={(e) => setNewCatSlug(e.target.value)}
+                placeholder="خودکار از نام"
+                dir="ltr"
+                className="text-left"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>توضیحات — اختیاری</Label>
+              <Input
+                value={newCatDesc}
+                onChange={(e) => setNewCatDesc(e.target.value)}
+                placeholder="توضیح کوتاه دسته"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCatDialogOpen(false)}>
+              انصراف
+            </Button>
+            <Button onClick={onCreateCategory} disabled={catSaving || !newCatName.trim()}>
+              {catSaving && <Loader2 className="size-4 animate-spin" />}
+              {catSaving ? "در حال ذخیره..." : "ایجاد دسته"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
