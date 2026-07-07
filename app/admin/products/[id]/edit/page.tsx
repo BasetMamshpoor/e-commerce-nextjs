@@ -6,11 +6,7 @@ import Link from "next/link";
 import {
   ArrowRight,
   Loader2,
-  Plus,
-  Trash2,
-  Save,
-  X,
-  Paperclip,
+  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -28,16 +24,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { RichTextEditor } from "@/components/common/rich-text-editor";
 import { CategoryTreeSelect } from "@/components/common/category-tree-select";
 import {
@@ -48,7 +34,7 @@ import {
   DisplayAttributesEditor,
   type DisplayAttributeFormData,
 } from "@/components/common/display-attributes-editor";
-import { MultiSelectCombobox } from "@/components/common/multi-select-combobox";
+import { VariantManagerModal } from "@/components/common/variant-manager-modal";
 import {
   productsService,
   brandsService,
@@ -109,9 +95,9 @@ export default function AdminProductEditPage({
   const [deletedImageIds, setDeletedImageIds] = React.useState<number[]>([]);
   const [displayAttrs, setDisplayAttrs] = React.useState<DisplayAttributeFormData[]>([]);
 
-  // Variants — loaded from product, managed inline via separate endpoints.
+  // Variants — loaded from product, managed via modal.
   const [variants, setVariants] = React.useState<ProductVariant[]>([]);
-  const [showAddVariant, setShowAddVariant] = React.useState(false);
+  const [variantModalOpen, setVariantModalOpen] = React.useState(false);
 
   React.useEffect(() => {
     Promise.all([
@@ -214,21 +200,6 @@ export default function AdminProductEditPage({
     } finally {
       setSaving(false);
     }
-  };
-
-  // ── Variant inline operations ──
-
-  const onVariantSaved = (variantId: number, updated: ProductVariant) => {
-    setVariants(variants.map((v) => (v.id === variantId ? updated : v)));
-  };
-
-  const onVariantDeleted = (variantId: number) => {
-    setVariants(variants.filter((v) => v.id !== variantId));
-  };
-
-  const onVariantAdded = (newVariant: ProductVariant) => {
-    setVariants([...variants, newVariant]);
-    setShowAddVariant(false);
   };
 
   if (loading) {
@@ -358,32 +329,49 @@ export default function AdminProductEditPage({
             </CardContent>
           </Card>
 
-          {/* Variants — inline editing with direct save */}
+          {/* Variants — read-only list + modal for full management */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">تنوع‌ها (Variants)</CardTitle>
-                <Button size="sm" variant="outline" onClick={() => setShowAddVariant(true)}>
-                  <Plus className="size-4" />
-                  افزودن تنوع
+                <Button size="sm" variant="outline" onClick={() => setVariantModalOpen(true)}>
+                  <Pencil className="size-4" />
+                  مدیریت تنوع‌ها
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2">
               {variants.length === 0 ? (
-                <p className="text-sm text-muted-foreground">هیچ تنوعی تعریف نشده. حداقل یک تنوع الزامی است.</p>
+                <p className="text-sm text-muted-foreground">
+                  هیچ تنوعی تعریف نشده. روی «مدیریت تنوع‌ها» کلیک کنید.
+                </p>
               ) : (
-                variants.map((v) => (
-                  <InlineVariantEditor
+                variants.map((v, i) => (
+                  <div
                     key={v.id}
-                    variant={v}
-                    productId={Number(id)}
-                    attributes={attributes}
-                    basePrice={basePriceNum}
-                    onSaved={(updated) => onVariantSaved(v.id, updated)}
-                    onDeleted={() => onVariantDeleted(v.id)}
-                    canDelete={variants.length > 1}
-                  />
+                    className={`flex items-center justify-between rounded-lg border p-3 ${v.isDefault ? "border-primary/40 bg-primary/5" : "border-border"}`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="flex size-6 items-center justify-center rounded-md bg-primary/10 text-xs font-bold text-primary nums-fa">
+                          {toPersianDigits(i + 1)}
+                        </span>
+                        {v.isDefault && <Badge className="text-[10px]">پیش‌فرض</Badge>}
+                        {!v.isActive && <Badge variant="secondary" className="text-[10px]">غیرفعال</Badge>}
+                      </div>
+                      <p className="mt-1 font-mono text-xs text-muted-foreground" dir="ltr">{v.sku}</p>
+                      <div className="mt-1 flex flex-wrap gap-2 text-xs">
+                        <span className="nums-fa">موجودی: {toPersianDigits(v.stock)}</span>
+                        <span className="nums-fa">قیمت: {formatPrice(basePriceNum + v.priceAdjustment)} ت</span>
+                        {v.weight != null && <span className="nums-fa text-muted-foreground">وزن: {toPersianDigits(v.weight)} kg</span>}
+                        {v.attributeValues && v.attributeValues.length > 0 && (
+                          <span className="text-muted-foreground">
+                            {v.attributeValues.map((av) => av.value).join("، ")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 ))
               )}
             </CardContent>
@@ -434,352 +422,16 @@ export default function AdminProductEditPage({
         </div>
       </div>
 
-      {/* Add new variant form (inline, below the list) */}
-      {showAddVariant && (
-        <AddVariantForm
-          productId={Number(id)}
-          attributes={attributes}
-          basePrice={basePriceNum}
-          onAdded={onVariantAdded}
-          onCancel={() => setShowAddVariant(false)}
-        />
-      )}
+      {/* Variant manager modal */}
+      <VariantManagerModal
+        open={variantModalOpen}
+        onOpenChange={setVariantModalOpen}
+        productId={Number(id)}
+        existingVariants={variants}
+        attributes={attributes}
+        basePrice={basePriceNum}
+        onSaved={setVariants}
+      />
     </div>
-  );
-}
-
-/* ════════════════════════════════════════════════════════════════════════════
-   InlineVariantEditor — each variant is edited and saved DIRECTLY via
-   PUT /products/:id/variants/:variantId. No dialog, no "cancel" rollback.
-   ════════════════════════════════════════════════════════════════════════════ */
-
-function InlineVariantEditor({
-  variant,
-  productId,
-  attributes,
-  basePrice,
-  onSaved,
-  onDeleted,
-  canDelete,
-}: {
-  variant: ProductVariant;
-  productId: number;
-  attributes: Attribute[];
-  basePrice: number;
-  onSaved: (updated: ProductVariant) => void;
-  onDeleted: () => void;
-  canDelete: boolean;
-}) {
-  const [editing, setEditing] = React.useState(false);
-  const [saving, setSaving] = React.useState(false);
-  const [deleting, setDeleting] = React.useState(false);
-
-  // Extract attribute value IDs: backend returns attributeValueIds=[] but
-  // attributeValues (array of objects) contains the actual values.
-  // We must extract IDs from attributeValues when attributeValueIds is empty.
-  const getAttributeValueIds = (v: ProductVariant): number[] => {
-    if (v.attributeValueIds && v.attributeValueIds.length > 0) return v.attributeValueIds;
-    return (v.attributeValues ?? []).map((av) => av.id);
-  };
-
-  // Editable fields
-  const [sku, setSku] = React.useState(variant.sku);
-  const [priceAdjustment, setPriceAdjustment] = React.useState(variant.priceAdjustment);
-  const [stock, setStock] = React.useState(variant.stock);
-  const [weight, setWeight] = React.useState(variant.weight != null ? String(variant.weight) : "");
-  const [isDefault, setIsDefault] = React.useState(variant.isDefault);
-  const [isActive, setIsActive] = React.useState(variant.isActive);
-  const [attributeValueIds, setAttributeValueIds] = React.useState<number[]>(getAttributeValueIds(variant));
-
-  const variantAttributes = attributes.filter((a) => a.isVariant);
-  const effectivePrice = basePrice + (editing ? priceAdjustment : variant.priceAdjustment);
-
-  // Sync when variant changes externally
-  React.useEffect(() => {
-    if (!editing) {
-      setSku(variant.sku);
-      setPriceAdjustment(variant.priceAdjustment);
-      setStock(variant.stock);
-      setWeight(variant.weight != null ? String(variant.weight) : "");
-      setIsDefault(variant.isDefault);
-      setIsActive(variant.isActive);
-      setAttributeValueIds(getAttributeValueIds(variant));
-    }
-     
-  }, [variant, editing]);
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const updated = await productsService.updateVariant(productId, variant.id, {
-        sku: sku.trim(),
-        priceAdjustment: Number(priceAdjustment) || 0,
-        stock: Number(stock) || 0,
-        weight: weight ? Number(weight) : undefined,
-        isDefault,
-        isActive,
-        attributeValueIds,
-      });
-      toast.success("تنوع ذخیره شد");
-      setEditing(false);
-      onSaved(updated);
-    } catch (e: unknown) {
-      const apiErr = e as { message?: string };
-      toast.error(apiErr?.message ?? "ذخیره ناموفق بود");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    setDeleting(true);
-    try {
-      await productsService.deleteVariant(productId, variant.id);
-      toast.success("تنوع حذف شد");
-      onDeleted();
-    } catch (e: unknown) {
-      const apiErr = e as { message?: string };
-      toast.error(apiErr?.message ?? "حذف ناموفق بود");
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  return (
-    <div className={`rounded-lg border p-3 ${variant.isDefault ? "border-primary/40 bg-primary/5" : "border-border"}`}>
-      {/* View mode */}
-      {!editing ? (
-        <>
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="flex size-6 items-center justify-center rounded-md bg-primary/10 text-xs font-bold text-primary nums-fa">
-                  #
-                </span>
-                {variant.isDefault && <Badge className="text-[10px]">پیش‌فرض</Badge>}
-                {!variant.isActive && <Badge variant="secondary" className="text-[10px]">غیرفعال</Badge>}
-              </div>
-              <p className="mt-1 font-mono text-xs text-muted-foreground" dir="ltr">{variant.sku}</p>
-              <div className="mt-1 flex flex-wrap gap-2 text-xs">
-                <span className="nums-fa">موجودی: {toPersianDigits(variant.stock)}</span>
-                <span className="nums-fa">قیمت: {formatPrice(effectivePrice)} ت</span>
-                {variant.weight != null && <span className="nums-fa text-muted-foreground">وزن: {toPersianDigits(variant.weight)} kg</span>}
-                {variant.attributeValues && variant.attributeValues.length > 0 && (
-                  <span className="text-muted-foreground">{variant.attributeValues.map((av) => av.value).join("، ")}</span>
-                )}
-              </div>
-            </div>
-            <div className="flex gap-1">
-              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditing(true)}>ویرایش</Button>
-              <Button size="icon" variant="ghost" className="size-7 text-destructive hover:text-destructive" onClick={handleDelete} disabled={!canDelete || deleting}>
-                {deleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
-              </Button>
-            </div>
-          </div>
-        </>
-      ) : (
-        /* Edit mode — inline */
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">ویرایش تنوع</span>
-            <div className="flex gap-1">
-              <Button size="sm" variant="default" className="h-7 text-xs" onClick={handleSave} disabled={saving}>
-                {saving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />}
-                ذخیره
-              </Button>
-              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditing(false)}>انصراف</Button>
-            </div>
-          </div>
-
-          {/* Attribute value selectors */}
-          {variantAttributes.length > 0 && (
-            <div className="space-y-2">
-              {variantAttributes.map((attr) => {
-                const selectedForAttr = attributeValueIds.filter((id) => attr.values.some((v) => v.id === id));
-                return (
-                  <div key={attr.id} className="grid grid-cols-[120px_1fr] items-center gap-2">
-                    <Label className="text-xs text-muted-foreground">{attr.name}:</Label>
-                    <MultiSelectCombobox
-                      options={attr.values.map((v) => ({ value: String(v.id), label: v.value, colorHex: v.colorHex }))}
-                      value={selectedForAttr.map(String)}
-                      onChange={(vals: string[]) => {
-                        const other = attributeValueIds.filter((id) => !attr.values.some((v) => v.id === id));
-                        setAttributeValueIds([...other, ...vals.map(Number)]);
-                      }}
-                      placeholder={`انتخاب ${attr.name}...`}
-                      searchPlaceholder="جست‌وجو..."
-                      emptyText="موردی یافت نشد"
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          <Separator />
-
-          {/* Fields */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="space-y-1">
-              <Label className="text-xs">SKU</Label>
-              <Input value={sku} onChange={(e) => setSku(e.target.value)} dir="ltr" className="h-8 text-xs" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">موجودی</Label>
-              <Input type="number" value={stock} onChange={(e) => setStock(Number(e.target.value))} dir="ltr" className="h-8 text-xs" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">افزایش قیمت</Label>
-              <Input type="number" value={priceAdjustment} onChange={(e) => setPriceAdjustment(Number(e.target.value))} dir="ltr" className="h-8 text-xs" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">وزن (kg)</Label>
-              <Input type="number" step="0.01" value={weight} onChange={(e) => setWeight(e.target.value)} dir="ltr" className="h-8 text-xs" placeholder="—" />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-1.5">
-              <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="size-4 rounded" />
-              <span className="text-xs">فعال</span>
-            </label>
-            <label className="flex items-center gap-1.5">
-              <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} className="size-4 rounded" />
-              <span className="text-xs">پیش‌فرض</span>
-            </label>
-            {basePrice > 0 && (
-              <span className="mr-auto text-xs text-success nums-fa">قیمت نهایی: {formatPrice(basePrice + (Number(priceAdjustment) || 0))} ت</span>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ════════════════════════════════════════════════════════════════════════════
-   AddVariantForm — adds a new variant via POST /products/:id/variants
-   ════════════════════════════════════════════════════════════════════════════ */
-
-function AddVariantForm({
-  productId,
-  attributes,
-  basePrice,
-  onAdded,
-  onCancel,
-}: {
-  productId: number;
-  attributes: Attribute[];
-  basePrice: number;
-  onAdded: (v: ProductVariant) => void;
-  onCancel: () => void;
-}) {
-  const [sku, setSku] = React.useState("");
-  const [priceAdjustment, setPriceAdjustment] = React.useState(0);
-  const [stock, setStock] = React.useState(0);
-  const [weight, setWeight] = React.useState("");
-  const [isDefault, setIsDefault] = React.useState(false);
-  const [isActive, setIsActive] = React.useState(true);
-  const [attributeValueIds, setAttributeValueIds] = React.useState<number[]>([]);
-  const [saving, setSaving] = React.useState(false);
-
-  const variantAttributes = attributes.filter((a) => a.isVariant);
-
-  const handleAdd = async () => {
-    setSaving(true);
-    try {
-      const v = await productsService.addVariant(productId, {
-        sku: sku.trim() || `SKU-${Date.now()}`,
-        priceAdjustment: Number(priceAdjustment) || 0,
-        stock: Number(stock) || 0,
-        weight: weight ? Number(weight) : undefined,
-        isDefault,
-        isActive,
-        attributeValueIds,
-      });
-      toast.success("تنوع اضافه شد");
-      onAdded(v);
-    } catch (e: unknown) {
-      const apiErr = e as { message?: string };
-      toast.error(apiErr?.message ?? "افزودن ناموفق بود");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Card className="border-primary/40">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base">افزودن تنوع جدید</CardTitle>
-          <Button size="sm" variant="ghost" onClick={onCancel}><X className="size-4" /></Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {variantAttributes.length > 0 && (
-          <div className="space-y-2">
-            {variantAttributes.map((attr) => {
-              const selectedForAttr = attributeValueIds.filter((id) => attr.values.some((v) => v.id === id));
-              return (
-                <div key={attr.id} className="grid grid-cols-[120px_1fr] items-center gap-2">
-                  <Label className="text-xs text-muted-foreground">{attr.name}:</Label>
-                  <MultiSelectCombobox
-                    options={attr.values.map((v) => ({ value: String(v.id), label: v.value, colorHex: v.colorHex }))}
-                    value={selectedForAttr.map(String)}
-                    onChange={(vals: string[]) => {
-                      const other = attributeValueIds.filter((id) => !attr.values.some((v) => v.id === id));
-                      setAttributeValueIds([...other, ...vals.map(Number)]);
-                    }}
-                    placeholder={`انتخاب ${attr.name}...`}
-                    searchPlaceholder="جست‌وجو..."
-                    emptyText="موردی یافت نشد"
-                  />
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        <Separator />
-
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="space-y-1">
-            <Label className="text-xs">SKU</Label>
-            <Input value={sku} onChange={(e) => setSku(e.target.value)} dir="ltr" className="h-8 text-xs" placeholder="خودکار" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">موجودی</Label>
-            <Input type="number" value={stock} onChange={(e) => setStock(Number(e.target.value))} dir="ltr" className="h-8 text-xs" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">افزایش قیمت</Label>
-            <Input type="number" value={priceAdjustment} onChange={(e) => setPriceAdjustment(Number(e.target.value))} dir="ltr" className="h-8 text-xs" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">وزن (kg)</Label>
-            <Input type="number" step="0.01" value={weight} onChange={(e) => setWeight(e.target.value)} dir="ltr" className="h-8 text-xs" placeholder="—" />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <label className="flex items-center gap-1.5">
-            <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="size-4 rounded" />
-            <span className="text-xs">فعال</span>
-          </label>
-          <label className="flex items-center gap-1.5">
-            <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} className="size-4 rounded" />
-            <span className="text-xs">پیش‌فرض</span>
-          </label>
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <Button size="sm" variant="outline" onClick={onCancel}>انصراف</Button>
-          <Button size="sm" onClick={handleAdd} disabled={saving}>
-            {saving ? <Loader2 className="size-3 animate-spin" /> : <Plus className="size-3" />}
-            افزودن تنوع
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
