@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 
 import {
   getGuestToken,
@@ -10,7 +11,6 @@ import {
 } from "@/lib/api-client";
 import { ENDPOINTS } from "@/api/endpoints";
 import type { Cart } from "@/types/domain";
-import { useAuth } from "./auth-context";
 
 /* ──────────────────────────────────────────────────────────────────────────
    Cart context
@@ -27,7 +27,8 @@ const CartContext = React.createContext<CartContextValue | null>(null);
 export const CART_QUERY_KEY = ["cart"] as const;
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { status, data: session } = useSession();
+  const isAuthenticated = status === "authenticated" && !!session?.user;
   const queryClient = useQueryClient();
   const [itemCount, setItemCount] = React.useState(0);
 
@@ -51,10 +52,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       .post<Cart>(ENDPOINTS.cart.merge, { guestToken })
       .then((cart) => {
         queryClient.setQueryData(CART_QUERY_KEY, cart);
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("sf_guest");
-        }
-        // Clear in-memory guest token after merge.
+        // Clear guest token after merge.
         setGuestToken("");
       })
       .catch(() => {

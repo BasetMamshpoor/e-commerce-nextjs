@@ -1,13 +1,16 @@
 /**
- * Centralized Axios client + React Query integration
+ * Centralized Axios client — works with NextAuth (Auth.js v5).
  *
- * Features:
- *   - Single axios instance for the whole app
- *   - Request interceptor: inject Authorization + X-Guest-Token headers
- *   - Response interceptor: unwrap { success, data } envelope
- *   - Refresh-token rotation: on 401, transparently refresh once and retry
- *   - Centralized error handling: ApiError with status, code, raw payload
- *   - SSR-safe: no localStorage on server
+ * NextAuth manages access/refresh tokens in an encrypted JWT cookie.
+ * The jwt callback in auth.ts handles automatic refresh when the
+ * access token expires — users never need to re-login.
+ *
+ * This module:
+ *   - Keeps a module-level `currentAccessToken` synced from the NextAuth session
+ *     by the <AxiosAuthSync/> component (client-side).
+ *   - Injects Authorization + X-Guest-Token headers via interceptor.
+ *   - On 401: dispatches event so the session can be refreshed via NextAuth.
+ *   - Supports server-side token override via config (for SSR with auth()).
  */
 
 import axios, {
@@ -18,93 +21,33 @@ import axios, {
 } from "axios";
 
 import { APP_CONFIG } from "@/constants/app";
-import { ENDPOINTS } from "@/api/endpoints";
 import {
   ApiErrorResponse,
   ApiSuccessResponse,
   ApiError,
 } from "@/types/api";
-import { AuthSession } from "@/types/domain";
 
 /* ──────────────────────────────────────────────────────────────────────────
-   Token storage abstraction (SSR-safe)
+   Access token — synced from NextAuth session by AxiosAuthSync component
+   ────────────────────────────────────────────────────────────────────────── */
+
+let currentAccessToken: string | null = null;
+
+/** Called by <AxiosAuthSync/> whenever the NextAuth session changes. */
+export function setAccessToken(token: string | null) {
+  currentAccessToken = token;
+}
+
+/** Get the current access token (for use in interceptors). */
+export function getAccessToken(): string | null {
+  return currentAccessToken;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Guest token (X-Guest-Token) — used by cart for anonymous users
    ────────────────────────────────────────────────────────────────────────── */
 
 const isBrowser = typeof window !== "undefined";
-
-interface TokenBundle {
-  accessToken: string | null;
-  refreshToken: string | null;
-}
-
-let memoryTokens: TokenBundle = {
-  accessToken: null,
-  refreshToken: null,
-};
-
-/** Subscribers that want to be notified when tokens change (e.g. AuthProvider). */
-type TokenListener = (tokens: TokenBundle) => void;
-const tokenListeners = new Set<TokenListener>();
-
-export function subscribeTokens(listener: TokenListener): () => void {
-  tokenListeners.add(listener);
-  return () => tokenListeners.delete(listener);
-}
-
-function notifyTokens() {
-  for (const l of tokenListeners) l({ ...memoryTokens });
-}
-
-export function setTokens(tokens: Partial<TokenBundle>) {
-  memoryTokens = { ...memoryTokens, ...tokens };
-  if (isBrowser) {
-    if (tokens.accessToken !== undefined) {
-      if (tokens.accessToken)
-        localStorage.setItem(APP_CONFIG.storageKeys.accessToken, tokens.accessToken);
-      else localStorage.removeItem(APP_CONFIG.storageKeys.accessToken);
-    }
-    if (tokens.refreshToken !== undefined) {
-      if (tokens.refreshToken)
-        localStorage.setItem(APP_CONFIG.storageKeys.refreshToken, tokens.refreshToken);
-      else localStorage.removeItem(APP_CONFIG.storageKeys.refreshToken);
-    }
-  }
-  notifyTokens();
-}
-
-export function getAccessToken(): string | null {
-  if (memoryTokens.accessToken) return memoryTokens.accessToken;
-  if (isBrowser) {
-    const t = localStorage.getItem(APP_CONFIG.storageKeys.accessToken);
-    if (t) memoryTokens.accessToken = t;
-    return t;
-  }
-  return null;
-}
-
-export function getRefreshToken(): string | null {
-  if (memoryTokens.refreshToken) return memoryTokens.refreshToken;
-  if (isBrowser) {
-    const t = localStorage.getItem(APP_CONFIG.storageKeys.refreshToken);
-    if (t) memoryTokens.refreshToken = t;
-    return t;
-  }
-  return null;
-}
-
-export function clearTokens() {
-  memoryTokens = { accessToken: null, refreshToken: null };
-  if (isBrowser) {
-    localStorage.removeItem(APP_CONFIG.storageKeys.accessToken);
-    localStorage.removeItem(APP_CONFIG.storageKeys.refreshToken);
-    localStorage.removeItem(APP_CONFIG.storageKeys.user);
-  }
-  notifyTokens();
-}
-
-/* ──────────────────────────────────────────────────────────────────────────
-   Guest token (X-Guest-Token) — used by cart + comparison for anonymous users
-   ────────────────────────────────────────────────────────────────────────── */
 
 export function getGuestToken(): string | null {
   if (!isBrowser) return null;
@@ -113,7 +56,11 @@ export function getGuestToken(): string | null {
 
 export function setGuestToken(token: string) {
   if (!isBrowser) return;
-  localStorage.setItem(APP_CONFIG.storageKeys.guestToken, token);
+  if (token) {
+    localStorage.setItem(APP_CONFIG.storageKeys.guestToken, token);
+  } else {
+    localStorage.removeItem(APP_CONFIG.storageKeys.guestToken);
+  }
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -132,12 +79,17 @@ export const apiClient: AxiosInstance = axios.create({
 /* ───────── Request interceptor: inject auth headers ───────── */
 
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const accessToken = getAccessToken();
-  if (accessToken) {
-    config.headers.set("Authorization", `Bearer ${accessToken}`);
+  // Use token from config override (for SSR) or from module-level variable (client).
+  const token =
+    (config.headers?.["x-ssr-token"] as string | undefined) ?? getAccessToken();
+  if (token) {
+    config.headers.set("Authorization", `Bearer ${token}`);
   }
-  // Always send guest token if present (cart + comparison need it even when authed,
-  // for the brief window before /cart/merge is called).
+  // Clean up the SSR-only header so backend doesn't see it.
+  if (config.headers?.["x-ssr-token"]) {
+    config.headers.delete("x-ssr-token");
+  }
+  // Guest token for cart (anonymous users).
   const guestToken = getGuestToken();
   if (guestToken) {
     config.headers.set("X-Guest-Token", guestToken);
@@ -167,53 +119,23 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError<ApiErrorResponse>) => {
     const original = error.config as
-      | (InternalAxiosRequestConfig & { _retried?: boolean; _refreshing?: boolean })
+      | (InternalAxiosRequestConfig & { _retried?: boolean })
       | undefined;
 
-    // 401 → try refresh once
+    // On 401: signal the NextAuth session to refresh.
+    // NextAuth's jwt callback will use the refresh token to get a new access token.
+    // If refresh fails, the user will be signed out.
     if (
       error.response?.status === 401 &&
       original &&
       !original._retried &&
-      !original.url?.includes(ENDPOINTS.auth.refreshToken) &&
-      !original.url?.includes(ENDPOINTS.auth.login) &&
-      !original.url?.includes(ENDPOINTS.auth.register)
+      isBrowser
     ) {
       original._retried = true;
-      const refreshToken = getRefreshToken();
-      if (refreshToken) {
-        try {
-          const refreshRes = await axios.post<
-            ApiSuccessResponse<{
-              accessToken: string;
-              refreshToken: string;
-              sessionId: string;
-            }>
-          >(
-            `${APP_CONFIG.apiBaseUrl}${ENDPOINTS.auth.refreshToken}`,
-            { refreshToken },
-            { headers: { "Content-Type": "application/json" } },
-          );
-          const { accessToken: newAt, refreshToken: newRt } = refreshRes.data.data;
-          setTokens({ accessToken: newAt, refreshToken: newRt });
-          original.headers.set("Authorization", `Bearer ${newAt}`);
-          return apiClient(original);
-        } catch (refreshErr) {
-          // Refresh failed → clear session, let caller handle
-          clearTokens();
-          if (isBrowser) {
-            // Notify auth provider via custom event
-            window.dispatchEvent(new CustomEvent("auth:session-expired"));
-          }
-          return Promise.reject(toApiError(error));
-        }
-      } else {
-        clearTokens();
-        if (isBrowser) {
-          window.dispatchEvent(new CustomEvent("auth:session-expired"));
-        }
-      }
+      // Dispatch event — AxiosAuthSync listens and calls session update.
+      window.dispatchEvent(new CustomEvent("auth:token-expired"));
     }
+
     return Promise.reject(toApiError(error));
   },
 );
@@ -243,7 +165,7 @@ export const http = {
   delete: <T>(url: string, config?: AxiosRequestConfig) =>
     request<T>({ url, method: "DELETE", ...config }),
 
-  /** Raw axios access for multipart uploads (caller builds FormData). Uses POST by default. */
+  /** Multipart upload with POST (caller builds FormData). */
   upload: async <T>(
     url: string,
     formData: FormData,
@@ -256,7 +178,7 @@ export const http = {
     return res.data.data;
   },
 
-  /** Multipart upload with PUT method (for updating resources with files). */
+  /** Multipart upload with PUT (for updating resources with files). */
   uploadPut: async <T>(
     url: string,
     formData: FormData,
@@ -271,37 +193,16 @@ export const http = {
 };
 
 /* ──────────────────────────────────────────────────────────────────────────
-   Session bootstrapper — call once on app start to hydrate tokens from storage
+   SSR helper — create a config with server-side token override
    ────────────────────────────────────────────────────────────────────────── */
 
-export function hydrateSession(): TokenBundle {
-  if (!isBrowser) return { accessToken: null, refreshToken: null };
-  const at = localStorage.getItem(APP_CONFIG.storageKeys.accessToken);
-  const rt = localStorage.getItem(APP_CONFIG.storageKeys.refreshToken);
-  memoryTokens = { accessToken: at, refreshToken: rt };
-  notifyTokens();
-  return memoryTokens;
-}
-
-/** Persist an AuthSession (from login/register/verify-otp) into storage + memory. */
-export function persistSession(session: AuthSession) {
-  setTokens({ accessToken: session.accessToken, refreshToken: session.refreshToken });
-  if (isBrowser) {
-    localStorage.setItem(
-      APP_CONFIG.storageKeys.user,
-      JSON.stringify(session.user),
-    );
-  }
-}
-
-/** Read the cached user (without an HTTP roundtrip). Used for instant UI render. */
-export function getCachedUser(): AuthSession["user"] | null {
-  if (!isBrowser) return null;
-  const raw = localStorage.getItem(APP_CONFIG.storageKeys.user);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as AuthSession["user"];
-  } catch {
-    return null;
-  }
+/**
+ * For server-side data fetching: pass the access token from auth() session.
+ * Usage: `http.get(ENDPOINTS.usersMe.get, undefined, withSSRToken(session?.accessToken))`
+ */
+export function withSSRToken(accessToken?: string): AxiosRequestConfig {
+  if (!accessToken) return {};
+  return {
+    headers: { "x-ssr-token": accessToken },
+  };
 }

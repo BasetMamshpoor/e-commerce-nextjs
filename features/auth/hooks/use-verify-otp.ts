@@ -2,106 +2,75 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { toast } from "sonner";
 
 import { authService } from "@/services";
-import { useAuth } from "@/providers/auth-context";
 import { ApiError } from "@/types/api";
-
-type VerifyParams = {
-  identifier: string;
-  code: string;
-  deviceName?: string;
-  mode: "register" | "login";
-};
+import type { OtpValues } from "@/features/auth/schemas/auth.schema";
 
 /**
- * Universal OTP verification hook — handles both:
- *   - register mode → POST /auth/register/verify-otp
- *   - login mode → POST /auth/login/otp/verify
- *
- * Both return the same AuthSession shape.
+ * Verify OTP (login or register) via NextAuth "otp" provider.
+ * On success, NextAuth creates a JWT session with auto-refresh.
  */
 export function useVerifyOtp() {
-  const { applySession } = useAuth();
   const router = useRouter();
 
   return useMutation({
-    mutationFn: async ({ identifier, code, deviceName, mode }: VerifyParams) => {
-      const finalDevice = deviceName ?? defaultDeviceName();
-      if (mode === "register") {
-        return authService.registerVerifyOtp({ identifier, code, deviceName: finalDevice });
+    mutationFn: async (params: { identifier: string; code: string; mode?: "login" | "register" }) => {
+      const mode = params.mode ?? "login";
+      const result = await signIn("otp", {
+        identifier: params.identifier,
+        code: params.code,
+        mode,
+        redirect: false,
+      });
+      if (!result || result.error) {
+        throw new Error("INVALID_OTP");
       }
-      return authService.loginOtpVerify({ identifier, code, deviceName: finalDevice });
+      return result;
     },
-    onSuccess: (session, variables) => {
-      applySession(session);
-      toast.success(
-        variables.mode === "register" ? "ثبت‌نام شما تکمیل شد 🎉" : "خوش آمدید 👋",
-      );
-      const isAdmin = ["ADMIN", "EDITOR", "SUPPORT"].includes(session.user.role);
-      router.replace(isAdmin ? "/admin" : "/account");
+    onSuccess: async (_data, variables) => {
+      toast.success(variables.mode === "register" ? "ثبت‌نام کامل شد" : "ورود موفقیت‌آمیز بود");
+      // Fetch session to determine role-based redirect.
+      const res = await fetch("/api/auth/session");
+      const session = await res.json();
+      const role = session?.user?.role;
+      const isAdmin = role === "ADMIN" || role === "EDITOR" || role === "SUPPORT";
+      router.push(isAdmin ? "/admin" : "/account");
       router.refresh();
     },
-    onError: (err) => {
-      const apiErr = err as ApiError;
-      if (apiErr.isRateLimited) {
-        toast.error("تعداد تلاش‌های ناموفق زیاد بود", {
-          description: "لطفاً چند دقیقه بعد دوباره تلاش کنید",
-        });
-      } else {
-        toast.error(apiErr.message || "کد تایید اشتباه یا منقضی است");
-      }
+    onError: () => {
+      toast.error("کد تایید اشتباه یا منقضی است");
     },
   });
 }
 
-/** Request an OTP for login (without password). */
+/**
+ * Request OTP for login (without password).
+ * Calls backend /auth/login/otp/request directly — no session created.
+ */
 export function useLoginOtpRequest() {
   return useMutation({
     mutationFn: (identifier: string) =>
       authService.loginOtpRequest({ identifier }),
-    onSuccess: (data) => {
+    onSuccess: (data, identifier) => {
       toast.success("کد تایید ارسال شد", {
         description:
           data.channel === "SMS"
-            ? "کد ۵ رقمی به شماره موبایل شما پیامک شد"
-            : "کد ۵ رقمی به ایمیل شما ارسال شد",
+            ? `کد ۵ رقمی به شماره ${identifier} پیامک شد`
+            : `کد ۵ رقمی به ایمیل ${identifier} ارسال شد`,
       });
     },
     onError: (err) => {
       const apiErr = err as ApiError;
       if (apiErr.isNotFound) {
-        // Backend returns 404 — but to avoid account enumeration, show generic message.
-        toast.error("اگر حسابی با این مشخصات وجود داشته باشد، کد ارسال می‌شود");
+        toast.error("کاربری با این مشخصات یافت نشد");
       } else if (apiErr.isForbidden) {
-        toast.error("حساب شما مسدود شده است");
-      } else if (apiErr.isRateLimited) {
-        toast.error("تعداد درخواست‌ها زیاد بود", {
-          description: "لطفاً چند دقیقه بعد دوباره تلاش کنید",
-        });
+        toast.error("حساب شما مسدود است");
       } else {
         toast.error(apiErr.message || "ارسال کد ناموفق بود");
       }
     },
   });
-}
-
-function defaultDeviceName(): string {
-  if (typeof navigator === "undefined") return "Unknown device";
-  const ua = navigator.userAgent;
-  let browser = "Browser";
-  if (/Chrome/.test(ua) && !/Edg/.test(ua)) browser = "Chrome";
-  else if (/Firefox/.test(ua)) browser = "Firefox";
-  else if (/Safari/.test(ua) && !/Chrome/.test(ua)) browser = "Safari";
-  else if (/Edg/.test(ua)) browser = "Edge";
-
-  let os = "Unknown OS";
-  if (/Windows/.test(ua)) os = "Windows";
-  else if (/Mac/.test(ua)) os = "Mac";
-  else if (/Linux/.test(ua)) os = "Linux";
-  else if (/Android/.test(ua)) os = "Android";
-  else if (/iPhone|iPad/.test(ua)) os = "iOS";
-
-  return `${browser} on ${os}`;
 }

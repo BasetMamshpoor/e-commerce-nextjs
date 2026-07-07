@@ -4,7 +4,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { QueryProvider } from "@/components/providers/query-provider";
-import { AuthProvider } from "@/providers/auth-context";
+import { Providers as SessionProviders } from "@/providers/session-provider";
 import { CartProvider } from "@/providers/cart-context";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -82,14 +82,14 @@ export default function RootLayout({
       <body className={`${vazirmatn.variable} font-sans antialiased`}>
         <ThemeProvider>
           <QueryProvider>
-            <AuthProvider>
+            <SessionProviders>
               <CartProvider>
                 <TooltipProvider delayDuration={200}>
                   {children}
                 </TooltipProvider>
                 <Toaster position="top-center" richColors closeButton />
               </CartProvider>
-            </AuthProvider>
+            </SessionProviders>
           </QueryProvider>
         </ThemeProvider>
         {/* Site-wide structured data */}
