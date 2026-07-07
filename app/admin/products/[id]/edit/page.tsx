@@ -394,7 +394,10 @@ export default function AdminProductEditPage({
             <CardHeader><CardTitle className="text-base">ویژگی‌های نمایشی</CardTitle></CardHeader>
             <CardContent>
               <DisplayAttributesEditor attributes={displayAttrs} onChange={setDisplayAttrs} availableAttributes={attributes} />
-              <p className="mt-2 text-xs text-muted-foreground">ویژگی‌های نمایشی با دکمه «ذخیره تغییرات» در پایین صفحه ذخیره می‌شوند.</p>
+              <p className="mt-2 text-xs text-amber-600">
+                ⚠ ویژگی‌های نمایشی در زمان ویرایش محصول قابل تغییر نیستند (محدودیت بک‌اند).
+                برای تغییر، محصول را حذف و مجدداً با ویژگی‌های دلخواه ایجاد کنید.
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -471,6 +474,14 @@ function InlineVariantEditor({
   const [saving, setSaving] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
 
+  // Extract attribute value IDs: backend returns attributeValueIds=[] but
+  // attributeValues (array of objects) contains the actual values.
+  // We must extract IDs from attributeValues when attributeValueIds is empty.
+  const getAttributeValueIds = (v: ProductVariant): number[] => {
+    if (v.attributeValueIds && v.attributeValueIds.length > 0) return v.attributeValueIds;
+    return (v.attributeValues ?? []).map((av) => av.id);
+  };
+
   // Editable fields
   const [sku, setSku] = React.useState(variant.sku);
   const [priceAdjustment, setPriceAdjustment] = React.useState(variant.priceAdjustment);
@@ -478,7 +489,7 @@ function InlineVariantEditor({
   const [weight, setWeight] = React.useState(variant.weight != null ? String(variant.weight) : "");
   const [isDefault, setIsDefault] = React.useState(variant.isDefault);
   const [isActive, setIsActive] = React.useState(variant.isActive);
-  const [attributeValueIds, setAttributeValueIds] = React.useState<number[]>(variant.attributeValueIds);
+  const [attributeValueIds, setAttributeValueIds] = React.useState<number[]>(getAttributeValueIds(variant));
 
   const variantAttributes = attributes.filter((a) => a.isVariant);
   const effectivePrice = basePrice + (editing ? priceAdjustment : variant.priceAdjustment);
@@ -492,8 +503,9 @@ function InlineVariantEditor({
       setWeight(variant.weight != null ? String(variant.weight) : "");
       setIsDefault(variant.isDefault);
       setIsActive(variant.isActive);
-      setAttributeValueIds(variant.attributeValueIds);
+      setAttributeValueIds(getAttributeValueIds(variant));
     }
+     
   }, [variant, editing]);
 
   const handleSave = async () => {
