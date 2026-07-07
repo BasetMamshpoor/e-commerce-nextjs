@@ -2,7 +2,16 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Loader2, Plus, Trash2, Pencil, X } from "lucide-react";
+import Link from "next/link";
+import {
+  ArrowRight,
+  Loader2,
+  Plus,
+  Trash2,
+  Save,
+  X,
+  Paperclip,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -79,7 +88,7 @@ export default function AdminProductEditPage({
   const router = useRouter();
   const [brands, setBrands] = React.useState<Brand[]>([]);
   const [categoryTree, setCategoryTree] = React.useState<Category[]>([]);
-  const [attributes, setAttributes] = React.useState<Attribute[]>([]);
+  const [categoryAttributes, setCategoryAttributes] = React.useState<Attribute[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
 
@@ -100,24 +109,22 @@ export default function AdminProductEditPage({
   const [deletedImageIds, setDeletedImageIds] = React.useState<number[]>([]);
   const [displayAttrs, setDisplayAttrs] = React.useState<DisplayAttributeFormData[]>([]);
 
-  // Variants — loaded from product, edited via separate endpoints
+  // Variants — loaded from product, managed inline via separate endpoints.
   const [variants, setVariants] = React.useState<ProductVariant[]>([]);
-  const [editingVariant, setEditingVariant] = React.useState<ProductVariant | null>(null);
-  const [addingVariant, setAddingVariant] = React.useState(false);
+  const [showAddVariant, setShowAddVariant] = React.useState(false);
 
   React.useEffect(() => {
     Promise.all([
       productsService.adminById(Number(id)),
       brandsService.list({ includeInactive: true }),
       categoriesService.tree(),
-      attributesService.list(),
     ])
-      .then(([p, b, c, a]) => {
+      .then(([p, b, c]) => {
         setBrands(b);
         setCategoryTree(c);
-        setAttributes(a);
         const product = p as Product;
         const cats = getProductCategories(product);
+        const catIds = cats.map((cat) => cat.id);
         setForm({
           name: product.name,
           brandId: product.brandId != null ? String(product.brandId) : "",
@@ -126,11 +133,10 @@ export default function AdminProductEditPage({
           basePrice: product.basePrice ?? 0,
           status: product.status,
           isFeatured: product.isFeatured,
-          categoryIds: cats.map((cat) => cat.id),
+          categoryIds: catIds,
           discountType: product.discountType ?? "NONE",
           discountValue: product.discountValue ?? "",
         });
-        // Map existing images to uploader format
         setImages(
           (product.images ?? []).map((img) => ({
             id: img.id,
@@ -140,16 +146,48 @@ export default function AdminProductEditPage({
           })),
         );
         setVariants(product.variants ?? []);
-        // Map displayAttributes
         setDisplayAttrs(
           (product.displayAttributeValues ?? []).map((d) => ({
             attributeId: d.attributeId,
             value: d.value,
           })),
         );
+        // Load category-specific attributes
+        loadCategoryAttributes(catIds);
       })
       .finally(() => setLoading(false));
   }, [id]);
+
+  const loadCategoryAttributes = (catIds: number[]) => {
+    if (catIds.length === 0) {
+      setCategoryAttributes([]);
+      return;
+    }
+    const fetches = catIds.map((cid) =>
+      categoriesService.attributes(cid).catch(() => [] as Attribute[]),
+    );
+    Promise.all(fetches).then((results) => {
+      const merged = new Map<number, Attribute>();
+      for (const attrs of results) {
+        for (const attr of attrs) {
+          if (!merged.has(attr.id)) merged.set(attr.id, attr);
+        }
+      }
+      setCategoryAttributes(Array.from(merged.values()));
+    });
+  };
+
+  // When categoryIds change → reload attributes
+  const prevCatIdsRef = React.useRef<number[]>([]);
+  React.useEffect(() => {
+    const prev = prevCatIdsRef.current;
+    const curr = form.categoryIds;
+    const changed = prev.length !== curr.length || prev.some((id) => !curr.includes(id));
+    if (changed) {
+      prevCatIdsRef.current = curr;
+      loadCategoryAttributes(curr);
+    }
+  }, [form.categoryIds]);
 
   const onSubmit = async () => {
     if (!form.name.trim()) {
@@ -164,23 +202,19 @@ export default function AdminProductEditPage({
 
     setSaving(true);
     try {
-      // Separate existing images (keep) from new file uploads
       const newImageFiles = images.filter((img): img is ProductImageItem & { file: File } =>
         !img.id && !!img.file,
       );
 
-      // Build discount fields
       const discountType =
         form.discountType === "NONE" ? null : (form.discountType as DiscountType);
       const discountValue =
         discountType && form.discountValue !== "" ? Number(form.discountValue) : null;
 
-      // Build displayAttributes
       const displayAttributes = displayAttrs
         .filter((d) => d.attributeId !== "" && d.value.trim())
         .map((d) => ({ attributeId: Number(d.attributeId), value: d.value.trim() }));
 
-      // Build update body — always include categoryIds (backend requires array)
       const updateBody = {
         name: form.name.trim(),
         brandId: form.brandId ? Number(form.brandId) : null,
@@ -197,13 +231,10 @@ export default function AdminProductEditPage({
       };
 
       if (newImageFiles.length > 0) {
-        // Multipart: send body as JSON string + image files
-        // Backend will upload files to /media and attach them to the product
         const bodyJson = JSON.stringify(updateBody);
         const fileArray = newImageFiles.map((img) => img.file);
         await productsService.updateWithImages(Number(id), bodyJson, fileArray);
       } else {
-        // JSON-only: no new images
         await productsService.update(Number(id), updateBody);
       }
 
@@ -217,60 +248,19 @@ export default function AdminProductEditPage({
     }
   };
 
-  // Variant operations
-  const onAddVariant = async (data: {
-    sku: string;
-    priceAdjustment: number;
-    stock: number;
-    weight?: number;
-    isDefault: boolean;
-    isActive: boolean;
-    attributeValueIds: number[];
-  }) => {
-    try {
-      const v = await productsService.addVariant(Number(id), data);
-      setVariants([...variants, v]);
-      setAddingVariant(false);
-      toast.success("تنوع اضافه شد");
-    } catch (e: unknown) {
-      const apiErr = e as { message?: string };
-      toast.error(apiErr?.message ?? "افزودن تنوع ناموفق بود");
-    }
+  // ── Variant inline operations ──
+
+  const onVariantSaved = (variantId: number, updated: ProductVariant) => {
+    setVariants(variants.map((v) => (v.id === variantId ? updated : v)));
   };
 
-  const onUpdateVariant = async (
-    variantId: number,
-    data: {
-      sku: string;
-      priceAdjustment: number;
-      stock: number;
-      weight?: number;
-      isDefault: boolean;
-      isActive: boolean;
-      attributeValueIds: number[];
-    },
-  ) => {
-    try {
-      const v = await productsService.updateVariant(Number(id), variantId, data);
-      setVariants(variants.map((vr) => (vr.id === variantId ? v : vr)));
-      setEditingVariant(null);
-      toast.success("تنوع به‌روزرسانی شد");
-    } catch (e: unknown) {
-      const apiErr = e as { message?: string };
-      toast.error(apiErr?.message ?? "به‌روزرسانی تنوع ناموفق بود");
-    }
+  const onVariantDeleted = (variantId: number) => {
+    setVariants(variants.filter((v) => v.id !== variantId));
   };
 
-  const onDeleteVariant = async (variantId: number) => {
-    if (!confirm("حذف این تنوع؟")) return;
-    try {
-      await productsService.deleteVariant(Number(id), variantId);
-      setVariants(variants.filter((v) => v.id !== variantId));
-      toast.success("تنوع حذف شد");
-    } catch (e: unknown) {
-      const apiErr = e as { message?: string };
-      toast.error(apiErr?.message ?? "حذف تنوع ناموفق بود");
-    }
+  const onVariantAdded = (newVariant: ProductVariant) => {
+    setVariants([...variants, newVariant]);
+    setShowAddVariant(false);
   };
 
   if (loading) {
@@ -283,6 +273,7 @@ export default function AdminProductEditPage({
   }
 
   const basePriceNum = Number(form.basePrice) || 0;
+  const hasCategories = form.categoryIds.length > 0;
 
   return (
     <div className="space-y-4">
@@ -300,139 +291,74 @@ export default function AdminProductEditPage({
         <div className="space-y-4 lg:col-span-2">
           {/* Basic info */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">اطلاعات اصلی</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-base">اطلاعات اصلی</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>نام محصول *</Label>
-                <Input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                />
+                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>برند</Label>
-                  <Select
-                    value={form.brandId}
-                    onValueChange={(v) => setForm({ ...form, brandId: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="بدون برند" />
-                    </SelectTrigger>
+                  <Select value={form.brandId} onValueChange={(v) => setForm({ ...form, brandId: v })}>
+                    <SelectTrigger><SelectValue placeholder="بدون برند" /></SelectTrigger>
                     <SelectContent>
-                      {brands.map((b) => (
-                        <SelectItem key={b.id} value={String(b.id)}>
-                          {b.name}
-                        </SelectItem>
-                      ))}
+                      {brands.map((b) => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>وضعیت</Label>
-                  <Select
-                    value={form.status}
-                    onValueChange={(v) => setForm({ ...form, status: v as ProductStatus })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as ProductStatus })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {STATUS_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
+                      {STATUS_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="space-y-2">
                 <Label>توضیح کوتاه</Label>
-                <Input
-                  value={form.shortDescription}
-                  onChange={(e) => setForm({ ...form, shortDescription: e.target.value })}
-                />
+                <Input value={form.shortDescription} onChange={(e) => setForm({ ...form, shortDescription: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>توضیحات کامل</Label>
-                <RichTextEditor
-                  value={form.description}
-                  onChange={(html) => setForm({ ...form, description: html })}
-                />
+                <RichTextEditor value={form.description} onChange={(html) => setForm({ ...form, description: html })} />
               </div>
               <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={form.isFeatured}
-                  onChange={(e) => setForm({ ...form, isFeatured: e.target.checked })}
-                  className="size-4 rounded"
-                />
+                <input type="checkbox" checked={form.isFeatured} onChange={(e) => setForm({ ...form, isFeatured: e.target.checked })} className="size-4 rounded" />
                 <span className="text-sm">محصول ویژه</span>
               </label>
               <div className="space-y-2">
                 <Label>دسته‌بندی‌ها</Label>
-                <CategoryTreeSelect
-                  categories={categoryTree}
-                  selectedIds={form.categoryIds}
-                  onChange={(ids) => setForm({ ...form, categoryIds: ids })}
-                />
+                <CategoryTreeSelect categories={categoryTree} selectedIds={form.categoryIds} onChange={(ids) => setForm({ ...form, categoryIds: ids })} />
               </div>
             </CardContent>
           </Card>
 
           {/* Pricing */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">قیمت و تخفیف</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-base">قیمت و تخفیف</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>قیمت پایه (تومان) *</Label>
-                  <Input
-                    type="number"
-                    dir="ltr"
-                    className="text-left"
-                    value={form.basePrice}
-                    onChange={(e) => setForm({ ...form, basePrice: e.target.value })}
-                  />
+                  <Input type="number" dir="ltr" className="text-left" value={form.basePrice} onChange={(e) => setForm({ ...form, basePrice: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <Label>نوع تخفیف</Label>
-                  <Select
-                    value={form.discountType}
-                    onValueChange={(v) =>
-                      setForm({ ...form, discountType: v as DiscountType | "NONE" })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Select value={form.discountType} onValueChange={(v) => setForm({ ...form, discountType: v as DiscountType | "NONE" })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {DISCOUNT_TYPE_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
+                      {DISCOUNT_TYPE_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               {form.discountType !== "NONE" && (
                 <div className="space-y-2">
-                  <Label>
-                    مقدار تخفیف {form.discountType === "PERCENT" ? "(٪)" : "(تومان)"}
-                  </Label>
-                  <Input
-                    type="number"
-                    dir="ltr"
-                    className="text-left"
-                    value={form.discountValue}
-                    onChange={(e) => setForm({ ...form, discountValue: e.target.value })}
-                  />
+                  <Label>مقدار تخفیف {form.discountType === "PERCENT" ? "(٪)" : "(تومان)"}</Label>
+                  <Input type="number" dir="ltr" className="text-left" value={form.discountValue} onChange={(e) => setForm({ ...form, discountValue: e.target.value })} />
                 </div>
               )}
               {basePriceNum > 0 && (
@@ -445,16 +371,7 @@ export default function AdminProductEditPage({
                     <div className="mt-1 flex items-center justify-between">
                       <span className="text-muted-foreground">محدوده قیمت تنوع‌ها:</span>
                       <span className="font-bold nums-fa">
-                        {formatPrice(
-                          basePriceNum +
-                            Math.min(...variants.map((v) => v.priceAdjustment)),
-                        )}
-                        {" - "}
-                        {formatPrice(
-                          basePriceNum +
-                            Math.max(...variants.map((v) => v.priceAdjustment)),
-                        )}{" "}
-                        تومان
+                        {formatPrice(basePriceNum + Math.min(...variants.map((v) => v.priceAdjustment)))} — {formatPrice(basePriceNum + Math.max(...variants.map((v) => v.priceAdjustment)))} تومان
                       </span>
                     </div>
                   )}
@@ -465,100 +382,41 @@ export default function AdminProductEditPage({
 
           {/* Images */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">تصاویر محصول</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-base">تصاویر محصول</CardTitle></CardHeader>
             <CardContent>
-              <ProductImageUploader
-                images={images}
-                onChange={setImages}
-                deletedImageIds={deletedImageIds}
-                onDeletedIdsChange={setDeletedImageIds}
-              />
+              <ProductImageUploader images={images} onChange={setImages} deletedImageIds={deletedImageIds} onDeletedIdsChange={setDeletedImageIds} />
               {deletedImageIds.length > 0 && (
-                <p className="mt-2 text-xs text-amber-600">
-                  {toPersianDigits(deletedImageIds.length)} تصویر برای حذف در ذخیره نهایی
-                </p>
+                <p className="mt-2 text-xs text-amber-600">{toPersianDigits(deletedImageIds.length)} تصویر برای حذف در ذخیره نهایی</p>
               )}
             </CardContent>
           </Card>
 
-          {/* Variants */}
+          {/* Variants — inline editing with direct save */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">تنوع‌ها (Variants)</CardTitle>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setAddingVariant(true)}
-                >
+                <Button size="sm" variant="outline" onClick={() => setShowAddVariant(true)}>
                   <Plus className="size-4" />
                   افزودن تنوع
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-3">
               {variants.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  هیچ تنوعی تعریف نشده. حداقل یک تنوع الزامی است.
-                </p>
+                <p className="text-sm text-muted-foreground">هیچ تنوعی تعریف نشده. حداقل یک تنوع الزامی است.</p>
               ) : (
-                variants.map((v, i) => (
-                  <div
+                variants.map((v) => (
+                  <InlineVariantEditor
                     key={v.id}
-                    className="flex items-center justify-between rounded-lg border border-border p-3"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="flex size-6 items-center justify-center rounded-md bg-primary/10 text-xs font-bold text-primary nums-fa">
-                          {toPersianDigits(i + 1)}
-                        </span>
-                        {v.isDefault && <Badge className="text-[10px]">پیش‌فرض</Badge>}
-                        {!v.isActive && <Badge variant="secondary" className="text-[10px]">غیرفعال</Badge>}
-                      </div>
-                      <p className="mt-1 font-mono text-xs text-muted-foreground" dir="ltr">
-                        {v.sku}
-                      </p>
-                      <div className="mt-1 flex flex-wrap gap-2 text-xs">
-                        <span className="nums-fa">
-                          موجودی: {toPersianDigits(v.stock)}
-                        </span>
-                        <span className="nums-fa">
-                          قیمت: {formatPrice(basePriceNum + v.priceAdjustment)} تومان
-                        </span>
-                        {v.weight != null && (
-                          <span className="nums-fa text-muted-foreground">
-                            وزن: {toPersianDigits(v.weight)} kg
-                          </span>
-                        )}
-                        {v.attributeValues && v.attributeValues.length > 0 && (
-                          <span className="text-muted-foreground">
-                            {v.attributeValues.map((av) => av.value).join("، ")}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="size-8"
-                        onClick={() => setEditingVariant(v)}
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="size-8 text-destructive hover:text-destructive"
-                        onClick={() => onDeleteVariant(v.id)}
-                        disabled={variants.length <= 1}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
-                  </div>
+                    variant={v}
+                    productId={Number(id)}
+                    attributes={categoryAttributes}
+                    basePrice={basePriceNum}
+                    onSaved={(updated) => onVariantSaved(v.id, updated)}
+                    onDeleted={() => onVariantDeleted(v.id)}
+                    canDelete={variants.length > 1}
+                  />
                 ))
               )}
             </CardContent>
@@ -566,15 +424,14 @@ export default function AdminProductEditPage({
 
           {/* Display attributes */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">ویژگی‌های نمایشی</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-base">ویژگی‌های نمایشی</CardTitle></CardHeader>
             <CardContent>
-              <DisplayAttributesEditor
-                attributes={displayAttrs}
-                onChange={setDisplayAttrs}
-                availableAttributes={attributes}
-              />
+              {hasCategories ? (
+                <DisplayAttributesEditor attributes={displayAttrs} onChange={setDisplayAttrs} availableAttributes={categoryAttributes} />
+              ) : (
+                <p className="text-sm text-muted-foreground">دسته‌بندی انتخاب کنید.</p>
+              )}
+              <p className="mt-2 text-xs text-muted-foreground">ویژگی‌های نمایشی با دکمه «ذخیره تغییرات» در پایین صفحه ذخیره می‌شوند.</p>
             </CardContent>
           </Card>
         </div>
@@ -582,9 +439,7 @@ export default function AdminProductEditPage({
         {/* Sidebar */}
         <div className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">خلاصه</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-base">خلاصه</CardTitle></CardHeader>
             <CardContent className="space-y-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">تنوع‌ها:</span>
@@ -597,9 +452,7 @@ export default function AdminProductEditPage({
               {deletedImageIds.length > 0 && (
                 <div className="flex items-center justify-between text-amber-600">
                   <span>برای حذف:</span>
-                  <span className="font-bold nums-fa">
-                    {toPersianDigits(deletedImageIds.length)}
-                  </span>
+                  <span className="font-bold nums-fa">{toPersianDigits(deletedImageIds.length)}</span>
                 </div>
               )}
             </CardContent>
@@ -610,218 +463,348 @@ export default function AdminProductEditPage({
               {saving ? <Loader2 className="size-4 animate-spin" /> : null}
               {saving ? "در حال ذخیره..." : "ذخیره تغییرات"}
             </Button>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => router.back()}
-              disabled={saving}
-            >
-              انصراف
-            </Button>
+            <Button variant="outline" className="w-full" onClick={() => router.back()} disabled={saving}>انصراف</Button>
           </div>
         </div>
       </div>
 
-      {/* Add/edit variant dialog */}
-      {(addingVariant || editingVariant) && (
-        <VariantDialog
-          variant={editingVariant}
-          attributes={attributes}
-          onClose={() => {
-            setAddingVariant(false);
-            setEditingVariant(null);
-          }}
-          onSubmit={(data) => {
-            if (editingVariant) {
-              onUpdateVariant(editingVariant.id, {
-                ...data,
-                isActive: editingVariant.isActive,
-              });
-            } else {
-              onAddVariant(data);
-            }
-          }}
+      {/* Add new variant form (inline, below the list) */}
+      {showAddVariant && (
+        <AddVariantForm
+          productId={Number(id)}
+          attributes={categoryAttributes}
+          basePrice={basePriceNum}
+          onAdded={onVariantAdded}
+          onCancel={() => setShowAddVariant(false)}
         />
       )}
     </div>
   );
 }
 
-/* ───────── Variant add/edit dialog ───────── */
-function VariantDialog({
+/* ════════════════════════════════════════════════════════════════════════════
+   InlineVariantEditor — each variant is edited and saved DIRECTLY via
+   PUT /products/:id/variants/:variantId. No dialog, no "cancel" rollback.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function InlineVariantEditor({
   variant,
+  productId,
   attributes,
-  onClose,
-  onSubmit,
+  basePrice,
+  onSaved,
+  onDeleted,
+  canDelete,
 }: {
-  variant: ProductVariant | null;
+  variant: ProductVariant;
+  productId: number;
   attributes: Attribute[];
-  onClose: () => void;
-  onSubmit: (data: {
-    sku: string;
-    priceAdjustment: number;
-    stock: number;
-    weight?: number;
-    isDefault: boolean;
-    isActive: boolean;
-    attributeValueIds: number[];
-  }) => void;
+  basePrice: number;
+  onSaved: (updated: ProductVariant) => void;
+  onDeleted: () => void;
+  canDelete: boolean;
 }) {
-  const [sku, setSku] = React.useState(variant?.sku ?? "");
-  const [priceAdjustment, setPriceAdjustment] = React.useState(
-    variant?.priceAdjustment ?? 0,
-  );
-  const [stock, setStock] = React.useState(variant?.stock ?? 0);
-  const [weight, setWeight] = React.useState<string>(
-    variant?.weight != null ? String(variant.weight) : "",
-  );
-  const [isDefault, setIsDefault] = React.useState(variant?.isDefault ?? false);
-  const [isActive, setIsActive] = React.useState(variant?.isActive ?? true);
-  const [attributeValueIds, setAttributeValueIds] = React.useState<number[]>(
-    variant?.attributeValueIds ?? [],
-  );
+  const [editing, setEditing] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+
+  // Editable fields
+  const [sku, setSku] = React.useState(variant.sku);
+  const [priceAdjustment, setPriceAdjustment] = React.useState(variant.priceAdjustment);
+  const [stock, setStock] = React.useState(variant.stock);
+  const [weight, setWeight] = React.useState(variant.weight != null ? String(variant.weight) : "");
+  const [isDefault, setIsDefault] = React.useState(variant.isDefault);
+  const [isActive, setIsActive] = React.useState(variant.isActive);
+  const [attributeValueIds, setAttributeValueIds] = React.useState<number[]>(variant.attributeValueIds);
 
   const variantAttributes = attributes.filter((a) => a.isVariant);
+  const effectivePrice = basePrice + (editing ? priceAdjustment : variant.priceAdjustment);
 
-  const handleSubmit = () => {
-    if (!sku.trim()) {
-      toast.error("SKU الزامی است");
-      return;
+  // Sync when variant changes externally
+  React.useEffect(() => {
+    if (!editing) {
+      setSku(variant.sku);
+      setPriceAdjustment(variant.priceAdjustment);
+      setStock(variant.stock);
+      setWeight(variant.weight != null ? String(variant.weight) : "");
+      setIsDefault(variant.isDefault);
+      setIsActive(variant.isActive);
+      setAttributeValueIds(variant.attributeValueIds);
     }
-    onSubmit({
-      sku: sku.trim(),
-      priceAdjustment: Number(priceAdjustment) || 0,
-      stock: Number(stock) || 0,
-      weight: weight ? Number(weight) : undefined,
-      isDefault,
-      isActive,
-      attributeValueIds,
-    });
+  }, [variant, editing]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const updated = await productsService.updateVariant(productId, variant.id, {
+        sku: sku.trim(),
+        priceAdjustment: Number(priceAdjustment) || 0,
+        stock: Number(stock) || 0,
+        weight: weight ? Number(weight) : undefined,
+        isDefault,
+        isActive,
+        attributeValueIds,
+      });
+      toast.success("تنوع ذخیره شد");
+      setEditing(false);
+      onSaved(updated);
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "ذخیره ناموفق بود");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await productsService.deleteVariant(productId, variant.id);
+      toast.success("تنوع حذف شد");
+      onDeleted();
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "حذف ناموفق بود");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
-    <AlertDialog open onOpenChange={(open) => !open && onClose()}>
-      <AlertDialogContent className="max-h-[90vh] overflow-y-auto">
-        <AlertDialogHeader>
-          <AlertDialogTitle>
-            {variant ? "ویرایش تنوع" : "افزودن تنوع جدید"}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            تنوع‌ها مشخصات متفاوت یک محصول را تعریف می‌کنند (مثلاً رنگ/سایز).
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        <div className="space-y-3 py-2">
-          {variantAttributes.length === 0 && (
-            <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-700 dark:bg-amber-950/20">
-              هنوز ویژگی variant تعریف نشده. از بخش ویژگی‌ها ایجاد کنید.
-            </p>
-          )}
-          {variantAttributes.map((attr) => {
-            const selectedForAttr = attributeValueIds.filter((id) =>
-              attr.values.some((v) => v.id === id),
-            );
-            return (
-              <div key={attr.id} className="space-y-1.5">
-                <Label className="text-xs">{attr.name}</Label>
-                <MultiSelectCombobox
-                  options={attr.values.map((v) => ({
-                    value: String(v.id),
-                    label: v.value,
-                    colorHex: v.colorHex,
-                  }))}
-                  value={selectedForAttr.map(String)}
-                  onChange={(vals: string[]) => {
-                    const other = attributeValueIds.filter(
-                      (id) => !attr.values.some((v) => v.id === id),
-                    );
-                    setAttributeValueIds([...other, ...vals.map(Number)]);
-                  }}
-                  placeholder={`انتخاب ${attr.name}...`}
-                  searchPlaceholder="جست‌وجو..."
-                  emptyText="موردی یافت نشد"
-                />
+    <div className={`rounded-lg border p-3 ${variant.isDefault ? "border-primary/40 bg-primary/5" : "border-border"}`}>
+      {/* View mode */}
+      {!editing ? (
+        <>
+          <div className="flex items-center justify-between">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="flex size-6 items-center justify-center rounded-md bg-primary/10 text-xs font-bold text-primary nums-fa">
+                  #
+                </span>
+                {variant.isDefault && <Badge className="text-[10px]">پیش‌فرض</Badge>}
+                {!variant.isActive && <Badge variant="secondary" className="text-[10px]">غیرفعال</Badge>}
               </div>
-            );
-          })}
+              <p className="mt-1 font-mono text-xs text-muted-foreground" dir="ltr">{variant.sku}</p>
+              <div className="mt-1 flex flex-wrap gap-2 text-xs">
+                <span className="nums-fa">موجودی: {toPersianDigits(variant.stock)}</span>
+                <span className="nums-fa">قیمت: {formatPrice(effectivePrice)} ت</span>
+                {variant.weight != null && <span className="nums-fa text-muted-foreground">وزن: {toPersianDigits(variant.weight)} kg</span>}
+                {variant.attributeValues && variant.attributeValues.length > 0 && (
+                  <span className="text-muted-foreground">{variant.attributeValues.map((av) => av.value).join("، ")}</span>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-1">
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditing(true)}>ویرایش</Button>
+              <Button size="icon" variant="ghost" className="size-7 text-destructive hover:text-destructive" onClick={handleDelete} disabled={!canDelete || deleting}>
+                {deleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+              </Button>
+            </div>
+          </div>
+        </>
+      ) : (
+        /* Edit mode — inline */
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">ویرایش تنوع</span>
+            <div className="flex gap-1">
+              <Button size="sm" variant="default" className="h-7 text-xs" onClick={handleSave} disabled={saving}>
+                {saving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />}
+                ذخیره
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditing(false)}>انصراف</Button>
+            </div>
+          </div>
+
+          {/* Attribute value selectors */}
+          {variantAttributes.length > 0 && (
+            <div className="space-y-2">
+              {variantAttributes.map((attr) => {
+                const selectedForAttr = attributeValueIds.filter((id) => attr.values.some((v) => v.id === id));
+                return (
+                  <div key={attr.id} className="grid grid-cols-[120px_1fr] items-center gap-2">
+                    <Label className="text-xs text-muted-foreground">{attr.name}:</Label>
+                    <MultiSelectCombobox
+                      options={attr.values.map((v) => ({ value: String(v.id), label: v.value, colorHex: v.colorHex }))}
+                      value={selectedForAttr.map(String)}
+                      onChange={(vals: string[]) => {
+                        const other = attributeValueIds.filter((id) => !attr.values.some((v) => v.id === id));
+                        setAttributeValueIds([...other, ...vals.map(Number)]);
+                      }}
+                      placeholder={`انتخاب ${attr.name}...`}
+                      searchPlaceholder="جست‌وجو..."
+                      emptyText="موردی یافت نشد"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           <Separator />
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">SKU *</Label>
-              <Input
-                value={sku}
-                onChange={(e) => setSku(e.target.value)}
-                dir="ltr"
-                className="text-left"
-                placeholder="مثال: TSHIRT-RED-L"
-              />
+          {/* Fields */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="space-y-1">
+              <Label className="text-xs">SKU</Label>
+              <Input value={sku} onChange={(e) => setSku(e.target.value)} dir="ltr" className="h-8 text-xs" />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">افزایش قیمت (تومان)</Label>
-              <Input
-                type="number"
-                dir="ltr"
-                className="text-left"
-                value={priceAdjustment}
-                onChange={(e) => setPriceAdjustment(Number(e.target.value))}
-              />
+            <div className="space-y-1">
+              <Label className="text-xs">موجودی</Label>
+              <Input type="number" value={stock} onChange={(e) => setStock(Number(e.target.value))} dir="ltr" className="h-8 text-xs" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">افزایش قیمت</Label>
+              <Input type="number" value={priceAdjustment} onChange={(e) => setPriceAdjustment(Number(e.target.value))} dir="ltr" className="h-8 text-xs" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">وزن (kg)</Label>
+              <Input type="number" step="0.01" value={weight} onChange={(e) => setWeight(e.target.value)} dir="ltr" className="h-8 text-xs" placeholder="—" />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">موجودی</Label>
-              <Input
-                type="number"
-                dir="ltr"
-                className="text-left"
-                value={stock}
-                onChange={(e) => setStock(Number(e.target.value))}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">وزن (kg)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                dir="ltr"
-                className="text-left"
-                value={weight}
-                onChange={(e) => setWeight(e.target.value)}
-                placeholder="—"
-              />
-            </div>
-            <div className="flex flex-col justify-end gap-2 pb-1.5">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={isActive}
-                  onChange={(e) => setIsActive(e.target.checked)}
-                  className="size-4 rounded"
-                />
-                <span className="text-xs">فعال</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={isDefault}
-                  onChange={(e) => setIsDefault(e.target.checked)}
-                  className="size-4 rounded"
-                />
-                <span className="text-xs">پیش‌فرض</span>
-              </label>
-            </div>
+
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-1.5">
+              <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="size-4 rounded" />
+              <span className="text-xs">فعال</span>
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} className="size-4 rounded" />
+              <span className="text-xs">پیش‌فرض</span>
+            </label>
+            {basePrice > 0 && (
+              <span className="mr-auto text-xs text-success nums-fa">قیمت نهایی: {formatPrice(basePrice + (Number(priceAdjustment) || 0))} ت</span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   AddVariantForm — adds a new variant via POST /products/:id/variants
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function AddVariantForm({
+  productId,
+  attributes,
+  basePrice,
+  onAdded,
+  onCancel,
+}: {
+  productId: number;
+  attributes: Attribute[];
+  basePrice: number;
+  onAdded: (v: ProductVariant) => void;
+  onCancel: () => void;
+}) {
+  const [sku, setSku] = React.useState("");
+  const [priceAdjustment, setPriceAdjustment] = React.useState(0);
+  const [stock, setStock] = React.useState(0);
+  const [weight, setWeight] = React.useState("");
+  const [isDefault, setIsDefault] = React.useState(false);
+  const [isActive, setIsActive] = React.useState(true);
+  const [attributeValueIds, setAttributeValueIds] = React.useState<number[]>([]);
+  const [saving, setSaving] = React.useState(false);
+
+  const variantAttributes = attributes.filter((a) => a.isVariant);
+
+  const handleAdd = async () => {
+    setSaving(true);
+    try {
+      const v = await productsService.addVariant(productId, {
+        sku: sku.trim() || `SKU-${Date.now()}`,
+        priceAdjustment: Number(priceAdjustment) || 0,
+        stock: Number(stock) || 0,
+        weight: weight ? Number(weight) : undefined,
+        isDefault,
+        isActive,
+        attributeValueIds,
+      });
+      toast.success("تنوع اضافه شد");
+      onAdded(v);
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "افزودن ناموفق بود");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card className="border-primary/40">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">افزودن تنوع جدید</CardTitle>
+          <Button size="sm" variant="ghost" onClick={onCancel}><X className="size-4" /></Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {variantAttributes.length > 0 && (
+          <div className="space-y-2">
+            {variantAttributes.map((attr) => {
+              const selectedForAttr = attributeValueIds.filter((id) => attr.values.some((v) => v.id === id));
+              return (
+                <div key={attr.id} className="grid grid-cols-[120px_1fr] items-center gap-2">
+                  <Label className="text-xs text-muted-foreground">{attr.name}:</Label>
+                  <MultiSelectCombobox
+                    options={attr.values.map((v) => ({ value: String(v.id), label: v.value, colorHex: v.colorHex }))}
+                    value={selectedForAttr.map(String)}
+                    onChange={(vals: string[]) => {
+                      const other = attributeValueIds.filter((id) => !attr.values.some((v) => v.id === id));
+                      setAttributeValueIds([...other, ...vals.map(Number)]);
+                    }}
+                    placeholder={`انتخاب ${attr.name}...`}
+                    searchPlaceholder="جست‌وجو..."
+                    emptyText="موردی یافت نشد"
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <Separator />
+
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="space-y-1">
+            <Label className="text-xs">SKU</Label>
+            <Input value={sku} onChange={(e) => setSku(e.target.value)} dir="ltr" className="h-8 text-xs" placeholder="خودکار" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">موجودی</Label>
+            <Input type="number" value={stock} onChange={(e) => setStock(Number(e.target.value))} dir="ltr" className="h-8 text-xs" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">افزایش قیمت</Label>
+            <Input type="number" value={priceAdjustment} onChange={(e) => setPriceAdjustment(Number(e.target.value))} dir="ltr" className="h-8 text-xs" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">وزن (kg)</Label>
+            <Input type="number" step="0.01" value={weight} onChange={(e) => setWeight(e.target.value)} dir="ltr" className="h-8 text-xs" placeholder="—" />
           </div>
         </div>
 
-        <AlertDialogFooter>
-          <AlertDialogCancel>انصراف</AlertDialogCancel>
-          <AlertDialogAction onClick={handleSubmit}>
-            {variant ? "ذخیره" : "افزودن"}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-1.5">
+            <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="size-4 rounded" />
+            <span className="text-xs">فعال</span>
+          </label>
+          <label className="flex items-center gap-1.5">
+            <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} className="size-4 rounded" />
+            <span className="text-xs">پیش‌فرض</span>
+          </label>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="outline" onClick={onCancel}>انصراف</Button>
+          <Button size="sm" onClick={handleAdd} disabled={saving}>
+            {saving ? <Loader2 className="size-3 animate-spin" /> : <Plus className="size-3" />}
+            افزودن تنوع
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

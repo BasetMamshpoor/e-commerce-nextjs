@@ -55,9 +55,12 @@ export default function AdminProductNewPage() {
   const router = useRouter();
   const [brands, setBrands] = React.useState<Brand[]>([]);
   const [categoryTree, setCategoryTree] = React.useState<Category[]>([]);
-  const [attributes, setAttributes] = React.useState<Attribute[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
+
+  // Category-specific attributes — loaded when categories are selected.
+  // These are the attributes ATTACHED to the selected categories.
+  const [categoryAttributes, setCategoryAttributes] = React.useState<Attribute[]>([]);
 
   const [form, setForm] = React.useState({
     name: "",
@@ -73,23 +76,44 @@ export default function AdminProductNewPage() {
   });
 
   const [variants, setVariants] = React.useState<VariantFormData[]>([]);
-
   const [images, setImages] = React.useState<ProductImageItem[]>([]);
   const [displayAttrs, setDisplayAttrs] = React.useState<DisplayAttributeFormData[]>([]);
 
+  // Initial load: brands + category tree
   React.useEffect(() => {
     Promise.all([
       brandsService.list({ includeInactive: true }),
       categoriesService.tree(),
-      attributesService.list(),
     ])
-      .then(([b, c, a]) => {
+      .then(([b, c]) => {
         setBrands(b);
         setCategoryTree(c);
-        setAttributes(a);
       })
       .finally(() => setLoading(false));
   }, []);
+
+  // When categories change → load category-specific attributes.
+  // GET /categories/:id/attributes returns attributes attached to that category.
+  React.useEffect(() => {
+    if (form.categoryIds.length === 0) {
+      setCategoryAttributes([]);
+      return;
+    }
+
+    // Fetch attributes for ALL selected categories and merge unique ones.
+    const fetches = form.categoryIds.map((id) =>
+      categoriesService.attributes(id).catch(() => [] as Attribute[]),
+    );
+    Promise.all(fetches).then((results) => {
+      const merged = new Map<number, Attribute>();
+      for (const attrs of results) {
+        for (const attr of attrs) {
+          if (!merged.has(attr.id)) merged.set(attr.id, attr);
+        }
+      }
+      setCategoryAttributes(Array.from(merged.values()));
+    });
+  }, [form.categoryIds]);
 
   const onSubmit = async () => {
     if (!form.name.trim()) {
@@ -101,7 +125,10 @@ export default function AdminProductNewPage() {
       toast.error("قیمت پایه محصول الزامی است");
       return;
     }
-    // Every product must have at least 1 variant (per api.md + expl.md).
+    if (form.categoryIds.length === 0) {
+      toast.error("حداقل یک دسته‌بندی الزامی است");
+      return;
+    }
     if (variants.length === 0) {
       toast.error("حداقل یک تنوع (Variant) الزامی است");
       return;
@@ -109,7 +136,7 @@ export default function AdminProductNewPage() {
 
     setSaving(true);
     try {
-      // 1. Upload new images to /media first
+      // 1. Upload new images to /media
       const uploadedImages: Array<{ mediaId: number; order: number; isMain: boolean }> = [];
       for (let i = 0; i < images.length; i++) {
         const img = images[i];
@@ -177,11 +204,12 @@ export default function AdminProductNewPage() {
     );
   }
 
-  // Preview effective price for default variant
   const basePriceNum = Number(form.basePrice) || 0;
   const defaultVariant = variants.find((v) => v.isDefault) ?? variants[0];
   const effectivePrice =
     basePriceNum + (defaultVariant ? Number(defaultVariant.priceAdjustment) || 0 : 0);
+
+  const hasCategories = form.categoryIds.length > 0;
 
   return (
     <div className="space-y-4">
@@ -214,144 +242,74 @@ export default function AdminProductNewPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>برند</Label>
-                  <Select
-                    value={form.brandId}
-                    onValueChange={(v) => setForm({ ...form, brandId: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="انتخاب برند" />
-                    </SelectTrigger>
+                  <Select value={form.brandId} onValueChange={(v) => setForm({ ...form, brandId: v })}>
+                    <SelectTrigger><SelectValue placeholder="انتخاب برند" /></SelectTrigger>
                     <SelectContent>
-                      {brands.map((b) => (
-                        <SelectItem key={b.id} value={String(b.id)}>
-                          {b.name}
-                        </SelectItem>
-                      ))}
+                      {brands.map((b) => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>وضعیت</Label>
-                  <Select
-                    value={form.status}
-                    onValueChange={(v) => setForm({ ...form, status: v as ProductStatus })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as ProductStatus })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {STATUS_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
+                      {STATUS_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="space-y-2">
                 <Label>توضیح کوتاه</Label>
-                <Input
-                  value={form.shortDescription}
-                  onChange={(e) => setForm({ ...form, shortDescription: e.target.value })}
-                  placeholder="توضیح یک‌خطی محصول"
-                />
+                <Input value={form.shortDescription} onChange={(e) => setForm({ ...form, shortDescription: e.target.value })} placeholder="توضیح یک‌خطی محصول" />
               </div>
               <div className="space-y-2">
                 <Label>توضیحات کامل</Label>
-                <RichTextEditor
-                  value={form.description}
-                  onChange={(html) => setForm({ ...form, description: html })}
-                  placeholder="توضیحات کامل محصول را بنویسید..."
-                />
+                <RichTextEditor value={form.description} onChange={(html) => setForm({ ...form, description: html })} placeholder="توضیحات کامل محصول را بنویسید..." />
               </div>
               <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={form.isFeatured}
-                  onChange={(e) => setForm({ ...form, isFeatured: e.target.checked })}
-                  className="size-4 rounded"
-                />
+                <input type="checkbox" checked={form.isFeatured} onChange={(e) => setForm({ ...form, isFeatured: e.target.checked })} className="size-4 rounded" />
                 <span className="text-sm">محصول ویژه</span>
               </label>
               <div className="space-y-2">
-                <Label>دسته‌بندی‌ها</Label>
-                <CategoryTreeSelect
-                  categories={categoryTree}
-                  selectedIds={form.categoryIds}
-                  onChange={(ids) => setForm({ ...form, categoryIds: ids })}
-                />
+                <Label>دسته‌بندی‌ها *</Label>
+                <CategoryTreeSelect categories={categoryTree} selectedIds={form.categoryIds} onChange={(ids) => setForm({ ...form, categoryIds: ids })} />
+                {!hasCategories && (
+                  <p className="text-xs text-muted-foreground">برای فعال شدن بخش تنوع‌ها و ویژگی‌های نمایشی، حداقل یک دسته‌بندی انتخاب کنید.</p>
+                )}
               </div>
             </CardContent>
           </Card>
 
           {/* Pricing */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">قیمت و تخفیف</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-base">قیمت و تخفیف</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>قیمت پایه (تومان) *</Label>
-                  <Input
-                    type="number"
-                    dir="ltr"
-                    className="text-left"
-                    value={form.basePrice}
-                    onChange={(e) => setForm({ ...form, basePrice: e.target.value })}
-                    placeholder="مثال: 250000"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    حداقل قیمت محصول. قیمت هر تنوع = پایه + افزایش قیمت تنوع.
-                  </p>
+                  <Input type="number" dir="ltr" className="text-left" value={form.basePrice} onChange={(e) => setForm({ ...form, basePrice: e.target.value })} placeholder="مثال: 250000" />
+                  <p className="text-xs text-muted-foreground">حداقل قیمت محصول. قیمت هر تنوع = پایه + افزایش قیمت تنوع.</p>
                 </div>
                 <div className="space-y-2">
                   <Label>نوع تخفیف</Label>
-                  <Select
-                    value={form.discountType}
-                    onValueChange={(v) =>
-                      setForm({ ...form, discountType: v as DiscountType | "NONE" })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Select value={form.discountType} onValueChange={(v) => setForm({ ...form, discountType: v as DiscountType | "NONE" })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {DISCOUNT_TYPE_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
+                      {DISCOUNT_TYPE_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               {form.discountType !== "NONE" && (
                 <div className="space-y-2">
-                  <Label>
-                    مقدار تخفیف {form.discountType === "PERCENT" ? "(٪)" : "(تومان)"}
-                  </Label>
-                  <Input
-                    type="number"
-                    dir="ltr"
-                    className="text-left"
-                    value={form.discountValue}
-                    onChange={(e) => setForm({ ...form, discountValue: e.target.value })}
-                    placeholder={
-                      form.discountType === "PERCENT" ? "مثال: 10" : "مثال: 50000"
-                    }
-                  />
-                  {form.discountType === "PERCENT" &&
-                    form.discountValue !== "" &&
-                    (Number(form.discountValue) < 1 || Number(form.discountValue) > 100) && (
-                      <p className="text-xs text-destructive">
-                        درصد تخفیف باید بین ۱ تا ۱۰۰ باشد
-                      </p>
-                    )}
+                  <Label>مقدار تخفیف {form.discountType === "PERCENT" ? "(٪)" : "(تومان)"}</Label>
+                  <Input type="number" dir="ltr" className="text-left" value={form.discountValue} onChange={(e) => setForm({ ...form, discountValue: e.target.value })} placeholder={form.discountType === "PERCENT" ? "مثال: 10" : "مثال: 50000"} />
+                  {form.discountType === "PERCENT" && form.discountValue !== "" && (Number(form.discountValue) < 1 || Number(form.discountValue) > 100) && (
+                    <p className="text-xs text-destructive">درصد تخفیف باید بین ۱ تا ۱۰۰ باشد</p>
+                  )}
                 </div>
               )}
-              {/* Price preview */}
               {basePriceNum > 0 && (
                 <div className="rounded-lg bg-muted/50 p-3 text-sm">
                   <div className="flex items-center justify-between">
@@ -360,23 +318,14 @@ export default function AdminProductNewPage() {
                   </div>
                   {defaultVariant && Number(defaultVariant.priceAdjustment) !== 0 && (
                     <div className="mt-1 flex items-center justify-between">
-                      <span className="text-muted-foreground">
-                        افزایش تنوع پیش‌فرض:
-                      </span>
-                      <span className="font-bold nums-fa">
-                        {Number(defaultVariant.priceAdjustment) > 0 ? "+" : ""}
-                        {formatPrice(Number(defaultVariant.priceAdjustment))} تومان
-                      </span>
+                      <span className="text-muted-foreground">افزایش تنوع پیش‌فرض:</span>
+                      <span className="font-bold nums-fa">{Number(defaultVariant.priceAdjustment) > 0 ? "+" : ""}{formatPrice(Number(defaultVariant.priceAdjustment))} تومان</span>
                     </div>
                   )}
                   <Separator className="my-2" />
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-foreground">
-                      قیمت تنوع پیش‌فرض:
-                    </span>
-                    <span className="font-bold text-primary nums-fa">
-                      {formatPrice(effectivePrice)} تومان
-                    </span>
+                    <span className="font-medium text-foreground">قیمت تنوع پیش‌فرض:</span>
+                    <span className="font-bold text-primary nums-fa">{formatPrice(effectivePrice)} تومان</span>
                   </div>
                 </div>
               )}
@@ -385,45 +334,37 @@ export default function AdminProductNewPage() {
 
           {/* Images */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">تصاویر محصول</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-base">تصاویر محصول</CardTitle></CardHeader>
             <CardContent>
-              <ProductImageUploader
-                images={images}
-                onChange={setImages}
-                deletedImageIds={[]}
-                onDeletedIdsChange={() => {}}
-              />
+              <ProductImageUploader images={images} onChange={setImages} deletedImageIds={[]} onDeletedIdsChange={() => {}} />
             </CardContent>
           </Card>
 
-          {/* Variants */}
+          {/* Variants — only show if categories are selected */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">تنوع‌ها (Variants)</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-base">تنوع‌ها (Variants)</CardTitle></CardHeader>
             <CardContent>
-              <VariantBuilder
-                variants={variants}
-                onChange={setVariants}
-                attributes={attributes}
-                basePrice={basePriceNum}
-              />
+              {hasCategories ? (
+                <VariantBuilder variants={variants} onChange={setVariants} attributes={categoryAttributes} basePrice={basePriceNum} />
+              ) : (
+                <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                  ابتدا یک دسته‌بندی انتخاب کنید تا ویژگی‌های تنوع مربوط به آن دسته بارگذاری شود.
+                </p>
+              )}
             </CardContent>
           </Card>
 
-          {/* Display attributes */}
+          {/* Display attributes — only show if categories are selected */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">ویژگی‌های نمایشی</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-base">ویژگی‌های نمایشی</CardTitle></CardHeader>
             <CardContent>
-              <DisplayAttributesEditor
-                attributes={displayAttrs}
-                onChange={setDisplayAttrs}
-                availableAttributes={attributes}
-              />
+              {hasCategories ? (
+                <DisplayAttributesEditor attributes={displayAttrs} onChange={setDisplayAttrs} availableAttributes={categoryAttributes} />
+              ) : (
+                <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                  ابتدا یک دسته‌بندی انتخاب کنید تا ویژگی‌های نمایشی مربوط به آن دسته بارگذاری شود.
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -431,50 +372,33 @@ export default function AdminProductNewPage() {
         {/* Sidebar */}
         <div className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">خلاصه</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-base">خلاصه</CardTitle></CardHeader>
             <CardContent className="space-y-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">تنوع‌ها:</span>
-                <span className="font-bold nums-fa">
-                  {variants.length > 0
-                    ? toPersianDigits(variants.length)
-                    : "بدون تنوع"}
-                </span>
+                <span className="font-bold nums-fa">{variants.length > 0 ? toPersianDigits(variants.length) : "—"}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">تعداد تصاویر:</span>
+                <span className="text-muted-foreground">تصاویر:</span>
                 <span className="font-bold nums-fa">{toPersianDigits(images.length)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">ویژگی‌های نمایشی:</span>
-                <span className="font-bold nums-fa">
-                  {toPersianDigits(
-                    displayAttrs.filter((d) => d.attributeId !== "" && d.value.trim()).length,
-                  )}
-                </span>
+                <span className="font-bold nums-fa">{toPersianDigits(displayAttrs.filter((d) => d.attributeId !== "" && d.value.trim()).length)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">دسته‌بندی‌ها:</span>
+                <span className="font-bold nums-fa">{toPersianDigits(form.categoryIds.length)}</span>
               </div>
             </CardContent>
           </Card>
 
           <div className="flex flex-col gap-2">
-            <Button
-              className="w-full"
-              onClick={onSubmit}
-              disabled={saving}
-            >
+            <Button className="w-full" onClick={onSubmit} disabled={saving}>
               {saving ? <Loader2 className="size-4 animate-spin" /> : null}
               {saving ? "در حال ذخیره..." : "ایجاد محصول"}
             </Button>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => router.back()}
-              disabled={saving}
-            >
-              انصراف
-            </Button>
+            <Button variant="outline" className="w-full" onClick={() => router.back()} disabled={saving}>انصراف</Button>
           </div>
         </div>
       </div>
