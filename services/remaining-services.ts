@@ -6,6 +6,7 @@
  */
 
 import { http } from "@/lib/api-client";
+import { buildMultipartFormData } from "@/lib/form-data-helper";
 import { ENDPOINTS } from "@/api/endpoints";
 import type {
   DiscountApplyResult, DiscountCode, PaginatedData,
@@ -121,20 +122,18 @@ export const ticketsService = {
   departments: () => http.get<TicketDepartment[]>(ENDPOINTS.tickets.departments),
   list: (query?: TicketListQuery) => http.get<PaginatedData<Ticket>>(ENDPOINTS.tickets.list, query),
   create: (body: CreateTicketBody) => http.post<Ticket>(ENDPOINTS.tickets.create, body),
-  /** Create ticket with inline file attachments (multipart/form-data). */
+  /** Create ticket with inline file attachments (multipart/form-data).
+   * Fields sent flat with bracket notation for arrays + attachments as files.
+   */
   createWithAttachments: (body: CreateTicketBody, files: File[]) => {
-    const fd = new FormData();
-    fd.append("body", JSON.stringify(body));
-    for (const f of files) fd.append("attachments", f);
+    const fd = buildMultipartFormData(body as unknown as Record<string, unknown>, { attachments: files });
     return http.upload<Ticket>(ENDPOINTS.tickets.create, fd);
   },
   byId: (id: number) => http.get<Ticket>(ENDPOINTS.tickets.byId(id)),
   addMessage: (id: number, body: AddTicketMessageBody) => http.post<Ticket>(ENDPOINTS.tickets.addMessage(id), body),
   /** Add message with inline file attachments (multipart/form-data). */
   addMessageWithAttachments: (id: number, body: AddTicketMessageBody, files: File[]) => {
-    const fd = new FormData();
-    fd.append("body", JSON.stringify(body));
-    for (const f of files) fd.append("attachments", f);
+    const fd = buildMultipartFormData(body as unknown as Record<string, unknown>, { attachments: files });
     return http.upload<Ticket>(ENDPOINTS.tickets.addMessage(id), fd);
   },
   createDepartment: (body: UpsertDepartmentBody) => http.post<TicketDepartment>(ENDPOINTS.tickets.createDepartment, body),
@@ -146,9 +145,7 @@ export const ticketsService = {
   adminAddMessage: (id: number, body: AddTicketMessageBody) => http.post<Ticket>(ENDPOINTS.tickets.adminAddMessage(id), body),
   /** Admin reply with inline file attachments (multipart/form-data). */
   adminAddMessageWithAttachments: (id: number, body: AddTicketMessageBody, files: File[]) => {
-    const fd = new FormData();
-    fd.append("body", JSON.stringify(body));
-    for (const f of files) fd.append("attachments", f);
+    const fd = buildMultipartFormData(body as unknown as Record<string, unknown>, { attachments: files });
     return http.upload<Ticket>(ENDPOINTS.tickets.adminAddMessage(id), fd);
   },
 };

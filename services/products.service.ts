@@ -5,6 +5,7 @@
  */
 
 import { http } from "@/lib/api-client";
+import { buildMultipartFormData } from "@/lib/form-data-helper";
 import { ENDPOINTS } from "@/api/endpoints";
 import type {
   PaginatedData,
@@ -90,11 +91,18 @@ export const productsService = {
   update: (id: number, body: UpdateProductBody) =>
     http.put<Product>(ENDPOINTS.products.update(id), body),
 
+  /** Create product with inline images (multipart/form-data).
+   * Uses bracket notation for arrays (Express/multer standard):
+   *   categoryIds[]=7, variants[0][sku]=..., images=<file>
+   */
+  createWithImages: (body: CreateProductBody, images: File[]) => {
+    const fd = buildMultipartFormData(body as unknown as Record<string, unknown>, { images });
+    return http.upload<Product>(ENDPOINTS.products.create, fd);
+  },
+
   /** Update product with inline images (multipart/form-data, PUT method). */
-  updateWithImages: (id: number, bodyJson: string, images: File[]) => {
-    const fd = new FormData();
-    fd.append("body", bodyJson);
-    for (const f of images) fd.append("images", f);
+  updateWithImages: (id: number, body: UpdateProductBody, images: File[]) => {
+    const fd = buildMultipartFormData(body as unknown as Record<string, unknown>, { images });
     return http.uploadPut<Product>(ENDPOINTS.products.update(id), fd);
   },
 

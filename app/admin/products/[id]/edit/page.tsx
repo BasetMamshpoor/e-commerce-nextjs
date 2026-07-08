@@ -185,9 +185,8 @@ export default function AdminProductEditPage({
       };
 
       if (newImageFiles.length > 0) {
-        const bodyJson = JSON.stringify(updateBody);
         const fileArray = newImageFiles.map((img) => img.file);
-        await productsService.updateWithImages(Number(id), bodyJson, fileArray);
+        await productsService.updateWithImages(Number(id), updateBody, fileArray);
       } else {
         await productsService.update(Number(id), updateBody);
       }

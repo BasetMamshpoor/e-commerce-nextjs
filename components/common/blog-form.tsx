@@ -124,7 +124,7 @@ export function BlogForm({ post, loading: externalLoading }: BlogFormProps) {
         // Edit mode
         if (coverImage) {
           // Multipart with cover image
-          await blogService.updateWithCover(post.id, JSON.stringify(body), coverImage);
+          await blogService.updateWithCover(post.id, body, coverImage);
         } else {
           await blogService.update(post.id, body);
         }
@@ -133,7 +133,7 @@ export function BlogForm({ post, loading: externalLoading }: BlogFormProps) {
       } else {
         // Create mode
         if (coverImage) {
-          await blogService.createWithCover(JSON.stringify(body), coverImage);
+          await blogService.createWithCover(body, coverImage);
         } else {
           await blogService.create(body);
         }

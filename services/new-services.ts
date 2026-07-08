@@ -3,6 +3,7 @@
  */
 
 import { http } from "@/lib/api-client";
+import { buildMultipartFormData } from "@/lib/form-data-helper";
 import { ENDPOINTS } from "@/api/endpoints";
 import type {
   Story,
@@ -74,20 +75,18 @@ export const blogService = {
     http.get<PaginatedData<BlogPost>>(ENDPOINTS.blog.adminList, params),
   create: (body: Partial<BlogPost> & { productIds?: number[] }) =>
     http.post<BlogPost>(ENDPOINTS.blog.create, body),
-  /** Create blog post with cover image (multipart/form-data). */
-  createWithCover: (bodyJson: string, coverImage: File) => {
-    const fd = new FormData();
-    fd.append("body", bodyJson);
-    fd.append("coverImage", coverImage);
+  /** Create blog post with cover image (multipart/form-data).
+   * Fields sent flat with bracket notation for arrays + coverImage as file.
+   */
+  createWithCover: (body: Partial<BlogPost> & { productIds?: number[] }, coverImage: File) => {
+    const fd = buildMultipartFormData(body as unknown as Record<string, unknown>, { coverImage });
     return http.upload<BlogPost>(ENDPOINTS.blog.create, fd);
   },
   update: (id: number, body: Partial<BlogPost> & { productIds?: number[] }) =>
     http.put<BlogPost>(ENDPOINTS.blog.update(id), body),
   /** Update blog post with cover image (multipart/form-data). */
-  updateWithCover: (id: number, bodyJson: string, coverImage: File) => {
-    const fd = new FormData();
-    fd.append("body", bodyJson);
-    fd.append("coverImage", coverImage);
+  updateWithCover: (id: number, body: Partial<BlogPost> & { productIds?: number[] }, coverImage: File) => {
+    const fd = buildMultipartFormData(body as unknown as Record<string, unknown>, { coverImage });
     return http.uploadPut<BlogPost>(ENDPOINTS.blog.update(id), fd);
   },
   delete: (id: number) => http.delete<void>(ENDPOINTS.blog.delete(id)),
