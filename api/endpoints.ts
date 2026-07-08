@@ -278,7 +278,7 @@ export const ENDPOINTS = {
 
   blog: {
     list: "/blog",
-    bySlug: (slug: string) => `/blog/slug/${slug}`,
+    bySlug: (slug: string) => `/blog/${slug}`,
     adminList: "/blog/admin",
     create: "/blog",
     update: (id: number) => `/blog/${id}`,

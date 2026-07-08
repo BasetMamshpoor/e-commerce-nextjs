@@ -8,14 +8,16 @@ import TiptapLink from "@tiptap/extension-link";
 import TextAlign from "@tiptap/extension-text-align";
 import Placeholder from "@tiptap/extension-placeholder";
 import TiptapUnderline from "@tiptap/extension-underline";
+import TableOfContents from "@tiptap/extension-table-of-contents";
 import {
   Bold, Italic, Strikethrough, Underline as UnderlineIcon,
   Heading1, Heading2, Heading3, List, ListOrdered, Quote, Code,
   Undo, Redo, AlignRight, AlignCenter, AlignLeft,
-  Link as LinkIcon, Image as ImageIcon,
+  Link as LinkIcon, Image as ImageIcon, Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { mediaService } from "@/services";
 
 interface RichTextEditorProps {
   value: string;
@@ -25,12 +27,24 @@ interface RichTextEditorProps {
 }
 
 export function RichTextEditor({ value, onChange, placeholder = "متن خود را بنویسید...", className }: RichTextEditorProps) {
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = React.useState(false);
+
   const editor = useEditor({
     extensions: [
-      StarterKit, TiptapUnderline, TiptapImage,
+      StarterKit,
+      TiptapUnderline,
+      TiptapImage.configure({
+        inline: false,
+        allowBase64: false,
+        HTMLAttributes: {
+          class: "rounded-lg max-w-full h-auto",
+        },
+      }),
       TiptapLink.configure({ openOnClick: false, HTMLAttributes: { class: "text-primary underline" } }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Placeholder.configure({ placeholder }),
+      TableOfContents,
     ],
     content: value,
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
@@ -43,11 +57,48 @@ export function RichTextEditor({ value, onChange, placeholder = "متن خود �
 
   if (!editor) return null;
 
-  const addLink = () => { const url = window.prompt("آدرس لینک:"); if (url) editor.chain().focus().setLink({ href: url }).run(); };
-  const addImage = () => { const url = window.prompt("آدرس تصویر:"); if (url) editor.chain().focus().setImage({ src: url }).run(); };
+  const addLink = () => {
+    const url = window.prompt("آدرس لینک:");
+    if (url) editor.chain().focus().setLink({ href: url }).run();
+  };
+
+  const onImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editor) return;
+
+    setUploading(true);
+    try {
+      const media = await mediaService.upload(file);
+      editor.chain().focus().setImage({
+        src: media.url,
+        alt: media.originalName,
+        title: media.originalName,
+      }).run();
+    } catch {
+      // Fallback: ask for URL
+      const url = window.prompt("آپلود ناموفق بود. آدرس تصویر را وارد کنید:");
+      if (url) editor.chain().focus().setImage({ src: url }).run();
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const setImageSize = (width: number) => {
+    editor.chain().focus().updateAttributes("image", { width: `${width}%` }).run();
+  };
 
   return (
     <div className={cn("rounded-lg border border-input bg-background", className)}>
+      {/* Hidden file input for image upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={onImageUpload}
+        className="hidden"
+      />
+
       <div className="flex flex-wrap items-center gap-0.5 border-b border-border p-1.5">
         <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive("bold")} title="ضخیم"><Bold className="size-4" /></ToolbarButton>
         <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} isActive={editor.isActive("italic")} title="کج"><Italic className="size-4" /></ToolbarButton>
@@ -68,7 +119,20 @@ export function RichTextEditor({ value, onChange, placeholder = "متن خود �
         <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("left").run()} isActive={editor.isActive({ textAlign: "left" })} title="چپ‌چین"><AlignLeft className="size-4" /></ToolbarButton>
         <div className="mx-1 h-5 w-px bg-border" />
         <ToolbarButton onClick={addLink} isActive={editor.isActive("link")} title="لینک"><LinkIcon className="size-4" /></ToolbarButton>
-        <ToolbarButton onClick={addImage} title="تصویر"><ImageIcon className="size-4" /></ToolbarButton>
+        <ToolbarButton onClick={() => fileInputRef.current?.click()} title="آپلود تصویر" disabled={uploading}>
+          {uploading ? <span className="text-xs">...</span> : <Upload className="size-4" />}
+        </ToolbarButton>
+        {/* Image size controls (when image is selected) */}
+        {editor.isActive("image") && (
+          <>
+            <div className="mx-1 h-5 w-px bg-border" />
+            <ToolbarButton onClick={() => setImageSize(25)} title="۲۵٪">۲۵٪</ToolbarButton>
+            <ToolbarButton onClick={() => setImageSize(50)} title="۵۰٪">۵۰٪</ToolbarButton>
+            <ToolbarButton onClick={() => setImageSize(75)} title="۷۵٪">۷۵٪</ToolbarButton>
+            <ToolbarButton onClick={() => setImageSize(100)} title="۱۰۰٪">۱۰۰٪</ToolbarButton>
+            <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("center").run()} isActive={editor.isActive({ textAlign: "center" })} title="وسط‌چین"><AlignCenter className="size-4" /></ToolbarButton>
+          </>
+        )}
         <div className="mx-1 h-5 w-px bg-border" />
         <ToolbarButton onClick={() => editor.chain().focus().undo().run()} title="بازگشت"><Undo className="size-4" /></ToolbarButton>
         <ToolbarButton onClick={() => editor.chain().focus().redo().run()} title="تکرار"><Redo className="size-4" /></ToolbarButton>
@@ -78,9 +142,9 @@ export function RichTextEditor({ value, onChange, placeholder = "متن خود �
   );
 }
 
-function ToolbarButton({ onClick, isActive, children, title }: { onClick: () => void; isActive?: boolean; children: React.ReactNode; title: string }) {
+function ToolbarButton({ onClick, isActive, children, title, disabled }: { onClick: () => void; isActive?: boolean; children: React.ReactNode; title: string; disabled?: boolean }) {
   return (
-    <Button type="button" variant="ghost" size="icon" className={cn("size-8", isActive && "bg-primary/10 text-primary")} onClick={onClick} title={title}>
+    <Button type="button" variant="ghost" size="icon" className={cn("size-8 text-xs", isActive && "bg-primary/10 text-primary")} onClick={onClick} title={title} disabled={disabled}>
       {children}
     </Button>
   );

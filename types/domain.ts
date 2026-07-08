@@ -780,9 +780,13 @@ export interface BlogPost {
   coverImageMediaId?: number | null;
   coverImageUrl?: string | null;
   categoryId?: number | null;
+  tags?: string[];
   metaTitle?: string | null;
   metaDescription?: string | null;
   publishedAt?: string | null;
+  productIds?: number[];
+  relatedProducts?: Product[];
+  relatedPosts?: BlogPost[];
   createdAt: string;
   updatedAt?: string;
 }
