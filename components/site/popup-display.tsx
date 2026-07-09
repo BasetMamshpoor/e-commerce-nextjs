@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { X } from "lucide-react";
 
@@ -93,12 +92,11 @@ export function PopupDisplay() {
             className="block"
           >
             <div className="relative aspect-video w-full overflow-hidden bg-muted">
-              <Image
+              { }
+              <img
                 src={popup.imageUrl}
                 alt={popup.title}
-                fill
-                sizes="(max-width: 768px) 100vw, 400px"
-                className="object-cover"
+                className="size-full object-cover"
               />
             </div>
           </Link>

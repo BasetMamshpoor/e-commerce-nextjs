@@ -8,6 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/common/empty-state";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { toPersianDigits } from "@/utils/format";
 
@@ -90,14 +98,14 @@ export function AdminTable<T>({
         </div>
       )}
 
-      {/* Table */}
+      {/* Table using shadcn Table component */}
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border bg-muted/30">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30">
                 {columns.map((col) => (
-                  <th
+                  <TableHead
                     key={col.key}
                     className={cn(
                       "whitespace-nowrap px-4 py-3 text-xs font-semibold text-muted-foreground",
@@ -105,35 +113,36 @@ export function AdminTable<T>({
                       col.align === "center" && "text-center",
                       (!col.align || col.align === "right") && "text-right",
                       col.className,
+                      col.hideOnMobile && "hidden md:table-cell",
                     )}
                   >
                     {col.header}
-                  </th>
+                  </TableHead>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="border-b border-border/40">
+                  <TableRow key={i} className="border-b border-border/40">
                     {columns.map((col) => (
-                      <td key={col.key} className="px-4 py-3">
+                      <TableCell key={col.key} className={cn("px-4 py-3", col.hideOnMobile && "hidden md:table-cell")}>
                         <Skeleton className="h-5 w-full" />
-                      </td>
+                      </TableCell>
                     ))}
-                  </tr>
+                  </TableRow>
                 ))
               ) : data.length === 0 ? (
-                <tr>
-                  <td colSpan={columns.length} className="p-0">
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="p-0">
                     <EmptyState
                       title={emptyTitle}
                       description={emptyDescription}
                       action={emptyAction}
                       className="py-12"
                     />
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ) : (
                 data.map((item) => {
                   const href = getRowHref?.(item);
@@ -150,24 +159,25 @@ export function AdminTable<T>({
                       style={{ display: "table-row" }}
                     >
                       {columns.map((col) => (
-                        <td
+                        <TableCell
                           key={col.key}
                           className={cn(
                             "whitespace-nowrap px-4 py-3 text-sm",
                             col.align === "left" && "text-left",
                             col.align === "center" && "text-center",
                             col.className,
+                            col.hideOnMobile && "hidden md:table-cell",
                           )}
                         >
                           {col.render(item)}
-                        </td>
+                        </TableCell>
                       ))}
                     </RowTag>
                   );
                 })
               )}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </div>
 
