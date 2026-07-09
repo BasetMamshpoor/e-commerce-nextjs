@@ -17,7 +17,7 @@ export function useStories() {
 }
 
 export function useAdminStories() {
-  return useQuery<Story[]>({
+  return useQuery({
     queryKey: [...STORIES_QUERY_KEY, "admin"],
     queryFn: () => storiesService.adminList(),
   });

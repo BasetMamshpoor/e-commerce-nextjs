@@ -184,21 +184,38 @@ export function StoryViewer({ stories, initialIndex, open, onClose }: StoryViewe
         onPointerLeave={() => setPaused(false)}
       >
         {videoUrl ? (
-          <video
-            ref={videoRef}
-            src={videoUrl}
-            poster={coverUrl ?? undefined}
-            className="max-h-[85vh] w-auto max-w-full rounded-2xl object-contain"
-            autoPlay
-            playsInline
-            onLoadedMetadata={(e) => {
-              const v = e.currentTarget;
-              if (v.duration && isFinite(v.duration)) {
-                setVideoDuration(v.duration * 1000);
-              }
-            }}
-            onEnded={goNext}
-          />
+          <div className="relative">
+            <video
+              ref={videoRef}
+              src={videoUrl}
+              poster={coverUrl ?? undefined}
+              className="max-h-[85vh] w-auto max-w-full rounded-2xl object-contain"
+              autoPlay
+              playsInline
+              onLoadedMetadata={(e) => {
+                const v = e.currentTarget;
+                if (v.duration && isFinite(v.duration)) {
+                  setVideoDuration(v.duration * 1000);
+                }
+              }}
+              onTimeUpdate={(e) => {
+                const v = e.currentTarget;
+                if (v.duration && isFinite(v.duration) && !paused) {
+                  // Update progress from actual video time for accurate progress bar
+                  const pct = (v.currentTime / v.duration) * 100;
+                  setProgress(pct);
+                }
+              }}
+              onEnded={goNext}
+            />
+            {/* Video progress bar (bottom of video) */}
+            <div className="absolute bottom-0 left-0 right-0 h-1 overflow-hidden rounded-b-2xl bg-white/20">
+              <div
+                className="h-full bg-primary transition-[width] duration-100 ease-linear"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
         ) : coverUrl ? (
           <img
             src={coverUrl}

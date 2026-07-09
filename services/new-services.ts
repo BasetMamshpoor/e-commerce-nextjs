@@ -21,15 +21,36 @@ import type {
 /* ───────── Stories ───────── */
 export const storiesService = {
   list: () => http.get<Story[]>(ENDPOINTS.stories.list),
-  adminList: () => http.get<Story[]>(ENDPOINTS.stories.adminList),
+  adminList: (params?: { page?: number; limit?: number }) =>
+    http.get<PaginatedData<Story>>(ENDPOINTS.stories.adminList, params),
   create: (body: {
-    title: string; coverImageMediaId: number; videoMediaId?: number;
+    title: string; coverImageMediaId?: number; videoMediaId?: number;
     expiresAt?: string; order?: number; productIds?: number[];
   }) => http.post<Story>(ENDPOINTS.stories.create, body),
+  /** Create story with cover image + video upload (multipart/form-data). */
+  createWithMedia: (body: {
+    title: string; expiresAt?: string; order?: number; productIds?: number[];
+  }, coverImage?: File, video?: File) => {
+    const fd = buildMultipartFormData(body as unknown as Record<string, unknown>, {
+      ...(coverImage ? { coverImage } : {}),
+      ...(video ? { video } : {}),
+    });
+    return http.upload<Story>(ENDPOINTS.stories.create, fd);
+  },
   update: (id: number, body: Partial<{
-    title: string; coverImageMediaId: number; videoMediaId?: number;
+    title: string; coverImageMediaId: number; videoMediaId: number;
     expiresAt?: string; order?: number; productIds?: number[];
   }>) => http.put<Story>(ENDPOINTS.stories.update(id), body),
+  /** Update story with cover image + video upload (multipart/form-data). */
+  updateWithMedia: (id: number, body: {
+    title: string; expiresAt?: string; order?: number; productIds?: number[];
+  }, coverImage?: File, video?: File) => {
+    const fd = buildMultipartFormData(body as unknown as Record<string, unknown>, {
+      ...(coverImage ? { coverImage } : {}),
+      ...(video ? { video } : {}),
+    });
+    return http.uploadPut<Story>(ENDPOINTS.stories.update(id), fd);
+  },
   delete: (id: number) => http.delete<void>(ENDPOINTS.stories.delete(id)),
 };
 
