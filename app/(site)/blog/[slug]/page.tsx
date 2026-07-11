@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Calendar, ChevronLeft, Tag, Package, FileText } from "lucide-react";
 import { Breadcrumb } from "@/components/common/breadcrumb";
 import { BlogTOC } from "@/components/common/blog-toc";
+import { BlogCommentSection } from "@/components/common/blog-comment-section";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -174,6 +175,9 @@ export default async function BlogPostPage({ params }: PageProps) {
               </div>
             </div>
           )}
+
+          {/* Comments */}
+          <BlogCommentSection postId={post.id} postTitle={post.title} />
 
           <div className="mt-12 border-t border-border pt-6">
             <Link href="/blog" className="flex items-center gap-1 text-sm font-medium text-primary hover:underline">
