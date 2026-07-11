@@ -665,7 +665,7 @@ export interface Popup {
   title: string;
   content: string;
   mediaId?: number | null;
-  imageUrl?: string | null;
+  mediaUrl?: string | null;
   link?: string | null;
   isActive: boolean;
   startsAt?: string | null;

@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { usePopups } from "@/features/catalog/hooks/use-popups";
 import { APP_CONFIG } from "@/constants/app";
+import Image from "next/image";
 
 /**
  * Show active promotional popups.
@@ -85,19 +86,20 @@ export function PopupDisplay() {
         >
           <X className="size-4" />
         </button>
-        {popup.imageUrl && (
+        {popup.mediaUrl && (
           <Link
             href={popup.link ?? "#"}
             onClick={() => handleOpenChange(false)}
             className="block"
           >
             <div className="relative aspect-video w-full overflow-hidden bg-muted">
-              { }
-              <img
-                src={popup.imageUrl}
+            <Image
+                src={popup.mediaUrl}
                 alt={popup.title}
-                className="size-full object-cover"
-              />
+                fill unoptimized
+                sizes="(max-width: 768px) 100vw, 400px"
+                className="object-cover"
+            />
             </div>
           </Link>
         )}

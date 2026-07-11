@@ -31,7 +31,6 @@ import {
   TrendingUp,
   Truck,
   MessageCircle,
-  ChevronDown,
   FileText as FileTextIcon,
 } from "lucide-react";
 
@@ -42,7 +41,6 @@ import { useUnreadNotificationsCount } from "@/features/notifications/hooks";
 import { useAdminUnreadCount } from "@/features/admin/hooks";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { APP_NAME } from "@/constants/app";
 import { toPersianDigits } from "@/utils/format";
 
@@ -191,7 +189,7 @@ export function AdminSidebar({ open, onOpenChange }: AdminSidebarProps) {
         </div>
 
         {/* Nav */}
-        <ScrollArea className="flex-1 px-3 py-3">
+        <div dir="rtl" className="flex-1 overflow-auto px-3 py-3">
           <nav className="space-y-5">
             {visibleGroups.map((group) => (
               <div key={group.label}>
@@ -224,7 +222,7 @@ export function AdminSidebar({ open, onOpenChange }: AdminSidebarProps) {
               </div>
             ))}
           </nav>
-        </ScrollArea>
+        </div>
 
         {/* Footer */}
         <div className="border-t border-sidebar-border p-3">

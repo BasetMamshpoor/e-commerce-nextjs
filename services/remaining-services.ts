@@ -194,13 +194,13 @@ export const popupsService = {
   create: (body: UpsertPopupBody) => http.post<Popup>(ENDPOINTS.popups.create, body),
   /** Create popup with image upload (multipart/form-data). */
   createWithImage: (body: Omit<UpsertPopupBody, "mediaId">, image?: File) => {
-    const fd = buildMultipartFormData(body as unknown as Record<string, unknown>, image ? { image } : undefined);
+    const fd = buildMultipartFormData(body as unknown as Record<string, unknown>, image ? { media:image } : undefined);
     return http.upload<Popup>(ENDPOINTS.popups.create, fd);
   },
   update: (id: number, body: Partial<UpsertPopupBody>) => http.put<Popup>(ENDPOINTS.popups.update(id), body),
   /** Update popup with image upload (multipart/form-data). */
   updateWithImage: (id: number, body: Partial<UpsertPopupBody>, image?: File) => {
-    const fd = buildMultipartFormData(body as unknown as Record<string, unknown>, image ? { image } : undefined);
+    const fd = buildMultipartFormData(body as unknown as Record<string, unknown>, image ? { media:image } : undefined);
     return http.uploadPut<Popup>(ENDPOINTS.popups.update(id), fd);
   },
   delete: (id: number) => http.delete<void>(ENDPOINTS.popups.delete(id)),

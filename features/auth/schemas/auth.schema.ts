@@ -32,7 +32,7 @@ export const identifierSchema = z
  */
 export const passwordSchema = z
   .string()
-  .min(8, "رمز عبور باید حداقل ۸ کاراکتر باشد")
+  .min(4, "رمز عبور باید حداقل 4 کاراکتر باشد")
   .refine((v) => /[a-zA-Z]/.test(v) && /\d/.test(v), {
     message: "رمز عبور باید شامل حداقل یک حرف و یک عدد باشد",
   });
