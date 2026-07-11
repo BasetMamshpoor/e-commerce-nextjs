@@ -41,19 +41,30 @@ export function useCreateComment() {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: (params: {
+    mutationFn: async (params: {
       productId: number;
       content: string;
       parentId?: number;
       rating?: number;
-      attachmentMediaIds?: number[];
-    }) =>
-      commentsService.create(params.productId, {
+      files?: File[];
+    }) => {
+      if (params.files && params.files.length > 0) {
+        // Multipart with attachments — flat fields per api.md
+        const fd = new FormData();
+        fd.append("content", params.content);
+        if (params.parentId) fd.append("parentId", String(params.parentId));
+        if (params.rating) fd.append("rating", String(params.rating));
+        for (const f of params.files) fd.append("attachments", f);
+        const { http } = await import("@/lib/api-client");
+        const { ENDPOINTS } = await import("@/api/endpoints");
+        return http.upload(ENDPOINTS.comments.create(params.productId), fd);
+      }
+      return commentsService.create(params.productId, {
         content: params.content,
         parentId: params.parentId,
         rating: params.rating,
-        attachmentMediaIds: params.attachmentMediaIds,
-      } satisfies CreateCommentBody),
+      } satisfies CreateCommentBody);
+    },
     onSuccess: (_data, variables) => {
       // Don't optimistically add — new comments have status=PENDING and
       // won't appear in the public list until approved. Just invalidate.

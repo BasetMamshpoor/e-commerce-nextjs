@@ -1,4 +1,6 @@
 "use client";
+/* eslint-disable react-hooks/refs */
+"use client";
 
 import * as React from "react";
 import { useForm, useWatch } from "react-hook-form";
@@ -19,7 +21,6 @@ import {
 import { StarRating } from "./star-rating";
 import { useCreateComment } from "@/features/comments/hooks";
 import { useAuth } from "@/providers/auth-context";
-import { mediaService } from "@/services";
 
 const commentSchema = z.object({
   content: z
@@ -56,7 +57,7 @@ export function CommentForm({
   const [rating, setRating] = React.useState(0);
   const [ratingTouched, setRatingTouched] = React.useState(false);
   const [attachments, setAttachments] = React.useState<File[]>([]);
-  const [uploading, setUploading] = React.useState(false);
+  
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const form = useForm<CommentFormValues>({
@@ -75,33 +76,13 @@ export function CommentForm({
       return;
     }
 
-    // Upload attachments to media service first, then pass IDs.
-    let attachmentMediaIds: number[] | undefined;
-    if (attachments.length > 0) {
-      setUploading(true);
-      try {
-        const uploadedIds: number[] = [];
-        for (const file of attachments) {
-          const media = await mediaService.upload(file);
-          uploadedIds.push(media.id);
-        }
-        attachmentMediaIds = uploadedIds;
-      } catch {
-        toast.error("آپلود فایل‌ها ناموفق بود");
-        setUploading(false);
-        return;
-      } finally {
-        setUploading(false);
-      }
-    }
-
     createComment.mutate(
       {
         productId,
         content: values.content,
         parentId,
         rating: isReply ? undefined : rating,
-        attachmentMediaIds,
+        files: attachments.length > 0 ? attachments : undefined,
       },
       {
         onSuccess: () => {
@@ -197,7 +178,7 @@ export function CommentForm({
             variant="outline"
             size="sm"
             onClick={() => fileInputRef.current?.click()}
-            disabled={createComment.isPending || uploading}
+            disabled={createComment.isPending}
           >
             <Paperclip className="size-4" />
             پیوست
@@ -244,14 +225,14 @@ export function CommentForm({
             <Button
               type="submit"
               size={compact ? "sm" : "default"}
-              disabled={createComment.isPending || uploading}
+              disabled={createComment.isPending}
             >
-              {createComment.isPending || uploading ? (
+              {createComment.isPending ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
                 <Send className="size-4" />
               )}
-              {uploading ? "در حال آپلود..." : isReply ? "ارسال پاسخ" : "ثبت نظر"}
+              {isReply ? "ارسال پاسخ" : "ثبت نظر"}
             </Button>
           </div>
         </div>
