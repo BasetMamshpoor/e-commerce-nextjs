@@ -190,30 +190,54 @@ function LandingSectionRenderer({ section }: { section: LandingSection }) {
 
 /* ───────── Section components ───────── */
 
+const POSITION_LABELS: Record<string, string> = {
+  HOME_MAIN: "اسلایدر اصلی",
+  HOME_MIDDLE: "بنر وسط",
+  CATEGORY_TOP: "بالای دسته",
+  SIDEBAR: "ستون کناری",
+};
+
 function BannersSection({ banners }: { banners: Banner[] }) {
   if (!banners || banners.length === 0) return null;
 
-  // Separate HOME_MAIN banners (hero carousel) from other positions.
-  const heroBanners = banners.filter((b) => b.position === "HOME_MAIN");
-  const sideBanners = banners.filter((b) => b.position !== "HOME_MAIN").slice(0, 4);
+  // Separate banners by position.
+  const mainBanners = banners.filter((b) => b.position === "HOME_MAIN");
+  const middleBanners = banners.filter((b) => b.position === "HOME_MIDDLE");
+  const sidebarBanners = banners.filter((b) => b.position === "SIDEBAR");
+  // CATEGORY_TOP is handled on category pages, not home page.
 
   return (
-    <section className="mb-8" aria-label="بنرها">
-      {heroBanners.length > 0 ? (
-        <div className={cn("grid gap-3", sideBanners.length > 0 ? "lg:grid-cols-[1fr_280px]" : "")}>
-          {/* Hero carousel */}
-          <HeroCarousel banners={heroBanners} />
-          {/* Side banners (small promotional cards) */}
-          {sideBanners.length > 0 && (
-            <div className="hidden gap-3 lg:grid lg:grid-rows-2">
-              {sideBanners.slice(0, 2).map((b) => (
-                <BannerTile key={b.id} banner={b} compact />
+    <section className="mb-8 space-y-3" aria-label="بنرها">
+      {/* HOME_MAIN: Hero carousel + sidebar banners side-by-side on desktop */}
+      {mainBanners.length > 0 && (
+        <div className={cn("grid gap-3", sidebarBanners.length > 0 ? "lg:grid-cols-[1fr_300px]" : "")}>
+          <HeroCarousel banners={mainBanners} />
+          {sidebarBanners.length > 0 && (
+            <div className="hidden gap-3 lg:flex lg:flex-col">
+              {sidebarBanners.slice(0, 2).map((b) => (
+                <BannerTile key={b.id} banner={b} variant="sidebar" />
               ))}
             </div>
           )}
         </div>
-      ) : (
-        // No hero banners — show grid of all banners
+      )}
+
+      {/* HOME_MIDDLE: horizontal row of banners */}
+      {middleBanners.length > 0 && (
+        <div className={cn(
+          "grid gap-3",
+          middleBanners.length === 1 ? "grid-cols-1" :
+          middleBanners.length === 2 ? "grid-cols-2" :
+          "grid-cols-2 lg:grid-cols-3"
+        )}>
+          {middleBanners.map((b) => (
+            <BannerTile key={b.id} banner={b} variant="middle" />
+          ))}
+        </div>
+      )}
+
+      {/* If no position-specific banners, show all as grid */}
+      {mainBanners.length === 0 && middleBanners.length === 0 && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {banners.slice(0, 6).map((b) => (
             <BannerTile key={b.id} banner={b} />
@@ -330,15 +354,19 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
   );
 }
 
-function BannerTile({ banner, compact = false }: { banner: Banner; compact?: boolean }) {
+function BannerTile({ banner, variant = "default" }: { banner: Banner; variant?: "default" | "sidebar" | "middle" }) {
   const image = banner.media?.url ?? banner.imageUrl;
+  const aspectClass =
+    variant === "sidebar" ? "aspect-[4/5]" :
+    variant === "middle" ? "aspect-[16/7]" :
+    "aspect-[16/7]";
   return (
     <Link
       href={banner.link ?? "#"}
       className="group relative block h-full overflow-hidden rounded-2xl border border-border/40 bg-muted"
       aria-label={banner.title}
     >
-      <div className={cn("relative w-full", compact ? "h-full min-h-[120px]" : "aspect-[16/7] sm:aspect-[16/6]")}>
+      <div className={cn("relative w-full", aspectClass)}>
         {image ? (
            
           <img
@@ -353,7 +381,7 @@ function BannerTile({ banner, compact = false }: { banner: Banner; compact?: boo
         )}
       </div>
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3">
-        <p className={cn("font-bold text-white", compact ? "text-xs" : "text-sm sm:text-base")}>
+        <p className={cn("font-bold text-white", variant === "sidebar" ? "text-xs" : "text-sm sm:text-base")}>
           {banner.title}
         </p>
       </div>

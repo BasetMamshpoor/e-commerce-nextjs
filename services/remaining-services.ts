@@ -170,7 +170,7 @@ export const commentsService = {
 
 /* ───────── Banners ───────── */
 export interface UpsertBannerBody {
-  title: string; mediaId: number; link?: string; position: BannerPosition;
+  title: string; mediaId?: number | null; link?: string; position: BannerPosition;
   order?: number; isActive?: boolean; startsAt?: string | null; endsAt?: string | null;
 }
 
@@ -178,7 +178,17 @@ export const bannersService = {
   list: (params?: { position?: BannerPosition }) => http.get<Banner[]>(ENDPOINTS.banners.list, params),
   adminList: () => http.get<Banner[]>(ENDPOINTS.banners.adminList),
   create: (body: UpsertBannerBody) => http.post<Banner>(ENDPOINTS.banners.create, body),
+  /** Create banner with image upload (multipart/form-data). */
+  createWithImage: (body: Omit<UpsertBannerBody, "mediaId">, image?: File) => {
+    const fd = buildMultipartFormData(body as unknown as Record<string, unknown>, image ? { image } : undefined);
+    return http.upload<Banner>(ENDPOINTS.banners.create, fd);
+  },
   update: (id: number, body: Partial<UpsertBannerBody>) => http.put<Banner>(ENDPOINTS.banners.update(id), body),
+  /** Update banner with image upload (multipart/form-data). */
+  updateWithImage: (id: number, body: Partial<UpsertBannerBody>, image?: File) => {
+    const fd = buildMultipartFormData(body as unknown as Record<string, unknown>, image ? { image } : undefined);
+    return http.uploadPut<Banner>(ENDPOINTS.banners.update(id), fd);
+  },
   delete: (id: number) => http.delete<void>(ENDPOINTS.banners.delete(id)),
 };
 

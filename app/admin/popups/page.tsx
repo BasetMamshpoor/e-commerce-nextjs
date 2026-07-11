@@ -44,9 +44,9 @@ export default function AdminPopupsPage() {
             header: "تصویر",
             render: (p) => (
               <div className="size-10 overflow-hidden rounded-lg bg-muted">
-                {p.imageUrl ? (
+                {p.mediaUrl ? (
                    
-                  <img src={p.imageUrl} alt={p.title} className="size-full object-cover" />
+                  <img src={p.mediaUrl} alt={p.title} className="size-full object-cover" />
                 ) : (
                   <div className="flex size-full items-center justify-center"><Megaphone className="size-4 text-muted-foreground" /></div>
                 )}
@@ -128,7 +128,7 @@ function PopupFormDialog({ open, onOpenChange, popup, onSaved }: {
       setIsActive(popup?.isActive ?? true);
       setShowOncePerSession(popup?.showOncePerSession ?? true);
       setImage(null);
-      setImagePreview(popup?.imageUrl ?? null);
+      setImagePreview(popup?.mediaUrl ?? null);
     }
   }, [open, popup]);
 
