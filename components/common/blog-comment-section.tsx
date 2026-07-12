@@ -238,16 +238,16 @@ function BlogCommentItem({
       <div className={cn("rounded-lg border border-border/40 p-3", depth > 0 && "border-r-2 border-r-primary/30")}>
         <div className="flex items-center gap-2">
           <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-            {(comment.authorName ?? "؟").charAt(0)}
+            {((comment.user?.fullName ?? comment.authorName ?? "؟")).charAt(0)}
           </div>
-          <span className="text-sm font-medium text-foreground">{comment.authorName ?? "ناشناس"}</span>
+          <span className="text-sm font-medium text-foreground">{(comment.user?.fullName ?? comment.authorName ?? "ناشناس")}</span>
           <span className="text-[10px] text-muted-foreground">{formatRelativeFa(comment.createdAt)}</span>
         </div>
         <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{comment.content}</p>
         {/* Attachments */}
-        {comment.attachments && comment.attachments.length > 0 && (
+        {((comment.media ?? comment.attachments) && (comment.media ?? comment.attachments)!.length > 0) && (
           <div className="mt-2 flex flex-wrap gap-1">
-            {comment.attachments.map((att) => (
+            {((comment.media ?? comment.attachments)!).map((att) => (
               <a key={att.id} href={att.url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-md">
                 {att.mimeType?.startsWith("image/") ? (
                    
