@@ -204,7 +204,7 @@ function toggleLikeInTree(
       return {
         ...c,
         isLiked: !wasLiked,
-        likeCount: wasLiked ? c.likeCount - 1 : c.likeCount + 1,
+        likeCount: wasLiked ? c.likeCount ?? 0 - 1 : c.likeCount ?? 0 + 1,
       };
     }
     if (c.replies && c.replies.length > 0) {
