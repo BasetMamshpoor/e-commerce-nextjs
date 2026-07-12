@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Heart, MessageSquare, Trash2, Pencil, Loader2 } from "lucide-react";
+import { Heart, MessageSquare, Trash2, Pencil, Loader2, FileText, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -36,8 +36,9 @@ export function CommentItem({ comment, productId, depth = 0 }: CommentItemProps)
 
   const [showReplyForm, setShowReplyForm] = React.useState(false);
   const [isEditing, setIsEditing] = React.useState(false);
+  const [repliesExpanded, setRepliesExpanded] = React.useState(depth === 0);
 
-  const isOwnComment = user?.id === comment.userId || user?.id === comment.authorId;
+  const isOwnComment = user?.id === comment.userId;
   const isAdmin = user?.role === "ADMIN" || user?.role === "EDITOR" || user?.role === "SUPPORT";
   const canDelete = isOwnComment || isAdmin;
   const hasReplies = comment.replies && comment.replies.length > 0;
@@ -93,6 +94,24 @@ export function CommentItem({ comment, productId, depth = 0 }: CommentItemProps)
           </p>
         )}
 
+        {/* Media */}
+        {comment.media && comment.media.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {comment.media.map((m) => (
+              <a key={m.id} href={m.url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-md border border-border/40">
+                {m.mimeType?.startsWith("image/") ? (
+                   
+                  <img src={m.url} alt={m.originalName} className="size-20 object-cover" />
+                ) : (
+                  <span className="flex items-center gap-1 px-2 py-1.5 text-[10px] text-primary">
+                    <FileText className="size-3" />{m.originalName}
+                  </span>
+                )}
+              </a>
+            ))}
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex items-center gap-1">
           <Button
@@ -106,8 +125,8 @@ export function CommentItem({ comment, productId, depth = 0 }: CommentItemProps)
             disabled={likeMutation.isPending}
           >
             <Heart className={cn("size-3.5", liked && "fill-primary")} />
-            {comment.likeCount > 0 && (
-              <span className="nums-fa">{toPersianDigits(comment.likeCount)}</span>
+            {(comment.likeCount ?? 0) > 0 && (
+              <span className="nums-fa">{toPersianDigits(comment.likeCount ?? 0)}</span>
             )}
           </Button>
 
@@ -168,17 +187,29 @@ export function CommentItem({ comment, productId, depth = 0 }: CommentItemProps)
           </div>
         )}
 
-        {/* Nested replies */}
+        {/* Nested replies — with show more toggle */}
         {hasReplies && (
-          <div className="space-y-3 border-r-2 border-border/40 pr-4">
-            {comment.replies!.map((reply) => (
-              <CommentItem
-                key={reply.id}
-                comment={reply}
-                productId={productId}
-                depth={depth + 1}
-              />
-            ))}
+          <div className="mt-3">
+            {repliesExpanded ? (
+              <div className="space-y-3 border-r-2 border-primary/15 pr-4">
+                {comment.replies!.map((reply) => (
+                  <CommentItem
+                    key={reply.id}
+                    comment={reply}
+                    productId={productId}
+                    depth={depth + 1}
+                  />
+                ))}
+              </div>
+            ) : (
+              <button
+                onClick={() => setRepliesExpanded(true)}
+                className="flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                <ChevronDown className="size-3" />
+                نمایش {toPersianDigits(comment.replies!.length)} پاسخ
+              </button>
+            )}
           </div>
         )}
       </div>

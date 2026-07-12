@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { MessageSquare, Heart, Loader2, Send, Paperclip, X } from "lucide-react";
+import { MessageSquare, Heart, Loader2, Send, Paperclip, X, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -232,10 +232,11 @@ function BlogCommentItem({
 }) {
   const maxDepth = 3;
   const hasReplies = comment.replies && comment.replies.length > 0;
+  const [repliesExpanded, setRepliesExpanded] = React.useState(depth === 0);
 
   return (
-    <div className={cn("space-y-1", depth > 0 && "pr-4")}>
-      <div className={cn("rounded-lg border border-border/40 p-3", depth > 0 && "border-r-2 border-r-primary/30")}>
+    <div className={cn("space-y-1", depth > 0 && "mr-3 border-r border-border/30 pr-3")}>
+      <div className={cn("rounded-lg border border-border/40 p-3", depth > 0 && "border-r-2 border-r-primary/20")}>
         <div className="flex items-center gap-2">
           <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
             {((comment.user?.fullName ?? comment.authorName ?? "؟")).charAt(0)}
@@ -245,9 +246,9 @@ function BlogCommentItem({
         </div>
         <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{comment.content}</p>
         {/* Attachments */}
-        {((comment.media ?? comment.attachments) && (comment.media ?? comment.attachments)!.length > 0) && (
+        {(comment.media && comment.media.length > 0) && (
           <div className="mt-2 flex flex-wrap gap-1">
-            {((comment.media ?? comment.attachments)!).map((att) => (
+            {(comment.media).map((att) => (
               <a key={att.id} href={att.url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-md">
                 {att.mimeType?.startsWith("image/") ? (
                    
@@ -265,7 +266,7 @@ function BlogCommentItem({
             className={cn("flex items-center gap-1 transition-colors", comment.isLiked ? "text-primary" : "text-muted-foreground hover:text-primary")}
           >
             <Heart className={cn("size-3.5", comment.isLiked && "fill-current")} />
-            {toPersianDigits(comment.likeCount)}
+            {toPersianDigits(comment.likeCount ?? 0)}
           </button>
           {isAuthenticated && depth < maxDepth && (
             <button
@@ -297,25 +298,20 @@ function BlogCommentItem({
         )}
       </div>
 
-      {/* Nested replies */}
+      {/* Nested replies — with show more toggle */}
       {hasReplies && (
-        <div className="space-y-1">
-          {comment.replies!.map((reply) => (
-            <BlogCommentItem
-              key={reply.id}
-              comment={reply}
-              depth={depth + 1}
-              replyTo={replyTo}
-              setReplyTo={setReplyTo}
-              replyContent={replyContent}
-              setReplyContent={setReplyContent}
-              onReply={onReply}
-              onLike={onLike}
-              submitting={submitting}
-              isAuthenticated={isAuthenticated}
-            />
-          ))}
-        </div>
+        repliesExpanded ? (
+          <div className="space-y-1">
+            {comment.replies!.map((reply) => (
+              <BlogCommentItem key={reply.id} comment={reply} depth={depth + 1} replyTo={replyTo} setReplyTo={setReplyTo} replyContent={replyContent} setReplyContent={setReplyContent} onReply={onReply} onLike={onLike} submitting={submitting} isAuthenticated={isAuthenticated} />
+            ))}
+          </div>
+        ) : (
+          <button onClick={() => setRepliesExpanded(true)} className="mt-1 flex items-center gap-1 text-xs text-primary hover:underline">
+            <ChevronDown className="size-3" />
+            نمایش {toPersianDigits(comment.replies!.length ?? 0)} پاسخ
+          </button>
+        )
       )}
     </div>
   );
