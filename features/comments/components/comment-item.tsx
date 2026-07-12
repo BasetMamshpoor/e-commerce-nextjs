@@ -37,7 +37,9 @@ export function CommentItem({ comment, productId, depth = 0 }: CommentItemProps)
   const [showReplyForm, setShowReplyForm] = React.useState(false);
   const [isEditing, setIsEditing] = React.useState(false);
 
-  const isOwnComment = user?.id === comment.authorId;
+  const isOwnComment = user?.id === comment.userId || user?.id === comment.authorId;
+  const isAdmin = user?.role === "ADMIN" || user?.role === "EDITOR" || user?.role === "SUPPORT";
+  const canDelete = isOwnComment || isAdmin;
   const hasReplies = comment.replies && comment.replies.length > 0;
   const canReply = depth < MAX_DEPTH;
   const liked = comment.isLiked ?? false;
@@ -52,7 +54,7 @@ export function CommentItem({ comment, productId, depth = 0 }: CommentItemProps)
   };
 
   // Get user display name (backend may not include user object — fallback).
-  const userName = comment.authorName ?? "کاربر";
+  const userName = comment.user?.fullName ?? comment.authorName ?? "کاربر";
   const userInitials = userName
     .split(" ")
     .map((p: string) => p.charAt(0))
@@ -132,22 +134,26 @@ export function CommentItem({ comment, productId, depth = 0 }: CommentItemProps)
                 <Pencil className="size-3.5" />
                 ویرایش
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-destructive"
-                onClick={handleDelete}
-                disabled={deleteMutation.isPending}
-              >
-                {deleteMutation.isPending ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <Trash2 className="size-3.5" />
-                )}
-                حذف
-              </Button>
             </>
           )}
+
+          {canDelete && !isEditing && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-destructive"
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="size-3.5" />
+              )}
+              حذف
+            </Button>
+          )}
+
         </div>
 
         {/* Reply form */}

@@ -616,9 +616,15 @@ export interface Comment {
   rating?: number | null;
   likeCount: number;
   isLiked?: boolean;
+  userId?: number;
+  user?: { id: number; fullName: string; avatarUrl?: string | null };
   authorId?: number;
   authorName?: string;
   status?: CommentStatus;
+  commentableType?: string;
+  commentableId?: number;
+  entity?: { id: number; name: string; slug: string };
+  media?: Media[];
   attachments?: Media[];
   replies?: Comment[];
   createdAt: string;
