@@ -16,6 +16,7 @@ import {
   Calendar,
   Wallet,
   ShoppingCart,
+  Ticket as TicketIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -300,6 +301,24 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
                   </div>
                 </>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Quick actions */}
+          <Card>
+            <CardContent className="flex flex-wrap gap-2 p-4">
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/admin/tickets?userId=${user.id}`}>
+                  <TicketIcon className="size-4" />
+                  تیکت‌های کاربر
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/admin/orders?userId=${user.id}`}>
+                  <ShoppingCart className="size-4" />
+                  سفارش‌های کاربر
+                </Link>
+              </Button>
             </CardContent>
           </Card>
 

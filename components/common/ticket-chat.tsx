@@ -85,7 +85,7 @@ export function TicketChat({
   const statusCfg = STATUS_CONFIG[ticket.status] ?? STATUS_CONFIG.OPEN;
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-xl border border-border bg-card">
+    <div className="flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden rounded-xl border border-border bg-card">
       {/* Header — fixed at top */}
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border p-3">
         <div className="min-w-0 flex-1">

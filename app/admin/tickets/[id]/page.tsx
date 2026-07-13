@@ -107,33 +107,31 @@ export default function AdminTicketDetailPage() {
   const isClosed = ticket.status === "CLOSED";
 
   return (
-    <div className="container-admin py-4">
-      <TicketChat
-        ticket={ticket}
-        mode="admin"
-        onSendMessage={handleSend}
-        sending={sending}
-        isClosed={isClosed}
-        headerActions={
-          <div className="flex items-center gap-2">
-            <Select value={ticket.status} onValueChange={(v) => handleStatusChange(v as TicketStatus)}>
-              <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {STATUS_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={ticket.priority} onValueChange={(v) => handlePriorityChange(v as TicketPriority)}>
-              <SelectTrigger className="h-8 w-28 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {PRIORITY_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.back()}>
-              <ArrowRight className="size-4" />
-            </Button>
-          </div>
-        }
-      />
-    </div>
+    <TicketChat
+      ticket={ticket}
+      mode="admin"
+      onSendMessage={handleSend}
+      sending={sending}
+      isClosed={isClosed}
+      headerActions={
+        <div className="flex items-center gap-2">
+          <Select value={ticket.status} onValueChange={(v) => handleStatusChange(v as TicketStatus)}>
+            <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={ticket.priority} onValueChange={(v) => handlePriorityChange(v as TicketPriority)}>
+            <SelectTrigger className="h-8 w-28 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {PRIORITY_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.back()}>
+            <ArrowRight className="size-4" />
+          </Button>
+        </div>
+      }
+    />
   );
 }
