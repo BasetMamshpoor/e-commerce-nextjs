@@ -2,163 +2,124 @@
 
 import * as React from "react";
 import Link from "next/link";
-import {
-  Ticket as TicketIcon,
-  Plus,
-  ChevronLeft,
-  MessageSquare,
-  Clock,
-} from "lucide-react";
+import { Plus, Ticket as TicketIcon, Clock } from "lucide-react";
+import { toast } from "sonner";
 
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Breadcrumb } from "@/components/common/breadcrumb";
 import { EmptyState } from "@/components/common/empty-state";
-import { useTickets, useDepartments, useCreateTicket } from "@/features/tickets/hooks";
-import { formatRelativeFa, formatDateTimeFa, toPersianDigits } from "@/utils/format";
-import type { TicketPriority, TicketStatus } from "@/types/domain";
+import { useTickets, useCreateTicket, useDepartments } from "@/features/tickets/hooks";
+import { formatDateTimeFa, toPersianDigits } from "@/utils/format";
+import { cn } from "@/lib/utils";
+import type { TicketStatus, TicketPriority } from "@/types/domain";
 
-const STATUS_LABELS: Record<TicketStatus, { label: string; variant: "default" | "secondary" | "outline" }> = {
+const STATUS_TABS: { key: TicketStatus | "ALL"; label: string }[] = [
+  { key: "ALL", label: "همه" },
+  { key: "OPEN", label: "باز" },
+  { key: "ANSWERED", label: "پاسخ داده شده" },
+  { key: "PENDING_CUSTOMER", label: "منتظر مشتری" },
+  { key: "CLOSED", label: "بسته شده" },
+];
+
+const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   OPEN: { label: "باز", variant: "default" },
   ANSWERED: { label: "پاسخ داده شده", variant: "secondary" },
-  CLOSED: { label: "بسته شده", variant: "outline" },
+  CLOSED: { label: "بسته شده", variant: "destructive" },
+  PENDING_CUSTOMER: { label: "منتظر مشتری", variant: "outline" },
 };
 
-const PRIORITY_LABELS: Record<TicketPriority, { label: string; className: string }> = {
-  LOW: { label: "کم", className: "text-muted-foreground" },
-  NORMAL: { label: "معمولی", className: "text-info" },
-  HIGH: { label: "زیاد", className: "text-warning" },
-  URGENT: { label: "فوری", className: "text-destructive" },
+const PRIORITY_LABELS: Record<TicketPriority, string> = {
+  LOW: "کم", NORMAL: "معمولی", HIGH: "زیاد", URGENT: "فوری",
 };
 
-export default function TicketsPage() {
-  const { data, isLoading } = useTickets();
+export default function UserTicketsPage() {
+  const [statusTab, setStatusTab] = React.useState<TicketStatus | "ALL">("ALL");
+  const { data, isLoading } = useTickets(statusTab === "ALL" ? undefined : { status: statusTab });
   const [createOpen, setCreateOpen] = React.useState(false);
-  const tickets = data?.items ?? [];
+  const { data: departments } = useDepartments();
+
+  const items = data?.items ?? [];
 
   return (
     <div className="space-y-6">
-      <Breadcrumb
-        items={[
-          { name: "خانه", url: "/" },
-          { name: "حساب کاربری", url: "/account" },
-          { name: "تیکت‌ها", url: "/account/tickets" },
-        ]}
-      />
+      <Breadcrumb items={[
+        { name: "خانه", url: "/" },
+        { name: "حساب کاربری", url: "/account" },
+        { name: "تیکت‌ها", url: "/account/tickets" },
+      ]} />
 
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-foreground sm:text-2xl">
-          تیکت‌های پشتیبانی
-          {tickets.length > 0 && (
-            <span className="mr-2 text-sm font-normal text-muted-foreground">
-              ({toPersianDigits(tickets.length)} تیکت)
-            </span>
-          )}
-        </h1>
+        <h1 className="text-xl font-bold text-foreground sm:text-2xl">تیکت‌های من</h1>
         <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="size-4" />
-          تیکت جدید
+          <Plus className="size-4" /> تیکت جدید
         </Button>
       </div>
 
+      {/* Status tabs */}
+      <div className="flex gap-1 overflow-x-auto rounded-lg border border-border bg-muted/30 p-1">
+        {STATUS_TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setStatusTab(t.key)}
+            className={cn(
+              "shrink-0 rounded-md px-4 py-2 text-xs font-medium transition-colors",
+              statusTab === t.key ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Ticket list */}
       {isLoading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 w-full rounded-xl" />
-          ))}
-        </div>
-      ) : tickets.length === 0 ? (
-        <EmptyState
-          icon={<TicketIcon className="size-16" />}
-          title="تیکتی ثبت نکرده‌اید"
-          description="اگر سوال یا مشکلی دارید، تیکت جدیدی ثبت کنید تا پشتیبانی پاسخ دهد."
-          action={
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus className="size-4" />
-              ثبت اولین تیکت
-            </Button>
-          }
-          className="border border-dashed border-border rounded-xl"
-        />
+        <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-lg" />)}</div>
+      ) : items.length === 0 ? (
+        <EmptyState icon={<TicketIcon className="size-12" />} title="تیکتی وجود ندارد" description="برای ارتباط با پشتیبانی، تیکت جدیدی ایجاد کنید." className="py-12" />
       ) : (
-        <div className="space-y-3">
-          {tickets.map((ticket) => {
-            const statusCfg = STATUS_LABELS[ticket.status] ?? STATUS_LABELS.OPEN;
-            const prioCfg = PRIORITY_LABELS[ticket.priority] ?? PRIORITY_LABELS.NORMAL;
+        <div className="space-y-2">
+          {items.map((t) => {
+            const cfg = STATUS_CONFIG[t.status] ?? STATUS_CONFIG.OPEN;
             return (
-              <Link
-                key={ticket.id}
-                href={`/account/tickets/${ticket.id}`}
-              >
-                <Card className="border-border/60 transition-colors hover:border-primary/40 hover:bg-accent/30">
-                  <CardContent className="flex items-center gap-3 p-4">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                      <MessageSquare className="size-5" />
+              <Link key={t.id} href={`/account/tickets/${t.id}`}>
+                <div className="flex items-center justify-between rounded-lg border border-border/40 p-3 transition-colors hover:bg-accent/30">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-foreground">{t.subject}</p>
+                    <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                      <Badge variant={cfg.variant} className="text-[9px]">{cfg.label}</Badge>
+                      <span>اولویت: {PRIORITY_LABELS[t.priority]}</span>
+                      {t.department && <span>بخش: {t.department.name}</span>}
+                      <span className="flex items-center gap-0.5"><Clock className="size-3" />{formatDateTimeFa(t.createdAt)}</span>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="truncate font-medium text-foreground">
-                          {ticket.subject}
-                        </p>
-                        <Badge variant={statusCfg.variant} className="shrink-0 text-xs">
-                          {statusCfg.label}
-                        </Badge>
-                      </div>
-                      <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
-                        {ticket.department && <span>{ticket.department.name}</span>}
-                        <span className="flex items-center gap-1">
-                          <Clock className="size-3" />
-                          {formatRelativeFa(ticket.createdAt)}
-                        </span>
-                        <span className={prioCfg.className}>
-                          اولویت: {prioCfg.label}
-                        </span>
-                      </div>
-                    </div>
-                    <ChevronLeft className="size-4 shrink-0 text-muted-foreground" />
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               </Link>
             );
           })}
         </div>
       )}
 
-      <CreateTicketDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <CreateTicketDialog open={createOpen} onOpenChange={setCreateOpen} departments={departments ?? []} />
     </div>
   );
 }
 
-function CreateTicketDialog({
-  open,
-  onOpenChange,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+function CreateTicketDialog({ open, onOpenChange, departments }: {
+  open: boolean; onOpenChange: (o: boolean) => void; departments: { id: number; name: string }[];
 }) {
-  const { data: departments } = useDepartments();
   const create = useCreateTicket();
-
   const [subject, setSubject] = React.useState("");
   const [departmentId, setDepartmentId] = React.useState<number | "">("");
   const [priority, setPriority] = React.useState<TicketPriority>("NORMAL");
@@ -166,148 +127,69 @@ function CreateTicketDialog({
   const [files, setFiles] = React.useState<File[]>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!subject.trim() || !message.trim()) return;
+  React.useEffect(() => {
+    if (open) {
+      setSubject(""); setDepartmentId(""); setPriority("NORMAL"); setMessage(""); setFiles([]);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }, [open]);
+
+  const onSubmit = async () => {
+    if (!subject.trim() || !message.trim()) { toast.error("موضوع و پیام الزامی است"); return; }
     create.mutate(
-      {
-        body: {
-          subject,
-          departmentId: departmentId === "" ? undefined : Number(departmentId),
-          priority,
-          message,
-        },
-        files: files.length > 0 ? files : undefined,
-      },
-      {
-        onSuccess: () => {
-          onOpenChange(false);
-          setSubject("");
-          setDepartmentId("");
-          setPriority("NORMAL");
-          setMessage("");
-          setFiles([]);
-          if (fileInputRef.current) fileInputRef.current.value = "";
-        },
-      },
+      { body: { subject: subject.trim(), departmentId: departmentId === "" ? undefined : Number(departmentId), priority, message: message.trim() }, files: files.length > 0 ? files : undefined },
+      { onSuccess: () => { onOpenChange(false); } }
     );
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>تیکت جدید</DialogTitle>
-          <DialogDescription>
-            سوال یا مشکل خود را شرح دهید. پشتیبانی در اسرع وقت پاسخ خواهد داد.
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={onSubmit} className="space-y-4 py-2">
-          <div className="space-y-2">
-            <Label htmlFor="subject">موضوع</Label>
-            <Input
-              id="subject"
-              placeholder="مثال: مشکل در پرداخت سفارش"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              required
-            />
-          </div>
-
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>تیکت جدید</DialogTitle></DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2"><Label>موضوع *</Label><Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="مثال: مشکل در پرداخت" /></div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>بخش پشتیبانی</Label>
+            <div className="space-y-2"><Label>بخش پشتیبانی</Label>
               <Select value={departmentId === "" ? "" : String(departmentId)} onValueChange={(v) => setDepartmentId(v ? Number(v) : "")}>
-                <SelectTrigger>
-                  <SelectValue placeholder="انتخاب بخش" />
-                </SelectTrigger>
-                <SelectContent>
-                  {departments?.map((d) => (
-                    <SelectItem key={d.id} value={String(d.id)}>
-                      {d.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
+                <SelectTrigger><SelectValue placeholder="انتخاب بخش" /></SelectTrigger>
+                <SelectContent>{departments.map((d) => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>اولویت</Label>
+            <div className="space-y-2"><Label>اولویت</Label>
               <Select value={priority} onValueChange={(v) => setPriority(v as TicketPriority)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="LOW">کم</SelectItem>
-                  <SelectItem value="NORMAL">معمولی</SelectItem>
-                  <SelectItem value="HIGH">زیاد</SelectItem>
-                  <SelectItem value="URGENT">فوری</SelectItem>
-                </SelectContent>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{Object.entries(PRIORITY_LABELS).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="message">پیام</Label>
-            <Textarea
-              id="message"
-              placeholder="شرح کامل مشکل یا سوال..."
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={5}
-              required
+          <div className="space-y-2"><Label>پیام *</Label>
+            <textarea
+              className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={message} onChange={(e) => setMessage(e.target.value)} placeholder="شرح مشکل یا سوال..." rows={4}
             />
           </div>
-
-          {/* File attachments */}
           <div className="space-y-2">
-            <Label>فایل‌های پیوست (اختیاری)</Label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              onChange={(e) => {
-                const newFiles = Array.from(e.target.files ?? []);
-                setFiles((prev) => [...prev, ...newFiles]);
-              }}
-              className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
-            />
+            <Label>فایل پیوست (اختیاری)</Label>
+            <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => { const f = Array.from(e.target.files ?? []); setFiles((p) => [...p, ...f]); }} />
+            <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}><Plus className="size-4" /> افزودن فایل</Button>
             {files.length > 0 && (
-              <div className="space-y-1">
+              <div className="flex flex-wrap gap-1">
                 {files.map((f, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between rounded-lg border border-border/40 px-2 py-1 text-xs"
-                  >
-                    <span className="truncate" title={f.name}>{f.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFiles((prev) => prev.filter((_, idx) => idx !== i));
-                        if (fileInputRef.current) fileInputRef.current.value = "";
-                      }}
-                      className="text-destructive hover:text-destructive/80"
-                    >
-                      حذف
-                    </button>
-                  </div>
+                  <span key={i} className="flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs">
+                    <span className="max-w-20 truncate">{f.name}</span>
+                    <button onClick={() => setFiles((p) => p.filter((_, idx) => idx !== i))} className="text-destructive">×</button>
+                  </span>
                 ))}
               </div>
             )}
           </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              انصراف
-            </Button>
-            <Button
-              type="submit"
-              disabled={create.isPending || !subject.trim() || !message.trim()}
-            >
-              {create.isPending ? "در حال ثبت..." : "ثبت تیکت"}
-            </Button>
-          </DialogFooter>
-        </form>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>انصراف</Button>
+          <Button onClick={onSubmit} disabled={create.isPending || !subject.trim() || !message.trim()}>
+            {create.isPending ? "در حال ارسال..." : "ارسال تیکت"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
