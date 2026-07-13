@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Ticket as TicketIcon, ChevronLeft } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Ticket as TicketIcon, ChevronLeft, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,8 @@ import { ticketsService } from "@/services";
 import { formatDateTimeFa, toPersianDigits } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import type { Ticket, TicketStatus, TicketPriority, TicketDepartment, PaginatedData } from "@/types/domain";
+
+export const dynamic = "force-dynamic";
 
 const STATUS_TABS: { key: TicketStatus | "ALL"; label: string }[] = [
   { key: "ALL", label: "همه" },
@@ -35,12 +38,14 @@ const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secon
 const PRIORITY_LABELS: Record<string, string> = { LOW: "کم", NORMAL: "معمولی", HIGH: "زیاد", URGENT: "فوری" };
 
 export default function AdminTicketsPage() {
+  const searchParams = useSearchParams();
+  const userIdFilter = searchParams.get("userId");
+
   const [data, setData] = React.useState<PaginatedData<Ticket> | null>(null);
   const [departments, setDepartments] = React.useState<TicketDepartment[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [page, setPage] = React.useState(1);
 
-  // Filters per api.md: status, departmentId, priority, search, userId
   const [statusTab, setStatusTab] = React.useState<TicketStatus | "ALL">("ALL");
   const [departmentId, setDepartmentId] = React.useState<string>("ALL");
   const [priority, setPriority] = React.useState<string>("ALL");
@@ -53,8 +58,9 @@ export default function AdminTicketsPage() {
     if (departmentId !== "ALL") params.departmentId = Number(departmentId);
     if (priority !== "ALL") params.priority = priority;
     if (search.trim()) params.search = search.trim();
+    if (userIdFilter) params.userId = Number(userIdFilter);
     ticketsService.adminList(params).then(setData).catch(() => toast.error("بارگذاری ناموفق بود")).finally(() => setLoading(false));
-  }, [page, statusTab, departmentId, priority, search]);
+  }, [page, statusTab, departmentId, priority, search, userIdFilter]);
 
   React.useEffect(() => { load(); }, [load]);
   React.useEffect(() => { ticketsService.departments().then(setDepartments).catch(() => {}); }, []);
@@ -63,12 +69,26 @@ export default function AdminTicketsPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="flex items-center gap-2 text-xl font-bold sm:text-2xl">
-          <TicketIcon className="size-5 text-primary" /> تیکت‌ها
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">مدیریت تیکت‌های پشتیبانی</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="flex items-center gap-2 text-xl font-bold sm:text-2xl">
+            <TicketIcon className="size-5 text-primary" /> تیکت‌ها
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">مدیریت تیکت‌های پشتیبانی</p>
+        </div>
+        {userIdFilter && (
+          <Button asChild variant="outline" size="sm">
+            <Link href="/admin/tickets"><X className="size-4" /> حذف فیلتر کاربر</Link>
+          </Button>
+        )}
       </div>
+
+      {/* User filter indicator */}
+      {userIdFilter && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+          فیلتر بر اساس کاربر: <span className="font-bold">#{userIdFilter}</span>
+        </div>
+      )}
 
       {/* Status tabs */}
       <div className="flex gap-1 overflow-x-auto rounded-lg border border-border bg-muted/30 p-1">
@@ -81,7 +101,7 @@ export default function AdminTicketsPage() {
         ))}
       </div>
 
-      {/* Filters: department, priority, search */}
+      {/* Filters */}
       <Card>
         <CardContent className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-3">
           <div>

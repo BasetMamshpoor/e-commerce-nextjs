@@ -53,19 +53,17 @@ export default function UserTicketDetailPage() {
   const isClosed = ticket.status === "CLOSED";
 
   return (
-    <div className="container-site py-4">
-      <TicketChat
-        ticket={ticket}
-        mode="user"
-        onSendMessage={handleSend}
-        sending={addMessage.isPending}
-        isClosed={isClosed}
-        headerActions={
-          <Button variant="ghost" size="icon" onClick={() => router.back()}>
-            <ArrowRight className="size-5" />
-          </Button>
-        }
-      />
-    </div>
+    <TicketChat
+      ticket={ticket}
+      mode="user"
+      onSendMessage={handleSend}
+      sending={addMessage.isPending}
+      isClosed={isClosed}
+      headerActions={
+        <Button variant="ghost" size="icon" onClick={() => router.back()}>
+          <ArrowRight className="size-5" />
+        </Button>
+      }
+    />
   );
 }
