@@ -568,22 +568,19 @@ export interface AdminNotification {
    18. Tickets
    ────────────────────────────────────────────────────────────────────────── */
 
-export type TicketStatus = "OPEN" | "ANSWERED" | "CLOSED";
+export type TicketStatus = "OPEN" | "ANSWERED" | "CLOSED" | "PENDING_CUSTOMER";
 export type TicketPriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
 export type TicketMessageSender = "USER" | "ADMIN";
 
 export interface TicketDepartment {
   id: number;
   name: string;
-  description?: string | null;
-  isActive: boolean;
 }
 
 export interface TicketMessage {
   id: number;
   senderType: TicketMessageSender;
   message: string;
-  attachmentMediaIds?: number[];
   attachments?: Array<{ id: number; mediaId: number; media: Media }>;
   createdAt: string;
 }
@@ -997,8 +994,6 @@ export interface AddTicketMessageBody {
 
 export interface UpsertDepartmentBody {
   name: string;
-  description?: string;
-  isActive?: boolean;
 }
 
 export interface AdminUpdateTicketBody {
