@@ -62,6 +62,15 @@ export function RichTextEditor({ value, onChange, placeholder = "متن خود �
     if (url) editor.chain().focus().setLink({ href: url }).run();
   };
 
+  // Image upload for the rich text editor.
+  //
+  // NOTE: This is one of the few legitimate places where we POST directly
+  // to /media — the uploaded image is inlined into the TipTap HTML content
+  // (`<img src="...">`) and is NOT tied to any specific entity (brand,
+  // product, ticket, etc.). Entity-bound uploads (brand logos, shipping
+  // company logos, product images, ticket attachments, return images,
+  // blog cover images, etc.) all use their own multipart endpoints and
+  // never pre-upload to /media.
   const onImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !editor) return;

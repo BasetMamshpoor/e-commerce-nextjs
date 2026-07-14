@@ -114,8 +114,23 @@ export function useRequestReturn() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, body }: { id: number; body: RequestReturnBody }) =>
-      ordersService.requestReturn(id, body),
+    mutationFn: ({
+      id,
+      body,
+      files,
+    }: {
+      id: number;
+      body: Omit<RequestReturnBody, "imageMediaIds">;
+      /** Optional image files — when provided, sent via multipart/form-data
+       *  with field name "images" (no pre-upload to /media needed). */
+      files?: File[];
+    }) => {
+      if (files && files.length > 0) {
+        return ordersService.requestReturnWithImages(id, body, files);
+      }
+      // No files — fall back to plain JSON request.
+      return ordersService.requestReturn(id, body);
+    },
     onSuccess: (order) => {
       queryClient.invalidateQueries({ queryKey: ORDERS_QUERY_KEY });
       toast.success("درخواست مرجوعی ثبت شد", {

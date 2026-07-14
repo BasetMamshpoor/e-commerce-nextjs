@@ -17,18 +17,18 @@ import {
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { AdminTable } from "@/features/admin/components/admin-table";
-import { shippingCompaniesService, mediaService } from "@/services";
+import { shippingCompaniesService } from "@/services";
 import type { ShippingCompany, ShippingPricingType } from "@/types/domain";
 import { formatPrice, toPersianDigits } from "@/utils/format";
 import { cn } from "@/lib/utils";
 
 interface LogoState {
-  /** Existing media ID from backend (only when editing). */
-  mediaId?: number | null;
-  /** Display URL — either backend logoUrl or object URL for newly selected file. */
-  url?: string | null;
-  /** Pending File to upload on submit. */
-  file?: File | null;
+  /** Display URL — backend logoUrl for existing, or object URL for newly picked file. */
+  url: string | null;
+  /** Pending File to upload on submit (multipart field "logo"). Null if no new file picked. */
+  file: File | null;
+  /** True if the user explicitly removed an existing logo (so we send logoMediaId=null on save). */
+  removed: boolean;
 }
 
 export default function AdminShippingCompaniesPage() {
@@ -230,8 +230,7 @@ function ShippingFormDialog({
     acceptsPrepay: true,
     acceptsFreightCollect: false,
   });
-  const [logo, setLogo] = React.useState<LogoState>({ mediaId: null, url: null, file: null });
-  const [logoUploading, setLogoUploading] = React.useState(false);
+  const [logo, setLogo] = React.useState<LogoState>({ url: null, file: null, removed: false });
   const [saving, setSaving] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -251,38 +250,26 @@ function ShippingFormDialog({
         acceptsFreightCollect: company?.acceptsFreightCollect ?? false,
       });
       setLogo({
-        mediaId: company?.logoMediaId ?? null,
         url: company?.logoUrl ?? null,
         file: null,
+        removed: false,
       });
     }
   }, [open, company]);
 
-  const onLogoSelected = async (files: FileList | null) => {
+  const onLogoSelected = (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const file = files[0];
     if (!file.type.startsWith("image/")) {
       toast.error("فقط فایل تصویری مجاز است");
       return;
     }
-    // Preview locally first
-    setLogo((prev) => ({ ...prev, url: URL.createObjectURL(file), file }));
-    // Upload immediately to get mediaId
-    setLogoUploading(true);
-    try {
-      const media = await mediaService.upload(file);
-      setLogo({ mediaId: media.id, url: media.url ?? URL.createObjectURL(file), file: null });
-      toast.success("لوگو بارگذاری شد");
-    } catch {
-      toast.error("بارگذاری لوگو ناموفق بود");
-      setLogo((prev) => ({ ...prev, file: null, url: company?.logoUrl ?? null }));
-    } finally {
-      setLogoUploading(false);
-    }
+    // Preview locally — the actual upload happens on form submit via multipart.
+    setLogo({ url: URL.createObjectURL(file), file, removed: false });
   };
 
   const removeLogo = () => {
-    setLogo({ mediaId: null, url: null, file: null });
+    setLogo({ url: null, file: null, removed: true });
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -308,7 +295,7 @@ function ShippingFormDialog({
 
     setSaving(true);
     try {
-      const body = {
+      const baseBody = {
         name: form.name,
         pricingType: form.pricingType,
         baseCost: form.pricingType === "FIXED" ? Number(form.baseCost) : 0,
@@ -320,13 +307,24 @@ function ShippingFormDialog({
         isActive: form.isActive,
         acceptsPrepay: form.acceptsPrepay,
         acceptsFreightCollect: form.acceptsFreightCollect,
-        logoMediaId: logo.mediaId ?? null,
+        // Only send logoMediaId when explicitly removing the existing logo
+        // (no new file to upload). When a new file is being uploaded via
+        // multipart, the backend ignores this field and uses the file.
+        ...(logo.removed && !logo.file && company ? { logoMediaId: null } : {}),
       };
       if (company) {
-        await shippingCompaniesService.update(company.id, body);
+        if (logo.file) {
+          await shippingCompaniesService.updateWithLogo(company.id, baseBody, logo.file);
+        } else {
+          await shippingCompaniesService.update(company.id, baseBody);
+        }
         toast.success("به‌روزرسانی شد");
       } else {
-        await shippingCompaniesService.create(body);
+        if (logo.file) {
+          await shippingCompaniesService.createWithLogo(baseBody, logo.file);
+        } else {
+          await shippingCompaniesService.create(baseBody);
+        }
         toast.success("ایجاد شد");
       }
       onOpenChange(false);
@@ -353,12 +351,11 @@ function ShippingFormDialog({
             <div className="flex items-center gap-4">
               <div className="relative flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-border bg-muted">
                 {logo.url ? (
-                   
                   <img src={logo.url} alt="logo" className="size-full object-contain" />
                 ) : (
                   <ImagePlus className="size-7 text-muted-foreground" />
                 )}
-                {logoUploading && (
+                {saving && logo.file && (
                   <div className="absolute inset-0 flex items-center justify-center bg-background/70">
                     <Loader2 className="size-5 animate-spin text-primary" />
                   </div>
@@ -378,7 +375,7 @@ function ShippingFormDialog({
                     variant="outline"
                     size="sm"
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={logoUploading}
+                    disabled={saving}
                   >
                     <ImagePlus className="size-4" />
                     {logo.url ? "تغییر لوگو" : "انتخاب لوگو"}
@@ -389,7 +386,7 @@ function ShippingFormDialog({
                       variant="ghost"
                       size="sm"
                       onClick={removeLogo}
-                      disabled={logoUploading}
+                      disabled={saving}
                     >
                       <X className="size-4" />
                       حذف
@@ -557,8 +554,8 @@ function ShippingFormDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>انصراف</Button>
-          <Button onClick={onSubmit} disabled={saving || logoUploading}>
-            {(saving || logoUploading) ? "در حال ذخیره..." : "ذخیره"}
+          <Button onClick={onSubmit} disabled={saving}>
+            {saving ? "در حال ذخیره..." : "ذخیره"}
           </Button>
         </DialogFooter>
       </DialogContent>
