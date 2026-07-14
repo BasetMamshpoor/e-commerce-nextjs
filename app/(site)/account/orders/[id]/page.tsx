@@ -640,45 +640,26 @@ function ReturnRequestButton({ orderId, orderItems }: { orderId: number; orderIt
   const [reason, setReason] = React.useState("");
   const [orderItemId, setOrderItemId] = React.useState<number | "">("");
   const [images, setImages] = React.useState<File[]>([]);
-  const [uploading, setUploading] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const requestReturn = useRequestReturn();
 
-  const onConfirm = async () => {
+  const onConfirm = () => {
     if (!reason.trim()) {
       toast.error("دلیل مرجوعی را وارد کنید");
       return;
     }
 
-    // Upload images to media service first.
-    let imageMediaIds: number[] | undefined;
-    if (images.length > 0) {
-      setUploading(true);
-      try {
-        const { mediaService } = await import("@/services");
-        const ids: number[] = [];
-        for (const img of images) {
-          const media = await mediaService.upload(img);
-          ids.push(media.id);
-        }
-        imageMediaIds = ids;
-      } catch {
-        toast.error("آپلود تصاویر ناموفق بود");
-        setUploading(false);
-        return;
-      } finally {
-        setUploading(false);
-      }
-    }
-
+    // Images are uploaded inline via multipart (field name "images").
+    // No pre-upload to /media needed — the backend handles attachment
+    // creation atomically with the return request.
     requestReturn.mutate(
       {
         id: orderId,
         body: {
           reason,
           orderItemId: orderItemId === "" ? undefined : Number(orderItemId),
-          imageMediaIds,
         },
+        files: images.length > 0 ? images : undefined,
       },
       {
         onSuccess: () => {
@@ -770,7 +751,7 @@ function ReturnRequestButton({ orderId, orderItems }: { orderId: number; orderIt
                 variant="outline"
                 size="sm"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={requestReturn.isPending || uploading}
+                disabled={requestReturn.isPending}
               >
                 <Paperclip className="size-4" />
                 افزودن تصویر
@@ -801,10 +782,10 @@ function ReturnRequestButton({ orderId, orderItems }: { orderId: number; orderIt
             <AlertDialogCancel>انصراف</AlertDialogCancel>
             <AlertDialogAction
               onClick={onConfirm}
-              disabled={requestReturn.isPending || uploading || !reason.trim()}
+              disabled={requestReturn.isPending || !reason.trim()}
             >
-              {(requestReturn.isPending || uploading) && <Loader2 className="size-4 animate-spin" />}
-              {uploading ? "در حال آپلود..." : "ارسال درخواست"}
+              {requestReturn.isPending && <Loader2 className="size-4 animate-spin" />}
+              {requestReturn.isPending ? "در حال ارسال..." : "ارسال درخواست"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

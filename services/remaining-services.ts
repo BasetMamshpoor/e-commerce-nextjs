@@ -66,6 +66,28 @@ export const shippingCompaniesService = {
   byId: (id: number) => http.get<ShippingCompany>(ENDPOINTS.shippingCompanies.byId(id)),
   create: (body: UpsertShippingCompanyBody) => http.post<ShippingCompany>(ENDPOINTS.shippingCompanies.create, body),
   update: (id: number, body: Partial<UpsertShippingCompanyBody>) => http.put<ShippingCompany>(ENDPOINTS.shippingCompanies.update(id), body),
+
+  /** Create shipping company with inline logo upload (multipart/form-data, field name: logo). */
+  createWithLogo: (body: Omit<UpsertShippingCompanyBody, "logoMediaId">, logo?: File) => {
+    const fd = buildMultipartFormData(
+      body as unknown as Record<string, unknown>,
+      logo ? { logo } : undefined,
+    );
+    return http.upload<ShippingCompany>(ENDPOINTS.shippingCompanies.create, fd);
+  },
+
+  /** Update shipping company with inline logo upload (multipart/form-data, field name: logo). */
+  updateWithLogo: (id: number, body: Partial<UpsertShippingCompanyBody>, logo?: File) => {
+    if (!logo) {
+      return http.put<ShippingCompany>(ENDPOINTS.shippingCompanies.update(id), body);
+    }
+    const fd = buildMultipartFormData(
+      body as unknown as Record<string, unknown>,
+      { logo },
+    );
+    return http.uploadPut<ShippingCompany>(ENDPOINTS.shippingCompanies.update(id), fd);
+  },
+
   delete: (id: number) => http.delete<void>(ENDPOINTS.shippingCompanies.delete(id)),
 };
 
@@ -92,6 +114,14 @@ export const ordersService = {
   byId: (id: number) => http.get<Order>(ENDPOINTS.orders.byId(id)),
   cancel: (id: number, body: { reason: string }) => http.post<Order>(ENDPOINTS.orders.cancel(id), body),
   requestReturn: (id: number, body: RequestReturnBody) => http.post<Order>(ENDPOINTS.orders.return(id), body),
+  /** Request return with inline image uploads (multipart/form-data, field name: images). */
+  requestReturnWithImages: (id: number, body: Omit<RequestReturnBody, "imageMediaIds">, images?: File[]) => {
+    const fd = buildMultipartFormData(
+      body as unknown as Record<string, unknown>,
+      images && images.length > 0 ? { images } : undefined,
+    );
+    return http.upload<Order>(ENDPOINTS.orders.return(id), fd);
+  },
   paymentInitiate: (id: number, body: { gatewaySlug: string }) => http.post<{ redirectUrl: string }>(ENDPOINTS.orders.paymentInitiate(id), body),
   paymentVerify: (id: number, body: { providerParams: Record<string, string> }) => http.post<Order>(ENDPOINTS.orders.paymentVerify(id), body),
   adminList: (query?: AdminOrderListQuery) => http.get<PaginatedData<Order>>(ENDPOINTS.orders.adminList, query),

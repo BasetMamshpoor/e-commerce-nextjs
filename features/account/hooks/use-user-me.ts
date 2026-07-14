@@ -35,7 +35,15 @@ export function useUpdateProfile() {
   });
 }
 
-/** Upload avatar file → set as avatar. */
+/** Upload avatar file → set as avatar.
+ *
+ * NOTE: This currently uploads the file to /media as a standalone Media
+ * asset because the backend's `/users/me` endpoint does not yet accept
+ * an avatar file directly via multipart. When the backend adds multipart
+ * support for avatars (e.g. field name "avatar" on PUT /users/me), this
+ * should be refactored to send the file inline — same pattern as brands
+ * (brandsService.createWithLogo) and shipping-companies.
+ */
 export function useSetAvatar() {
   const queryClient = useQueryClient();
 

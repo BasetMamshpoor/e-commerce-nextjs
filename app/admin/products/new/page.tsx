@@ -34,7 +34,6 @@ import {
   brandsService,
   categoriesService,
   attributesService,
-  mediaService,
 } from "@/services";
 import type { Brand, Category, Attribute, ProductStatus, DiscountType } from "@/types/domain";
 import { formatPrice, toPersianDigits } from "@/utils/format";
@@ -114,28 +113,18 @@ export default function AdminProductNewPage() {
 
     setSaving(true);
     try {
-      // 1. Upload new images to /media
-      const uploadedImages: Array<{ mediaId: number; order: number; isMain: boolean }> = [];
-      for (let i = 0; i < images.length; i++) {
-        const img = images[i];
-        if (img.file) {
-          const media = await mediaService.upload(img.file);
-          uploadedImages.push({ mediaId: media.id, order: i, isMain: img.isMain });
-        }
-      }
-
-      // 2. Build discount fields
+      // 1. Build discount fields
       const discountType =
         form.discountType === "NONE" ? undefined : (form.discountType as DiscountType);
       const discountValue =
         discountType && form.discountValue !== "" ? Number(form.discountValue) : undefined;
 
-      // 3. Build displayAttributes
+      // 2. Build displayAttributes
       const displayAttributes = displayAttrs
         .filter((d) => d.attributeId !== "" && d.value.trim())
         .map((d) => ({ attributeId: Number(d.attributeId), value: d.value.trim() }));
 
-      // 4. Build variants — auto-generate SKU if empty
+      // 3. Build variants — auto-generate SKU if empty
       const variantsPayload = variants.map((v, i) => ({
         sku: v.sku.trim() || `SKU-${form.name.replace(/\s+/g, "-").toUpperCase().slice(0, 8)}-${i + 1}`,
         priceAdjustment: Number(v.priceAdjustment) || 0,
@@ -146,7 +135,27 @@ export default function AdminProductNewPage() {
         attributeValueIds: v.attributeValueIds,
       }));
 
-      // 5. Create product
+      // 4. Separate new image files from existing image metadata.
+      // New files are uploaded inline via multipart (field name "images").
+      // Existing images (already uploaded when the user picked them in this
+      // session) are referenced by mediaId. The backend supports BOTH in the
+      // same multipart request: a `images` array of files + the JSON metadata.
+      // To keep the contract simple, we send ALL images as files (existing ones
+      // too), but if an image has no file we treat it as already uploaded and
+      // send the mediaId in the JSON body.
+      const newImageFiles: File[] = [];
+      const existingImages: Array<{ mediaId: number; order: number; isMain?: boolean }> = [];
+      for (let i = 0; i < images.length; i++) {
+        const img = images[i];
+        if (img.file) {
+          newImageFiles.push(img.file);
+        } else if (img.id) {
+          existingImages.push({ mediaId: img.id, order: i, isMain: img.isMain });
+        }
+      }
+
+      // 5. Build the body — note: `images` in the JSON body refers to existing
+      // uploaded images (with mediaId). New files go via multipart field "images".
       const body = {
         name: form.name.trim(),
         brandId: form.brandId ? Number(form.brandId) : undefined,
@@ -158,11 +167,16 @@ export default function AdminProductNewPage() {
         status: form.status,
         isFeatured: form.isFeatured,
         categoryIds: form.categoryIds,
-        images: uploadedImages,
+        images: existingImages.length > 0 ? existingImages : undefined,
         variants: variantsPayload,
         displayAttributes,
       };
-      const product = await productsService.create(body);
+
+      // 6. Create product — use multipart if there are new image files, else JSON.
+      const product =
+        newImageFiles.length > 0
+          ? await productsService.createWithImages(body, newImageFiles)
+          : await productsService.create(body);
       toast.success("محصول ایجاد شد");
       router.push(`/admin/products/${product.id}`);
     } catch (e: unknown) {
