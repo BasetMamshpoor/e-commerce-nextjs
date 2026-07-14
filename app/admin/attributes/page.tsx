@@ -110,6 +110,7 @@ export default function AdminAttributesPage() {
                     <span
                       key={v.id}
                       className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs"
+                      title={v.order ? `ترتیب: ${v.order}` : undefined}
                     >
                       {attr.inputType === "COLOR" && v.colorHex && (
                         <span
@@ -118,6 +119,11 @@ export default function AdminAttributesPage() {
                         />
                       )}
                       {v.value}
+                      {v.order ? (
+                        <span className="text-[10px] text-muted-foreground nums-fa">
+                          ({v.order})
+                        </span>
+                      ) : null}
                       <button
                         onClick={() => handleDeleteValue(attr.id, v.id)}
                         className="text-muted-foreground hover:text-destructive"
@@ -127,7 +133,7 @@ export default function AdminAttributesPage() {
                     </span>
                   ))}
                 </div>
-                <AddValueForm attributeId={attr.id} onAdded={load} />
+                <AddValueForm attributeId={attr.id} inputType={attr.inputType} onAdded={load} />
               </CardContent>
             </Card>
           ))}
@@ -143,21 +149,38 @@ export default function AdminAttributesPage() {
   );
 }
 
-function AddValueForm({ attributeId, onAdded }: { attributeId: number; onAdded: () => void }) {
+function AddValueForm({
+  attributeId,
+  inputType,
+  onAdded,
+}: {
+  attributeId: number;
+  inputType: AttributeInputType;
+  onAdded: () => void;
+}) {
   const [value, setValue] = React.useState("");
   const [colorHex, setColorHex] = React.useState("");
+  const [order, setOrder] = React.useState("");
   const [saving, setSaving] = React.useState(false);
+
+  const isColor = inputType === "COLOR";
 
   const onAdd = async () => {
     if (!value.trim()) return;
+    if (isColor && !colorHex.trim()) {
+      toast.error("برای ویژگی رنگ، کد رنگ الزامی است");
+      return;
+    }
     setSaving(true);
     try {
       await attributesService.addValue(attributeId, {
         value,
-        colorHex: colorHex || undefined,
+        colorHex: isColor ? (colorHex || undefined) : undefined,
+        order: order ? Number(order) : 0,
       });
       setValue("");
       setColorHex("");
+      setOrder("");
       onAdded();
     } catch {
       toast.error("افزودن ناموفق بود");
@@ -167,17 +190,57 @@ function AddValueForm({ attributeId, onAdded }: { attributeId: number; onAdded: 
   };
 
   return (
-    <div className="flex gap-1.5 pt-2">
-      <Input
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="مقدار جدید..."
-        className="h-8 text-sm"
-        onKeyDown={(e) => e.key === "Enter" && onAdd()}
-      />
-      <Button size="sm" className="h-8" onClick={onAdd} disabled={saving || !value.trim()}>
-        <Plus className="size-3.5" />
-      </Button>
+    <div className="space-y-1.5 pt-2">
+      {isColor && (
+        <div className="flex items-center gap-1.5">
+          <Label className="text-[11px] text-muted-foreground shrink-0">رنگ</Label>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="color"
+              value={colorHex || "#000000"}
+              onChange={(e) => setColorHex(e.target.value)}
+              className="size-8 shrink-0 cursor-pointer rounded-md border border-border bg-background p-0.5"
+              title="انتخاب رنگ"
+            />
+            <Input
+              value={colorHex}
+              onChange={(e) => setColorHex(e.target.value)}
+              placeholder="#FF0000"
+              className="h-8 w-24 text-xs nums-fa"
+              dir="ltr"
+            />
+          </div>
+          {colorHex && (
+            <span
+              className="size-6 rounded-full border border-border"
+              style={{ backgroundColor: colorHex }}
+              title={colorHex}
+            />
+          )}
+        </div>
+      )}
+      <div className="flex gap-1.5">
+        <Input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={isColor ? "نام رنگ (مثال: قرمز)" : "مقدار جدید..."}
+          className="h-8 text-sm"
+          onKeyDown={(e) => e.key === "Enter" && onAdd()}
+        />
+        <Input
+          type="number"
+          value={order}
+          onChange={(e) => setOrder(e.target.value)}
+          placeholder="ترتیب"
+          className="h-8 w-16 text-xs nums-fa"
+          dir="ltr"
+          title="ترتیب نمایش"
+          onKeyDown={(e) => e.key === "Enter" && onAdd()}
+        />
+        <Button size="sm" className="h-8" onClick={onAdd} disabled={saving || !value.trim()}>
+          <Plus className="size-3.5" />
+        </Button>
+      </div>
     </div>
   );
 }

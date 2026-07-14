@@ -7,7 +7,7 @@ import type { Brand } from "@/types/domain";
 
 export interface UpsertBrandBody {
   name: string; slug?: string; description?: string;
-  logoMediaId?: number; isActive?: boolean;
+  logoMediaId?: number | null; isActive?: boolean;
   metaTitle?: string; metaDescription?: string;
 }
 
