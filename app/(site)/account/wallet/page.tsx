@@ -12,6 +12,7 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   RefreshCw,
+  CreditCard,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -232,15 +233,25 @@ export default function WalletPage() {
                       <p className="truncate text-sm font-medium text-foreground">
                         {w.description ?? "درخواست برداشت"}
                       </p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <Badge variant={cfg.variant} className="text-[10px]">{cfg.label}</Badge>
                         <span>{formatDateTimeFa(w.createdAt)}</span>
+                        {w.trackingCode && (
+                          <span className="rounded bg-success/10 px-1.5 py-0.5 text-success nums-fa" dir="ltr">
+                            کد پیگیری: {w.trackingCode}
+                          </span>
+                        )}
                         {w.adminNote && (
                           <span className="truncate text-muted-foreground">
                             یادداشت: {w.adminNote}
                           </span>
                         )}
                       </div>
+                      {w.bankSheba && (
+                        <p className="mt-0.5 truncate text-[11px] text-muted-foreground" dir="ltr">
+                          شبا: {w.bankSheba}
+                        </p>
+                      )}
                     </div>
                     <span className="text-sm font-bold text-destructive nums-fa">
                       -{formatPrice(w.amount)}
@@ -406,12 +417,18 @@ function WithdrawalDialog({
 }) {
   const [amount, setAmount] = React.useState<number>(0);
   const [description, setDescription] = React.useState("");
+  const [bankAccountOwnerName, setBankAccountOwnerName] = React.useState("");
+  const [bankSheba, setBankSheba] = React.useState("");
+  const [bankCardNumber, setBankCardNumber] = React.useState("");
   const withdrawal = useRequestWithdrawal();
 
   React.useEffect(() => {
     if (!open) {
       setAmount(0);
       setDescription("");
+      setBankAccountOwnerName("");
+      setBankSheba("");
+      setBankCardNumber("");
     }
   }, [open]);
 
@@ -424,19 +441,40 @@ function WithdrawalDialog({
       toast.error("مبلغ درخواستی بیش از موجودی کیف پول است");
       return;
     }
+    // Require at least one of bankSheba or bankCardNumber
+    if (!bankSheba.trim() && !bankCardNumber.trim()) {
+      toast.error("شماره شبا یا شماره کارت برای واریز الزامی است");
+      return;
+    }
+    // Basic sheba validation — must start with IR + 24 digits
+    if (bankSheba.trim() && !/^IR\d{24}$/.test(bankSheba.trim().toUpperCase())) {
+      toast.error("شماره شبا باید با IR شروع و ۲۴ رقم داشته باشد");
+      return;
+    }
+    // Basic card validation — 16 digits
+    if (bankCardNumber.trim() && !/^\d{16}$/.test(bankCardNumber.trim())) {
+      toast.error("شماره کارت باید ۱۶ رقم باشد");
+      return;
+    }
     withdrawal.mutate(
-      { amount, description: description.trim() || undefined },
+      {
+        amount,
+        description: description.trim() || undefined,
+        bankAccountOwnerName: bankAccountOwnerName.trim() || undefined,
+        bankSheba: bankSheba.trim() || undefined,
+        bankCardNumber: bankCardNumber.trim() || undefined,
+      },
       { onSuccess: () => onOpenChange(false) }
     );
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle>درخواست برداشت از کیف پول</DialogTitle>
           <DialogDescription>
-            مبلغ برداشت را وارد کنید. درخواست شما پس از بررسی توسط ادمین تایید می‌شود.
+            مبلغ برداشت و اطلاعات حساب بانکی خود را وارد کنید. درخواست شما پس از بررسی توسط ادمین تایید و واریز می‌شود.
           </DialogDescription>
         </DialogHeader>
 
@@ -465,6 +503,55 @@ function WithdrawalDialog({
             )}
           </div>
 
+          {/* Bank account details */}
+          <div className="rounded-lg border border-border/60 p-3 space-y-3">
+            <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <CreditCard className="size-3.5" />
+              اطلاعات حساب بانکی برای واریز
+            </p>
+
+            <div>
+              <Label className="mb-1.5 block text-sm font-medium">نام صاحب حساب</Label>
+              <Input
+                placeholder="نام و نام خانوادگی صاحب حساب"
+                value={bankAccountOwnerName}
+                onChange={(e) => setBankAccountOwnerName(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <Label className="mb-1.5 block text-sm font-medium">شماره شبا (IR...)</Label>
+              <Input
+                placeholder="IR820540102680020817909002"
+                value={bankSheba}
+                onChange={(e) => setBankSheba(e.target.value.toUpperCase())}
+                dir="ltr"
+                className="text-left nums-fa"
+                maxLength={26}
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                ۲۶ کاراکتر، با IR شروع می‌شود
+              </p>
+            </div>
+
+            <div>
+              <Label className="mb-1.5 block text-sm font-medium">شماره کارت (۱۶ رقم)</Label>
+              <Input
+                placeholder="6104337000000000"
+                value={bankCardNumber}
+                onChange={(e) => setBankCardNumber(e.target.value.replace(/\D/g, ""))}
+                dir="ltr"
+                className="text-left nums-fa"
+                maxLength={16}
+                inputMode="numeric"
+              />
+            </div>
+
+            <p className="text-[11px] text-muted-foreground">
+              حداقل یکی از فیلدهای شبا یا شماره کارت باید پر شود.
+            </p>
+          </div>
+
           <div>
             <Label className="mb-2 block text-sm font-medium">
               توضیحات (اختیاری)
@@ -473,7 +560,7 @@ function WithdrawalDialog({
               placeholder="مثلاً: برداشت به حساب بانکی"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              rows={3}
+              rows={2}
             />
           </div>
         </div>

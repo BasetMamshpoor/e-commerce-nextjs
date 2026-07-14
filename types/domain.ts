@@ -375,13 +375,26 @@ export interface Address {
    12. Shipping Companies
    ────────────────────────────────────────────────────────────────────────── */
 
+export type ShippingPricingType = "FIXED" | "WEIGHT_DISTANCE";
+
 export interface ShippingCompany {
   id: number;
   name: string;
   logoUrl?: string | null;
   logoMediaId?: number | null;
   description?: string | null;
+  /** Pricing model used to calculate shipping cost. */
+  pricingType: ShippingPricingType;
+  /** Flat rate cost in tomans — used when pricingType is FIXED. */
   baseCost: number;
+  /** Cost per kilogram in tomans — required when pricingType is WEIGHT_DISTANCE. */
+  pricePerKg?: number | null;
+  /** Cost per kilometer in tomans — required when pricingType is WEIGHT_DISTANCE. */
+  pricePerKm?: number | null;
+  /** Whether the company accepts prepayment (GATEWAY / WALLET / MIXED). Defaults to true. */
+  acceptsPrepay: boolean;
+  /** Whether the company accepts payment on delivery (FREIGHT_COLLECT / COD). Defaults to false. */
+  acceptsFreightCollect: boolean;
   estimatedDaysMin?: number | null;
   estimatedDaysMax?: number | null;
   isActive: boolean;
@@ -438,6 +451,14 @@ export interface WithdrawalRequest {
   status: "PENDING" | "APPROVED" | "REJECTED";
   description?: string | null;
   adminNote?: string | null;
+  /** User bank IBAN (sheba) — captured at withdrawal request time. */
+  bankSheba?: string | null;
+  /** User bank card number. */
+  bankCardNumber?: string | null;
+  /** Account holder full name. */
+  bankAccountOwnerName?: string | null;
+  /** Admin-entered payment tracking code — shown to the user after approval. */
+  trackingCode?: string | null;
   createdAt: string;
   updatedAt?: string;
 }
@@ -457,7 +478,7 @@ export type OrderStatus =
   | "REFUNDED"
   | "FAILED";
 
-export type PaymentMethod = "WALLET" | "GATEWAY" | "MIXED";
+export type PaymentMethod = "WALLET" | "GATEWAY" | "MIXED" | "FREIGHT_COLLECT";
 
 export interface OrderItem {
   id: number;
@@ -506,6 +527,10 @@ export interface Order {
   totalAmount: number;
   trackingCode?: string | null;
   packageNumber?: string | null;
+  /** Total order weight in grams — captured at order creation for shipping cost calc. */
+  shippingWeight?: number | null;
+  /** Shipping distance in kilometers — captured at order creation for shipping cost calc. */
+  shippingDistance?: number | null;
   shippingAddress?: Partial<Address>;
   address?: Address;
   items: OrderItem[];
@@ -526,6 +551,10 @@ export interface CreateOrderBody {
   paymentMethod: PaymentMethod;
   gatewaySlug?: string;
   discountCode?: string;
+  /** Total order weight in grams (used for WEIGHT_DISTANCE pricing). */
+  shippingWeight?: number;
+  /** Shipping distance in kilometers (used for WEIGHT_DISTANCE pricing). */
+  shippingDistance?: number;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -1038,9 +1067,20 @@ export interface UpsertAddressBody {
 
 export interface UpsertShippingCompanyBody {
   name: string;
-  logoMediaId?: number;
+  logoMediaId?: number | null;
   description?: string;
-  baseCost: number;
+  /** Pricing model — FIXED (flat rate) or WEIGHT_DISTANCE (per kg + per km). */
+  pricingType?: ShippingPricingType;
+  /** Flat rate cost in tomans (required for FIXED). */
+  baseCost?: number;
+  /** Cost per kilogram in tomans (required for WEIGHT_DISTANCE). */
+  pricePerKg?: number;
+  /** Cost per kilometer in tomans (required for WEIGHT_DISTANCE). */
+  pricePerKm?: number;
+  /** Accepts prepayment (GATEWAY / WALLET / MIXED). Defaults to true. */
+  acceptsPrepay?: boolean;
+  /** Accepts payment on delivery (FREIGHT_COLLECT / COD). Defaults to false. */
+  acceptsFreightCollect?: boolean;
   estimatedDaysMin?: number;
   estimatedDaysMax?: number;
   isActive?: boolean;

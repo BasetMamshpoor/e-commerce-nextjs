@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { walletService } from "@/services";
+import { walletService, type ReviewWithdrawalBody } from "@/services";
 import { ApiError } from "@/types/api";
 
 export const ADMIN_WITHDRAWALS_QUERY_KEY = ["admin", "withdrawals"] as const;
@@ -20,7 +20,7 @@ export function useAdminWithdrawals(params?: { page?: number; limit?: number; st
 export function useReviewWithdrawal() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, body }: { id: number; body: { status: "APPROVED" | "REJECTED"; adminNote?: string } }) =>
+    mutationFn: ({ id, body }: { id: number; body: ReviewWithdrawalBody }) =>
       walletService.adminReviewWithdrawal(id, body),
     onSuccess: (_data, vars) => {
       toast.success(vars.body.status === "APPROVED" ? "درخواست برداشت تایید شد." : "درخواست برداشت رد شد.");

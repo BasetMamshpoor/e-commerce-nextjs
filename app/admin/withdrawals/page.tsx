@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, X, ArrowUpFromLine, Wallet as WalletIcon, RotateCcw } from "lucide-react";
+import { Check, X, ArrowUpFromLine, Wallet as WalletIcon, RotateCcw, CreditCard, User, Hash } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -27,8 +27,6 @@ import {
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AdminTable } from "@/features/admin/components/admin-table";
@@ -131,7 +129,16 @@ export default function AdminWithdrawalsPage() {
           {
             key: "user",
             header: "کاربر",
-            render: (w) => <span className="font-medium">{w.user?.fullName ?? `کاربر #${w.userId}`}</span>,
+            render: (w) => (
+              <div className="min-w-0">
+                <p className="font-medium">{w.user?.fullName ?? `کاربر #${w.userId}`}</p>
+                {w.bankAccountOwnerName && (
+                  <p className="truncate text-xs text-muted-foreground">
+                    صاحب حساب: {w.bankAccountOwnerName}
+                  </p>
+                )}
+              </div>
+            ),
           },
           {
             key: "amount",
@@ -144,14 +151,42 @@ export default function AdminWithdrawalsPage() {
             ),
           },
           {
-            key: "description",
-            header: "توضیحات",
-            render: (w) => (
-              <span className="line-clamp-1 max-w-xs text-muted-foreground">
-                {w.description ?? "—"}
-              </span>
-            ),
+            key: "bank",
+            header: "اطلاعات بانکی",
             hideOnMobile: true,
+            render: (w) => (
+              <div className="text-xs leading-tight">
+                {w.bankSheba || w.bankCardNumber ? (
+                  <>
+                    {w.bankSheba && (
+                      <p className="nums-fa text-muted-foreground" dir="ltr">
+                        شبا: {w.bankSheba}
+                      </p>
+                    )}
+                    {w.bankCardNumber && (
+                      <p className="nums-fa text-muted-foreground" dir="ltr">
+                        کارت: {w.bankCardNumber}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </div>
+            ),
+          },
+          {
+            key: "tracking",
+            header: "کد پیگیری",
+            hideOnMobile: true,
+            render: (w) =>
+              w.trackingCode ? (
+                <span className="rounded-md bg-success/10 px-2 py-0.5 text-xs font-medium text-success nums-fa" dir="ltr">
+                  {w.trackingCode}
+                </span>
+              ) : (
+                <span className="text-xs text-muted-foreground">—</span>
+              ),
           },
           {
             key: "status",
@@ -185,7 +220,18 @@ export default function AdminWithdrawalsPage() {
                   بررسی
                 </Button>
               ) : (
-                <span className="text-xs text-muted-foreground">بررسی شده</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-muted-foreground"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setReviewTarget(w);
+                  }}
+                >
+                  مشاهده
+                </Button>
               ),
           },
         ]}
@@ -207,6 +253,31 @@ export default function AdminWithdrawalsPage() {
   );
 }
 
+function BankDetailRow({
+  icon,
+  label,
+  value,
+  dir = "rtl",
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: React.ReactNode;
+  dir?: "rtl" | "ltr";
+}) {
+  if (!value) return null;
+  return (
+    <div className="flex items-start gap-2 text-sm">
+      <span className="mt-0.5 text-muted-foreground">{icon}</span>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="font-medium text-foreground break-all" dir={dir}>
+          {value}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function ReviewWithdrawalDialog({
   target,
   onClose,
@@ -214,31 +285,47 @@ function ReviewWithdrawalDialog({
   target: WithdrawalRequest | null;
   onClose: () => void;
 }) {
+  const isReadOnly = target && target.status !== "PENDING";
   const [decision, setDecision] = React.useState<"APPROVED" | "REJECTED">("APPROVED");
   const [adminNote, setAdminNote] = React.useState("");
+  const [trackingCode, setTrackingCode] = React.useState("");
   const review = useReviewWithdrawal();
 
   React.useEffect(() => {
     if (target) {
       setDecision("APPROVED");
-      setAdminNote("");
+      setAdminNote(target.adminNote ?? "");
+      setTrackingCode(target.trackingCode ?? "");
     }
   }, [target]);
 
   if (!target) return null;
 
   const onSubmit = () => {
+    if (decision === "REJECTED" && !adminNote.trim()) {
+      toast.error("برای رد درخواست، یادداشت دلیل الزامی است");
+      return;
+    }
     review.mutate(
-      { id: target.id, body: { status: decision, adminNote: adminNote.trim() || undefined } },
+      {
+        id: target.id,
+        body: {
+          status: decision,
+          adminNote: adminNote.trim() || undefined,
+          trackingCode: decision === "APPROVED" ? trackingCode.trim() || undefined : undefined,
+        },
+      },
       { onSuccess: onClose }
     );
   };
 
   return (
     <Dialog open={!!target} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>بررسی درخواست برداشت</DialogTitle>
+          <DialogTitle>
+            {isReadOnly ? "جزئیات درخواست برداشت" : "بررسی درخواست برداشت"}
+          </DialogTitle>
           <DialogDescription>
             کاربر: {target.user?.fullName ?? `#${target.userId}`} — مبلغ:{" "}
             <span className="font-bold nums-fa">{toPersianDigits(formatPrice(target.amount))}</span> تومان
@@ -246,6 +333,7 @@ function ReviewWithdrawalDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
+          {/* User's description */}
           {target.description && (
             <div className="rounded-lg bg-muted/50 p-3 text-sm">
               <p className="mb-1 text-xs text-muted-foreground">توضیحات کاربر:</p>
@@ -253,70 +341,151 @@ function ReviewWithdrawalDialog({
             </div>
           )}
 
-          <div>
-            <Label className="mb-2 block text-sm font-medium">تصمیم</Label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setDecision("APPROVED")}
-                className={`flex items-center justify-center gap-2 rounded-lg border-2 px-3 py-2.5 text-sm transition-all ${
-                  decision === "APPROVED"
-                    ? "border-success bg-success/10 text-success"
-                    : "border-border hover:border-success/40"
-                }`}
-              >
-                <Check className="size-4" />
-                تایید و پرداخت
-              </button>
-              <button
-                type="button"
-                onClick={() => setDecision("REJECTED")}
-                className={`flex items-center justify-center gap-2 rounded-lg border-2 px-3 py-2.5 text-sm transition-all ${
-                  decision === "REJECTED"
-                    ? "border-destructive bg-destructive/10 text-destructive"
-                    : "border-border hover:border-destructive/40"
-                }`}
-              >
-                <X className="size-4" />
-                رد درخواست
-              </button>
+          {/* Bank account details */}
+          {(target.bankSheba || target.bankCardNumber || target.bankAccountOwnerName) ? (
+            <div className="rounded-lg border border-border/60 p-3">
+              <p className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <CreditCard className="size-3.5" />
+                اطلاعات حساب بانکی
+              </p>
+              <div className="space-y-3">
+                <BankDetailRow
+                  icon={<User className="size-4" />}
+                  label="نام صاحب حساب"
+                  value={target.bankAccountOwnerName ?? null}
+                />
+                <BankDetailRow
+                  icon={<Hash className="size-4" />}
+                  label="شماره شبا (IR...)"
+                  value={target.bankSheba ?? null}
+                  dir="ltr"
+                />
+                <BankDetailRow
+                  icon={<CreditCard className="size-4" />}
+                  label="شماره کارت"
+                  value={target.bankCardNumber ?? null}
+                  dir="ltr"
+                />
+              </div>
             </div>
-          </div>
-
-          <div>
-            <Label className="mb-2 block text-sm font-medium">
-              یادداشت ادمین {decision === "REJECTED" ? "(توضیح دلیل رد)" : "(اختیاری)"}
-            </Label>
-            <Textarea
-              value={adminNote}
-              onChange={(e) => setAdminNote(e.target.value)}
-              rows={3}
-              placeholder={decision === "REJECTED" ? "دلیل رد درخواست را شرح دهید..." : "یادداشت داخلی..."}
-            />
-          </div>
-
-          {decision === "APPROVED" && (
-            <div className="rounded-lg bg-success/10 p-3 text-xs text-success">
-              با تایید، مبلغ {toPersianDigits(formatPrice(target.amount))} تومان از کیف پول کاربر کسر خواهد شد.
+          ) : (
+            <div className="rounded-lg border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
+              کاربر اطلاعات بانکی ثبت نکرده است
             </div>
+          )}
+
+          {/* Existing tracking code (for read-only) */}
+          {isReadOnly && target.trackingCode && (
+            <div className="rounded-lg bg-success/10 p-3 text-sm">
+              <p className="mb-1 text-xs text-success">کد پیگیری پرداخت:</p>
+              <p className="font-bold text-success nums-fa" dir="ltr">{target.trackingCode}</p>
+            </div>
+          )}
+
+          {/* Existing admin note (for read-only) */}
+          {isReadOnly && target.adminNote && (
+            <div className="rounded-lg bg-muted/50 p-3 text-sm">
+              <p className="mb-1 text-xs text-muted-foreground">یادداشت ادمین:</p>
+              <p>{target.adminNote}</p>
+            </div>
+          )}
+
+          {/* Decision + form (only when pending) */}
+          {!isReadOnly && (
+            <>
+              <div>
+                <Label className="mb-2 block text-sm font-medium">تصمیم</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDecision("APPROVED")}
+                    className={`flex items-center justify-center gap-2 rounded-lg border-2 px-3 py-2.5 text-sm transition-all ${
+                      decision === "APPROVED"
+                        ? "border-success bg-success/10 text-success"
+                        : "border-border hover:border-success/40"
+                    }`}
+                  >
+                    <Check className="size-4" />
+                    تایید و پرداخت
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDecision("REJECTED")}
+                    className={`flex items-center justify-center gap-2 rounded-lg border-2 px-3 py-2.5 text-sm transition-all ${
+                      decision === "REJECTED"
+                        ? "border-destructive bg-destructive/10 text-destructive"
+                        : "border-border hover:border-destructive/40"
+                    }`}
+                  >
+                    <X className="size-4" />
+                    رد درخواست
+                  </button>
+                </div>
+              </div>
+
+              {/* Tracking code (when approving) */}
+              {decision === "APPROVED" && (
+                <div>
+                  <Label className="mb-2 block text-sm font-medium">
+                    کد پیگیری پرداخت (اختیاری)
+                  </Label>
+                  <Input
+                    value={trackingCode}
+                    onChange={(e) => setTrackingCode(e.target.value)}
+                    dir="ltr"
+                    className="text-left"
+                    placeholder="مثال: TRK-1001"
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    این کد پس از تایید به کاربر نمایش داده می‌شود
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <Label className="mb-2 block text-sm font-medium">
+                  یادداشت ادمین {decision === "REJECTED" ? "(توضیح دلیل رد)" : "(اختیاری)"}
+                </Label>
+                <Textarea
+                  value={adminNote}
+                  onChange={(e) => setAdminNote(e.target.value)}
+                  rows={3}
+                  placeholder={decision === "REJECTED" ? "دلیل رد درخواست را شرح دهید..." : "یادداشت داخلی..."}
+                />
+              </div>
+
+              {decision === "APPROVED" && (
+                <div className="rounded-lg bg-success/10 p-3 text-xs text-success">
+                  با تایید، مبلغ {toPersianDigits(formatPrice(target.amount))} تومان از کیف پول کاربر کسر خواهد شد.
+                </div>
+              )}
+            </>
           )}
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            انصراف
-          </Button>
-          <Button
-            onClick={onSubmit}
-            disabled={review.isPending || (decision === "REJECTED" && !adminNote.trim())}
-            variant={decision === "APPROVED" ? "default" : "destructive"}
-          >
-            {review.isPending
-              ? "در حال ثبت..."
-              : decision === "APPROVED"
-              ? "تایید نهایی"
-              : "رد درخواست"}
-          </Button>
+          {isReadOnly ? (
+            <Button variant="outline" onClick={onClose}>
+              بستن
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={onClose}>
+                انصراف
+              </Button>
+              <Button
+                onClick={onSubmit}
+                disabled={review.isPending}
+                variant={decision === "APPROVED" ? "default" : "destructive"}
+              >
+                {review.isPending
+                  ? "در حال ثبت..."
+                  : decision === "APPROVED"
+                  ? "تایید نهایی"
+                  : "رد درخواست"}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

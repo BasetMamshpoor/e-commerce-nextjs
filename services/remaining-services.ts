@@ -10,7 +10,7 @@ import { buildMultipartFormData } from "@/lib/form-data-helper";
 import { ENDPOINTS } from "@/api/endpoints";
 import type {
   DiscountApplyResult, DiscountCode, PaginatedData,
-  Address, ShippingCompany, PaymentGateway,
+  Address, ShippingCompany, PaymentGateway, UpsertShippingCompanyBody,
   Order, OrderListQuery, AdminOrderListQuery, AdminReturnsQuery,
   OrderReturn, ReviewReturnBody, RequestReturnBody, CreateOrderBody,
   AppNotification, NotificationType, NotificationListQuery, BroadcastBody,
@@ -61,11 +61,6 @@ export const addressesService = {
 };
 
 /* ───────── Shipping Companies ───────── */
-export interface UpsertShippingCompanyBody {
-  name: string; logoMediaId?: number; description?: string;
-  baseCost: number; estimatedDaysMin?: number; estimatedDaysMax?: number; isActive?: boolean;
-}
-
 export const shippingCompaniesService = {
   list: (params?: { includeInactive?: boolean }) => http.get<ShippingCompany[]>(ENDPOINTS.shippingCompanies.list, params),
   byId: (id: number) => http.get<ShippingCompany>(ENDPOINTS.shippingCompanies.byId(id)),

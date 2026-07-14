@@ -248,7 +248,13 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
               <div className="pt-2">
                 <Badge variant="outline" className="gap-1">
                   <CreditCard className="size-3" />
-                  {order.paymentMethod === "WALLET" ? "کیف پول" : order.paymentMethod === "GATEWAY" ? "درگاه" : "ترکیبی"}
+                  {order.paymentMethod === "WALLET"
+                    ? "کیف پول"
+                    : order.paymentMethod === "GATEWAY"
+                      ? "درگاه"
+                      : order.paymentMethod === "FREIGHT_COLLECT"
+                        ? "پرداخت در محل"
+                        : "ترکیبی"}
                 </Badge>
                 {order.discountCode && (
                   <Badge variant="outline" className="mr-2">{order.discountCode.code}</Badge>

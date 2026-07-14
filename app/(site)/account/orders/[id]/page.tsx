@@ -366,7 +366,9 @@ function OrderDetailContent({ id }: { id: number }) {
                     ? "کیف پول"
                     : order.paymentMethod === "GATEWAY"
                       ? "درگاه بانکی"
-                      : "ترکیبی"}
+                      : order.paymentMethod === "FREIGHT_COLLECT"
+                        ? "پرداخت در محل"
+                        : "ترکیبی"}
                 </Badge>
                 {order.discountCode && (
                   <Badge variant="outline" className="mr-2 gap-1">

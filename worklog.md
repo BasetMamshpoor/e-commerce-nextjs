@@ -920,3 +920,62 @@ Stage Summary:
 - Return form: ENHANCED (item selector + image upload)
 - BACKEND-DEBUG.md: CREATED
 - ZIP: /home/z/my-project/download/storefront-final-v20.zip (626KB)
+
+---
+Task ID: backend-changes-v21
+Agent: main (Super Z)
+Task: Apply recent backend changes documented in /home/z/my-project/upload/recent-changes.md — (1) shipping company logo upload, (2) pricingType FIXED/WEIGHT_DISTANCE with pricePerKg/pricePerKm, (3) acceptsPrepay/acceptsFreightCollect flags, (4) FREIGHT_COLLECT payment method (COD), (5) wallet withdrawal bank details + tracking code, (6) order shippingWeight/shippingDistance.
+
+Work Log:
+- Read /home/z/my-project/upload/recent-changes.md fully — 7 documented change sections.
+- Updated /home/z/my-project/types/domain.ts:
+  - ShippingCompany: added `pricingType` (FIXED | WEIGHT_DISTANCE), `pricePerKg`, `pricePerKm`, `acceptsPrepay`, `acceptsFreightCollect` + exported `ShippingPricingType` type.
+  - WithdrawalRequest: added `bankSheba`, `bankCardNumber`, `bankAccountOwnerName`, `trackingCode`.
+  - PaymentMethod: added `FREIGHT_COLLECT` value.
+  - Order: added `shippingWeight`, `shippingDistance`.
+  - CreateOrderBody: added `shippingWeight`, `shippingDistance` optional fields.
+  - UpsertShippingCompanyBody: relaxed `baseCost` to optional, added new pricing/payment fields + allowed `logoMediaId?: number | null`.
+- Removed duplicate (stale) UpsertShippingCompanyBody definition from /home/z/my-project/services/remaining-services.ts and added it to imports from @/types/domain.
+- Updated /home/z/my-project/services/wallet.service.ts:
+  - Added `WithdrawalRequestBody` interface with bankSheba/bankCardNumber/bankAccountOwnerName fields.
+  - Added `ReviewWithdrawalBody` interface with optional `trackingCode`.
+  - Updated both `requestWithdrawal` and `adminReviewWithdrawal` signatures.
+- Exported both new wallet types from /home/z/my-project/services/index.ts.
+- Updated hooks:
+  - /home/z/my-project/features/account/hooks/use-withdrawals.ts: useRequestWithdrawal now accepts WithdrawalRequestBody.
+  - /home/z/my-project/features/admin/hooks/use-admin-withdrawals.ts: useReviewWithdrawal now accepts ReviewWithdrawalBody.
+- Rebuilt /home/z/my-project/app/admin/shipping-companies/page.tsx:
+  - Added inline logo uploader (uploads via mediaService.upload immediately, stores logoMediaId).
+  - Added pricingType selector (FIXED vs WEIGHT_DISTANCE) with conditional price fields.
+  - Added acceptsPrepay + acceptsFreightCollect checkboxes (validation: at least one must be true).
+  - Table now shows logo thumbnail, pricing type label, payment-method badges, weight/distance pricing display.
+- Updated /home/z/my-project/app/admin/withdrawals/page.tsx:
+  - Table now shows bank account info (شبا / کارت) and tracking code columns.
+  - Review dialog shows full bank details section (owner name, sheba, card number) when present.
+  - When approving, admin can enter a trackingCode that gets shown to the user.
+  - Read-only mode for already-processed requests (status !== PENDING) — shows existing data + "بستن" button.
+- Updated /home/z/my-project/app/(site)/account/wallet/page.tsx:
+  - WithdrawalDialog now captures bankAccountOwnerName, bankSheba (validated IR+24 digits), bankCardNumber (validated 16 digits).
+  - Validation: at least one of sheba or card number is required.
+  - History list now displays trackingCode badge (when present) and bank sheba line.
+- Updated /home/z/my-project/app/(site)/checkout/page.tsx:
+  - Added `computeShippingCost()` helper — handles both FIXED and WEIGHT_DISTANCE pricing models.
+  - Added shippingWeight/shippingDistance state + conditional input UI in shipping step (shown only when selected company uses WEIGHT_DISTANCE).
+  - Added FREIGHT_COLLECT payment option — only visible when shipping company.acceptsFreightCollect is true.
+  - GATEWAY/WALLET/MIXED options only visible when shipping company.acceptsPrepay is true.
+  - Auto-switch payment method when selected shipping company doesn't support it.
+  - onPlaceOrder validates compatibility (acceptsPrepay for prepaid methods, acceptsFreightCollect for COD).
+  - Passes shippingWeight/shippingDistance in CreateOrderBody when applicable.
+  - Order summary now uses computed shippingCost (not raw baseCost).
+  - ShippingRadioCard now shows company logo + "پرداخت در محل" badge for COD-capable companies + WEIGHT_DISTANCE pricing display.
+- Updated payment-method labels in /home/z/my-project/app/(site)/account/orders/[id]/page.tsx and /home/z/my-project/app/admin/orders/[id]/page.tsx to support FREIGHT_COLLECT ("پرداخت در محل").
+
+Stage Summary:
+- All 6 backend changes from recent-changes.md applied end-to-end (types → services → hooks → UI).
+- Shipping company logo upload implemented (inline in admin form, immediate upload to /media).
+- Pricing type FIXED/WEIGHT_DISTANCE fully implemented in admin form + checkout calculation.
+- FREIGHT_COLLECT (COD) payment method working end-to-end with company-level capability flag.
+- Wallet withdrawal bank details captured at request time, displayed to admin, and admin can attach tracking code visible to user after approval.
+- TypeScript: 0 errors
+- ESLint: 0 errors, 0 warnings
+- Build: ✓ Compiled successfully (54/54 static pages generated)
