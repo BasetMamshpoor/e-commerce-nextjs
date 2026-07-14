@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { walletService } from "@/services";
+import { walletService, type WithdrawalRequestBody } from "@/services";
 import { ApiError } from "@/types/api";
 
 export const WITHDRAWALS_QUERY_KEY = ["wallet", "withdrawals"] as const;
@@ -20,7 +20,7 @@ export function useMyWithdrawals(page = 1, limit = 20) {
 export function useRequestWithdrawal() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { amount: number; description?: string }) =>
+    mutationFn: (body: WithdrawalRequestBody) =>
       walletService.requestWithdrawal(body),
     onSuccess: () => {
       toast.success("درخواست برداشت ثبت شد و در انتظار بررسی است.");

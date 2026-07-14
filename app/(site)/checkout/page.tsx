@@ -15,6 +15,8 @@ import {
   Loader2,
   AlertCircle,
   ShoppingBag,
+  Banknote,
+  Scale,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -49,6 +51,20 @@ import type {
 import { formatToman, formatPrice, toPersianDigits } from "@/utils/format";
 import { cn } from "@/lib/utils";
 
+/** Compute shipping cost for a given company + weight/distance inputs. */
+function computeShippingCost(
+  company: ShippingCompany | undefined,
+  weightGrams: number,
+  distanceKm: number,
+): number {
+  if (!company) return 0;
+  if (company.pricingType === "WEIGHT_DISTANCE") {
+    const weightKg = weightGrams / 1000;
+    return (company.pricePerKg ?? 0) * weightKg + (company.pricePerKm ?? 0) * distanceKm;
+  }
+  return company.baseCost;
+}
+
 type Step = "address" | "shipping" | "review" | "payment";
 
 const STEPS: { id: Step; label: string; icon: React.ReactNode }[] = [
@@ -79,6 +95,10 @@ function CheckoutContent() {
   const [discountResult, setDiscountResult] = React.useState<DiscountApplyResult | null>(null);
   const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod>("GATEWAY");
   const [addressDialogOpen, setAddressDialogOpen] = React.useState(false);
+  // For WEIGHT_DISTANCE pricing — user-provided weight/distance.
+  // (Future enhancement will auto-calc these from product weight + address.)
+  const [shippingWeight, setShippingWeight] = React.useState<number>(0);
+  const [shippingDistance, setShippingDistance] = React.useState<number>(0);
 
   // Shipping companies + payment gateways (one-time fetch).
   const [shippingCompanies, setShippingCompanies] = React.useState<ShippingCompany[]>([]);
@@ -112,21 +132,32 @@ function CheckoutContent() {
   // Calculate totals (safe even if cart is empty).
   const cartTotal = cart?.total ?? 0;
   const selectedShipping = shippingCompanies.find((s) => s.id === selectedShippingId);
-  const shippingCost = selectedShipping?.baseCost ?? 0;
+  const isWeightDistance = selectedShipping?.pricingType === "WEIGHT_DISTANCE";
+  const shippingCost = computeShippingCost(selectedShipping, shippingWeight, shippingDistance);
   const discountAmount = discountResult?.discountAmount ?? 0;
   const payableTotal = Math.max(0, cartTotal - discountAmount + shippingCost);
   const walletBalance = wallet?.balance ?? 0;
   const canPayWithWallet = walletBalance >= payableTotal && payableTotal > 0;
+  const isFreightCollect = paymentMethod === "FREIGHT_COLLECT";
 
   const applyDiscount = useApplyDiscountCode();
   const createOrder = useCreateOrder();
 
-  // Auto-switch payment method if wallet can't cover.
+  // Auto-switch payment method if wallet can't cover OR
+  // if the chosen method isn't supported by the selected shipping company.
   React.useEffect(() => {
-    if (paymentMethod === "WALLET" && !canPayWithWallet && payableTotal > 0) {
-      setPaymentMethod("GATEWAY");
+    if (!selectedShipping) return;
+    const supportsPrepay = selectedShipping.acceptsPrepay;
+    const supportsCod = selectedShipping.acceptsFreightCollect;
+    if (paymentMethod === "WALLET" && (!canPayWithWallet || !supportsPrepay)) {
+      // Try prepay gateway first, fall back to COD, finally fall back to GATEWAY.
+      setPaymentMethod(supportsPrepay ? "GATEWAY" : supportsCod ? "FREIGHT_COLLECT" : "GATEWAY");
+    } else if ((paymentMethod === "GATEWAY" || paymentMethod === "MIXED") && !supportsPrepay) {
+      setPaymentMethod(supportsCod ? "FREIGHT_COLLECT" : "GATEWAY");
+    } else if (paymentMethod === "FREIGHT_COLLECT" && !supportsCod) {
+      setPaymentMethod(supportsPrepay ? "GATEWAY" : "GATEWAY");
     }
-  }, [paymentMethod, canPayWithWallet, payableTotal]);
+  }, [paymentMethod, canPayWithWallet, payableTotal, selectedShipping]);
 
   if (cartLoading || addressesLoading) {
     return <CheckoutSkeleton />;
@@ -169,17 +200,37 @@ function CheckoutContent() {
       toast.error("آدرس و روش ارسال را انتخاب کنید");
       return;
     }
-    const gatewaySlug = paymentMethod !== "WALLET" ? gateways[0]?.slug : undefined;
-    if (paymentMethod !== "WALLET" && !gatewaySlug) {
-      toast.error("درگاه پرداخت در دسترس نیست");
+    // For WEIGHT_DISTANCE pricing, weight & distance are required inputs.
+    if (isWeightDistance && (shippingWeight <= 0 || shippingDistance <= 0)) {
+      toast.error("وزن بسته و مسافت را وارد کنید");
       return;
+    }
+    // FREIGHT_COLLECT requires no gateway + requires company.acceptsFreightCollect
+    if (isFreightCollect) {
+      if (!selectedShipping?.acceptsFreightCollect) {
+        toast.error("این شرکت ارسال پرداخت در محل را پشتیبانی نمی‌کند");
+        return;
+      }
+    } else {
+      // GATEWAY/WALLET/MIXED require acceptsPrepay
+      if (!selectedShipping?.acceptsPrepay) {
+        toast.error("این شرکت ارسال پیش‌پرداخت را پشتیبانی نمی‌کند");
+        return;
+      }
+      const gatewaySlug = paymentMethod !== "WALLET" ? gateways[0]?.slug : undefined;
+      if (paymentMethod !== "WALLET" && !gatewaySlug) {
+        toast.error("درگاه پرداخت در دسترس نیست");
+        return;
+      }
     }
     createOrder.mutate({
       addressId: selectedAddressId,
       shippingCompanyId: selectedShippingId,
       paymentMethod,
-      gatewaySlug,
+      gatewaySlug: isFreightCollect ? undefined : (paymentMethod !== "WALLET" ? gateways[0]?.slug : undefined),
       discountCode: discountResult?.code,
+      shippingWeight: isWeightDistance ? shippingWeight : undefined,
+      shippingDistance: isWeightDistance ? shippingDistance : undefined,
     });
   };
 
@@ -300,6 +351,50 @@ function CheckoutContent() {
                       onSelect={() => setSelectedShippingId(sc.id)}
                     />
                   ))
+                )}
+
+                {/* Conditional weight/distance inputs for WEIGHT_DISTANCE pricing */}
+                {isWeightDistance && (
+                  <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4 space-y-3">
+                    <p className="flex items-center gap-2 text-sm font-medium text-primary">
+                      <Scale className="size-4" />
+                      محاسبه هزینه ارسال بر اساس وزن و مسافت
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      شرکت انتخابی شما هزینه را بر اساس وزن بسته و مسافت محاسبه می‌کند. لطفاً مقادیر تقریبی را وارد کنید.
+                    </p>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">وزن بسته (گرم)</Label>
+                        <Input
+                          type="number"
+                          dir="ltr"
+                          className="text-left"
+                          placeholder="مثال: 2500"
+                          value={shippingWeight || ""}
+                          onChange={(e) => setShippingWeight(Number(e.target.value))}
+                          min={0}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">مسافت (کیلومتر)</Label>
+                        <Input
+                          type="number"
+                          dir="ltr"
+                          className="text-left"
+                          placeholder="مثال: 15"
+                          value={shippingDistance || ""}
+                          onChange={(e) => setShippingDistance(Number(e.target.value))}
+                          min={0}
+                        />
+                      </div>
+                    </div>
+                    {shippingWeight > 0 && shippingDistance > 0 && (
+                      <p className="text-xs text-muted-foreground nums-fa">
+                        هزینه محاسبه‌شده: {toPersianDigits(formatPrice(shippingCost))} تومان
+                      </p>
+                    )}
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -450,53 +545,84 @@ function CheckoutContent() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <RadioGroup
-                  value={paymentMethod}
-                  onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}
-                >
-                  <PaymentOptionCard
-                    value="GATEWAY"
-                    selected={paymentMethod === "GATEWAY"}
-                    icon={<CreditCard className="size-5" />}
-                    title="پرداخت آنلاین (درگاه)"
-                    description={`مبلغ ${formatPrice(payableTotal)} تومان از درگاه بانکی پرداخت می‌شود`}
-                  />
-                  <PaymentOptionCard
-                    value="WALLET"
-                    selected={paymentMethod === "WALLET"}
-                    icon={<Wallet className="size-5" />}
-                    title="پرداخت از کیف پول"
-                    description={
-                      canPayWithWallet
-                        ? `موجودی شما: ${formatPrice(walletBalance)} تومان`
-                        : `موجودی ناکافی (${formatPrice(walletBalance)} تومان)`
-                    }
-                    disabled={!canPayWithWallet}
-                  />
-                  <PaymentOptionCard
-                    value="MIXED"
-                    selected={paymentMethod === "MIXED"}
-                    icon={<CreditCard className="size-5" />}
-                    title="پرداخت ترکیبی (کیف پول + درگاه)"
-                    description={
-                      canPayWithWallet
-                        ? "کل مبلغ از کیف پول کسر می‌شود"
-                        : `${formatPrice(walletBalance)} تومان از کیف پول، ${formatPrice(
-                            payableTotal - walletBalance,
-                          )} تومان از درگاه`
-                    }
-                    disabled={walletBalance === 0}
-                  />
-                </RadioGroup>
+                {!selectedShipping && (
+                  <p className="text-sm text-destructive">
+                    ابتدا روش ارسال را انتخاب کنید.
+                  </p>
+                )}
+                {selectedShipping && (
+                  <>
+                    <RadioGroup
+                      value={paymentMethod}
+                      onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}
+                    >
+                      {selectedShipping.acceptsPrepay && (
+                        <>
+                          <PaymentOptionCard
+                            value="GATEWAY"
+                            selected={paymentMethod === "GATEWAY"}
+                            icon={<CreditCard className="size-5" />}
+                            title="پرداخت آنلاین (درگاه)"
+                            description={`مبلغ ${formatPrice(payableTotal)} تومان از درگاه بانکی پرداخت می‌شود`}
+                          />
+                          <PaymentOptionCard
+                            value="WALLET"
+                            selected={paymentMethod === "WALLET"}
+                            icon={<Wallet className="size-5" />}
+                            title="پرداخت از کیف پول"
+                            description={
+                              canPayWithWallet
+                                ? `موجودی شما: ${formatPrice(walletBalance)} تومان`
+                                : `موجودی ناکافی (${formatPrice(walletBalance)} تومان)`
+                            }
+                            disabled={!canPayWithWallet}
+                          />
+                          <PaymentOptionCard
+                            value="MIXED"
+                            selected={paymentMethod === "MIXED"}
+                            icon={<CreditCard className="size-5" />}
+                            title="پرداخت ترکیبی (کیف پول + درگاه)"
+                            description={
+                              canPayWithWallet
+                                ? "کل مبلغ از کیف پول کسر می‌شود"
+                                : `${formatPrice(walletBalance)} تومان از کیف پول، ${formatPrice(
+                                    payableTotal - walletBalance,
+                                  )} تومان از درگاه`
+                            }
+                            disabled={walletBalance === 0}
+                          />
+                        </>
+                      )}
 
-                <div className="rounded-lg bg-info/10 p-3 text-xs text-info">
-                  <AlertCircle className="mb-1 size-4" />
-                  {paymentMethod === "WALLET" && "سفارش بلافاصله پس از پرداخت پردازش می‌شود."}
-                  {paymentMethod === "GATEWAY" &&
-                    "پس از ثبت سفارش، به درگاه پرداخت منتقل می‌شوید."}
-                  {paymentMethod === "MIXED" &&
-                    "مبلغ کیف پول بلافاصله کسر می‌شود؛ بقیه از درگاه پرداخت می‌شود."}
-                </div>
+                      {selectedShipping.acceptsFreightCollect && (
+                        <PaymentOptionCard
+                          value="FREIGHT_COLLECT"
+                          selected={paymentMethod === "FREIGHT_COLLECT"}
+                          icon={<Banknote className="size-5" />}
+                          title="پرداخت در محل (COD)"
+                          description="مبلغ سفارش هنگام تحویل به شرکت حمل پرداخت می‌شود — نیازی به پرداخت آنلاین نیست"
+                        />
+                      )}
+
+                      {!selectedShipping.acceptsPrepay && !selectedShipping.acceptsFreightCollect && (
+                        <p className="text-sm text-destructive">
+                          این شرکت ارسال هیچ روش پرداختی را پشتیبانی نمی‌کند. لطفاً شرکت دیگری انتخاب کنید.
+                        </p>
+                      )}
+                    </RadioGroup>
+
+                    <div className="rounded-lg bg-info/10 p-3 text-xs text-info">
+                      <AlertCircle className="mb-1 size-4" />
+                      {paymentMethod === "WALLET" && "سفارش بلافاصله پس از پرداخت پردازش می‌شود."}
+                      {paymentMethod === "GATEWAY" &&
+                        "پس از ثبت سفارش، به درگاه پرداخت منتقل می‌شوید."}
+                      {paymentMethod === "MIXED" &&
+                        "مبلغ کیف پول بلافاصله کسر می‌شود؛ بقیه از درگاه پرداخت می‌شود."}
+                      {paymentMethod === "FREIGHT_COLLECT" &&
+                        "سفارش بدون پرداخت آنلاین ثبت می‌شود. مبلغ را هنگام تحویل به مامور پست بپردازید."}
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           )}
@@ -571,7 +697,7 @@ function CheckoutContent() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">هزینه ارسال</span>
                 <span className="nums-fa">
-                  {selectedShipping ? formatPrice(selectedShipping.baseCost) : "—"}
+                  {selectedShipping ? formatPrice(shippingCost) : "—"}
                 </span>
               </div>
               <Separator />
@@ -668,26 +794,49 @@ function ShippingRadioCard({
         selected ? "border-primary bg-primary/5" : "border-border hover:border-primary/40",
       )}
     >
-      <div className="flex items-center gap-3">
-        <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
-          <Truck className="size-5 text-primary" />
-        </div>
-        <div>
-          <p className="font-medium text-foreground">{company.name}</p>
-          {company.estimatedDaysMin && (
-            <p className="text-xs text-muted-foreground">
-              تحویل {toPersianDigits(company.estimatedDaysMin)}
-              {company.estimatedDaysMax
-                ? ` تا ${toPersianDigits(company.estimatedDaysMax)}`
-                : ""}{" "}
-              روز کاری
-            </p>
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
+          {company.logoUrl ? (
+             
+            <img src={company.logoUrl} alt={company.name} className="size-full object-contain" />
+          ) : (
+            <Truck className="size-5 text-primary" />
           )}
         </div>
+        <div className="min-w-0">
+          <p className="font-medium text-foreground">{company.name}</p>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+            {company.estimatedDaysMin ? (
+              <span>
+                تحویل {toPersianDigits(company.estimatedDaysMin)}
+                {company.estimatedDaysMax
+                  ? ` تا ${toPersianDigits(company.estimatedDaysMax)}`
+                  : ""}{" "}
+                روز کاری
+              </span>
+            ) : null}
+            {company.acceptsFreightCollect && (
+              <span className="rounded bg-success/10 px-1.5 py-0.5 text-[10px] text-success">
+                پرداخت در محل
+              </span>
+            )}
+          </div>
+        </div>
       </div>
-      <div className="text-left">
-        <p className="font-bold nums-fa">{formatPrice(company.baseCost)}</p>
-        <p className="text-xs text-muted-foreground">تومان</p>
+      <div className="shrink-0 text-left">
+        {company.pricingType === "WEIGHT_DISTANCE" ? (
+          <>
+            <p className="text-xs text-muted-foreground">بر اساس وزن و مسافت</p>
+            <p className="text-[11px] text-muted-foreground nums-fa">
+              {formatPrice(company.pricePerKg ?? 0)}/کیلو
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="font-bold nums-fa">{formatPrice(company.baseCost)}</p>
+            <p className="text-xs text-muted-foreground">تومان</p>
+          </>
+        )}
       </div>
     </button>
   );
