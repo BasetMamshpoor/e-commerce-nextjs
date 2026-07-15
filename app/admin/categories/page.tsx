@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, FolderTree, ChevronLeft, ChevronDown, Pencil, Trash2, ImagePlus, X, Loader2 } from "lucide-react";
+import { Plus, FolderTree, ChevronLeft, ChevronDown, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -27,18 +27,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { EmptyState } from "@/components/common/empty-state";
+import { EntityImageField, type EntityImageValue } from "@/components/common/entity-image-field";
 import { categoriesService } from "@/services";
 import type { Category } from "@/types/domain";
 import { cn } from "@/lib/utils";
-
-interface ImageState {
-  /** Display URL — backend imageUrl for existing, or object URL for newly picked file. */
-  url: string | null;
-  /** Pending File to upload on submit (multipart field "image"). Null if no new file picked. */
-  file: File | null;
-  /** True if the user explicitly removed an existing image (so we send imageMediaId=null on save). */
-  removed: boolean;
-}
 
 export default function AdminCategoriesPage() {
   const [tree, setTree] = React.useState<Category[]>([]);
@@ -222,9 +214,11 @@ function CategoryFormDialog({
   const [description, setDescription] = React.useState("");
   const [parentId, setParentId] = React.useState<number | "">("");
   const [isActive, setIsActive] = React.useState(true);
-  const [image, setImage] = React.useState<ImageState>({ url: null, file: null, removed: false });
+  const [imageValue, setImageValue] = React.useState<EntityImageValue>({
+    kind: "unchanged",
+    previewUrl: null,
+  });
   const [saving, setSaving] = React.useState(false);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (open) {
@@ -233,29 +227,9 @@ function CategoryFormDialog({
       setDescription(category?.description ?? "");
       setParentId(category?.parentId ?? "");
       setIsActive(category?.isActive ?? true);
-      setImage({
-        url: category?.imageUrl ?? null,
-        file: null,
-        removed: false,
-      });
+      setImageValue({ kind: "unchanged", previewUrl: category?.imageUrl ?? null });
     }
   }, [open, category]);
-
-  const onImageSelected = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    const file = files[0];
-    if (!file.type.startsWith("image/")) {
-      toast.error("فقط فایل تصویری مجاز است");
-      return;
-    }
-    // Preview locally — the actual upload happens on form submit via multipart.
-    setImage({ url: URL.createObjectURL(file), file, removed: false });
-  };
-
-  const removeImage = () => {
-    setImage({ url: null, file: null, removed: true });
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
 
   const onSubmit = async () => {
     if (!name.trim()) {
@@ -270,23 +244,32 @@ function CategoryFormDialog({
         description: description || undefined,
         parentId: parentId === "" ? undefined : Number(parentId),
         isActive,
-        // Only send imageMediaId when explicitly removing the existing image
-        // (no new file to upload). When a new file is being uploaded via
-        // multipart, the backend ignores this field and uses the file.
-        ...(image.removed && !image.file && category ? { imageMediaId: null } : {}),
       };
+
+      // Route based on image value (file → multipart, mediaId → JSON, removed → null).
+      const hasFile = imageValue.kind === "file";
+      const imageFile = hasFile ? (imageValue as { file: File }).file : undefined;
+      const imageJsonFields =
+        imageValue.kind === "mediaId"
+          ? { imageMediaId: (imageValue as { mediaId: number }).mediaId }
+          : imageValue.kind === "removed" && category
+          ? { imageMediaId: null }
+          : {};
+
+      const fullBody = { ...baseBody, ...imageJsonFields };
+
       if (category) {
-        if (image.file) {
-          await categoriesService.updateWithImage(category.id, baseBody, image.file);
+        if (imageFile) {
+          await categoriesService.updateWithImage(category.id, fullBody, imageFile);
         } else {
-          await categoriesService.update(category.id, baseBody);
+          await categoriesService.update(category.id, fullBody);
         }
         toast.success("دسته به‌روزرسانی شد");
       } else {
-        if (image.file) {
-          await categoriesService.createWithImage(baseBody, image.file);
+        if (imageFile) {
+          await categoriesService.createWithImage(fullBody, imageFile);
         } else {
-          await categoriesService.create(baseBody);
+          await categoriesService.create(fullBody);
         }
         toast.success("دسته ایجاد شد");
       }
@@ -320,60 +303,13 @@ function CategoryFormDialog({
           <DialogDescription>اطلاعات دسته‌بندی را وارد کنید.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
-          {/* Image uploader */}
-          <div className="space-y-2">
-            <Label>تصویر دسته</Label>
-            <div className="flex items-center gap-4">
-              <div className="relative flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-border bg-muted">
-                {image.url ? (
-                  <img src={image.url} alt="category" className="size-full object-cover" />
-                ) : (
-                  <ImagePlus className="size-7 text-muted-foreground" />
-                )}
-                {saving && image.file && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-background/70">
-                    <Loader2 className="size-5 animate-spin text-primary" />
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 space-y-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => onImageSelected(e.target.files)}
-                  className="hidden"
-                />
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={saving}
-                  >
-                    <ImagePlus className="size-4" />
-                    {image.url ? "تغییر تصویر" : "انتخاب تصویر"}
-                  </Button>
-                  {image.url && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={removeImage}
-                      disabled={saving}
-                    >
-                      <X className="size-4" />
-                      حذف
-                    </Button>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  فرمت: JPG, PNG, WebP — حداکثر ۲ مگابایت
-                </p>
-              </div>
-            </div>
-          </div>
+          <EntityImageField
+            label="تصویر دسته"
+            initialUrl={category?.imageUrl}
+            onChange={setImageValue}
+            disabled={saving}
+            square
+          />
 
           <div className="space-y-2">
             <Label>نام *</Label>

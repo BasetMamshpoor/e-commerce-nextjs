@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Pencil, Trash2, Film, Eye, X, Upload, Search, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Film, Eye, X, Upload, Search, Loader2, FolderOpen, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { AdminTable } from "@/features/admin/components/admin-table";
 import { PersianDatePicker } from "@/components/common/persian-date-picker";
+import { MediaGalleryPicker } from "@/components/common/media-gallery-picker";
 import { storiesService, productsService } from "@/services";
 import { formatDateTimeFa, toPersianDigits } from "@/utils/format";
 import type { Story, Product, PaginatedData } from "@/types/domain";
@@ -147,10 +148,18 @@ function StoryDialog({
   const [title, setTitle] = React.useState("");
   const [expiresAt, setExpiresAt] = React.useState<string | null>(null);
   const [order, setOrder] = React.useState("0");
+  // Cover image: file (multipart) OR mediaId (JSON) OR removed.
   const [coverImage, setCoverImage] = React.useState<File | null>(null);
+  const [coverImageMediaId, setCoverImageMediaId] = React.useState<number | null>(null);
   const [coverPreview, setCoverPreview] = React.useState<string | null>(null);
+  const [coverRemoved, setCoverRemoved] = React.useState(false);
+  // Video: file (multipart) OR mediaId (JSON) OR removed.
   const [video, setVideo] = React.useState<File | null>(null);
+  const [videoMediaId, setVideoMediaId] = React.useState<number | null>(null);
   const [videoPreview, setVideoPreview] = React.useState<string | null>(null);
+  const [videoRemoved, setVideoRemoved] = React.useState(false);
+  const [coverGalleryOpen, setCoverGalleryOpen] = React.useState(false);
+  const [videoGalleryOpen, setVideoGalleryOpen] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const coverInputRef = React.useRef<HTMLInputElement>(null);
   const videoInputRef = React.useRef<HTMLInputElement>(null);
@@ -167,9 +176,13 @@ function StoryDialog({
       setExpiresAt(editing?.expiresAt ?? null);
       setOrder(String(editing?.order ?? 0));
       setCoverImage(null);
+      setCoverImageMediaId(null);
       setCoverPreview(editing?.coverImage?.url ?? editing?.coverImageUrl ?? null);
+      setCoverRemoved(false);
       setVideo(null);
+      setVideoMediaId(null);
       setVideoPreview(editing?.video?.url ?? editing?.videoUrl ?? null);
+      setVideoRemoved(false);
       setSelectedProducts(editing?.products ?? []);
       setProductSearch("");
       setSearchResults([]);
@@ -190,11 +203,36 @@ function StoryDialog({
 
   const onCoverSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
-    setCoverImage(f); setCoverPreview(URL.createObjectURL(f));
+    setCoverImage(f); setCoverImageMediaId(null);
+    setCoverPreview(URL.createObjectURL(f)); setCoverRemoved(false);
   };
+  const onCoverGallerySelect = (items: Array<{ id: number; url: string }>) => {
+    if (items.length === 0) return;
+    const picked = items[0];
+    setCoverImage(null); setCoverImageMediaId(picked.id);
+    setCoverPreview(picked.url); setCoverRemoved(false);
+  };
+  const removeCover = () => {
+    setCoverImage(null); setCoverImageMediaId(null);
+    setCoverPreview(null); setCoverRemoved(true);
+    if (coverInputRef.current) coverInputRef.current.value = "";
+  };
+
   const onVideoSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
-    setVideo(f); setVideoPreview(URL.createObjectURL(f));
+    setVideo(f); setVideoMediaId(null);
+    setVideoPreview(URL.createObjectURL(f)); setVideoRemoved(false);
+  };
+  const onVideoGallerySelect = (items: Array<{ id: number; url: string }>) => {
+    if (items.length === 0) return;
+    const picked = items[0];
+    setVideo(null); setVideoMediaId(picked.id);
+    setVideoPreview(picked.url); setVideoRemoved(false);
+  };
+  const removeVideo = () => {
+    setVideo(null); setVideoMediaId(null);
+    setVideoPreview(null); setVideoRemoved(true);
+    if (videoInputRef.current) videoInputRef.current.value = "";
   };
 
   const addProduct = (p: Product) => {
@@ -212,10 +250,15 @@ function StoryDialog({
         expiresAt: expiresAt ?? undefined,
         order: Number(order) || 0,
         productIds: selectedProducts.length > 0 ? selectedProducts.map((p) => p.id) : undefined,
+        // Attach mediaId fields when picking from gallery OR removing existing.
+        ...(coverImageMediaId ? { coverImageMediaId: coverImageMediaId } : {}),
+        ...(coverRemoved && !coverImage && editing ? { coverImageMediaId: null } : {}),
+        ...(videoMediaId ? { videoMediaId: videoMediaId } : {}),
+        ...(videoRemoved && !video && editing ? { videoMediaId: null } : {}),
       };
 
       if (editing) {
-        // Edit — use multipart if new files, else JSON
+        // Edit — use multipart if new files, else JSON.
         if (coverImage || video) {
           await storiesService.updateWithMedia(editing.id, body, coverImage ?? undefined, video ?? undefined);
         } else {
@@ -223,7 +266,7 @@ function StoryDialog({
         }
         toast.success("استوری ویرایش شد");
       } else {
-        // Create — use multipart if files provided, else JSON
+        // Create — use multipart if files provided, else JSON.
         if (coverImage || video) {
           await storiesService.createWithMedia(body, coverImage ?? undefined, video ?? undefined);
         } else {
@@ -272,18 +315,35 @@ function StoryDialog({
             <input ref={coverInputRef} type="file" accept="image/*" onChange={onCoverSelected} className="hidden" />
             {coverPreview ? (
               <div className="relative overflow-hidden rounded-xl">
-                { }
                 <img src={coverPreview} alt="cover" className="aspect-[9/16] w-32 object-cover" />
-                <Button type="button" variant="destructive" size="icon" className="absolute left-1 top-1 size-6" onClick={() => { setCoverImage(null); setCoverPreview(null); if (coverInputRef.current) coverInputRef.current.value = ""; }}>
+                <Button type="button" variant="destructive" size="icon" className="absolute left-1 top-1 size-6" onClick={removeCover} disabled={saving}>
                   <X className="size-3" />
                 </Button>
-                {!coverImage && <p className="absolute bottom-1 right-1 rounded bg-black/60 px-1 text-[8px] text-white">فعلی</p>}
+                {!coverImage && !coverImageMediaId && (
+                  <p className="absolute bottom-1 right-1 rounded bg-black/60 px-1 text-[8px] text-white">فعلی</p>
+                )}
+                {coverImageMediaId && (
+                  <p className="absolute bottom-1 right-1 rounded bg-primary/80 px-1 text-[8px] text-primary-foreground">گالری</p>
+                )}
+                {coverImage && (
+                  <p className="absolute bottom-1 right-1 rounded bg-success/80 px-1 text-[8px] text-white">جدید</p>
+                )}
               </div>
             ) : (
-              <button type="button" onClick={() => coverInputRef.current?.click()} className="flex aspect-[9/16] w-32 items-center justify-center rounded-xl border-2 border-dashed border-border text-muted-foreground hover:border-primary/40">
-                <Upload className="size-6" />
-              </button>
+              <div className="flex aspect-[9/16] w-32 items-center justify-center rounded-xl border-2 border-dashed border-border text-muted-foreground">
+                <ImageIcon className="size-6" />
+              </div>
             )}
+            <div className="flex gap-1.5">
+              <Button type="button" variant="outline" size="sm" onClick={() => coverInputRef.current?.click()} disabled={saving}>
+                <Upload className="size-3.5" />
+                آپلود
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setCoverGalleryOpen(true)} disabled={saving}>
+                <FolderOpen className="size-3.5" />
+                گالری
+              </Button>
+            </div>
           </div>
 
           {/* Video */}
@@ -293,16 +353,34 @@ function StoryDialog({
             {videoPreview ? (
               <div className="relative">
                 <video src={videoPreview} className="aspect-[9/16] w-32 rounded-xl" muted />
-                <Button type="button" variant="destructive" size="icon" className="absolute left-1 top-1 size-6" onClick={() => { setVideo(null); setVideoPreview(null); if (videoInputRef.current) videoInputRef.current.value = ""; }}>
+                <Button type="button" variant="destructive" size="icon" className="absolute left-1 top-1 size-6" onClick={removeVideo} disabled={saving}>
                   <X className="size-3" />
                 </Button>
-                {!video && <p className="absolute bottom-1 right-1 rounded bg-black/60 px-1 text-[8px] text-white">فعلی</p>}
+                {!video && !videoMediaId && (
+                  <p className="absolute bottom-1 right-1 rounded bg-black/60 px-1 text-[8px] text-white">فعلی</p>
+                )}
+                {videoMediaId && (
+                  <p className="absolute bottom-1 right-1 rounded bg-primary/80 px-1 text-[8px] text-primary-foreground">گالری</p>
+                )}
+                {video && (
+                  <p className="absolute bottom-1 right-1 rounded bg-success/80 px-1 text-[8px] text-white">جدید</p>
+                )}
               </div>
             ) : (
-              <button type="button" onClick={() => videoInputRef.current?.click()} className="flex aspect-[9/16] w-32 items-center justify-center rounded-xl border-2 border-dashed border-border text-muted-foreground hover:border-primary/40">
+              <div className="flex aspect-[9/16] w-32 items-center justify-center rounded-xl border-2 border-dashed border-border text-muted-foreground">
                 <Film className="size-6" />
-              </button>
+              </div>
             )}
+            <div className="flex gap-1.5">
+              <Button type="button" variant="outline" size="sm" onClick={() => videoInputRef.current?.click()} disabled={saving}>
+                <Upload className="size-3.5" />
+                آپلود
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setVideoGalleryOpen(true)} disabled={saving}>
+                <FolderOpen className="size-3.5" />
+                گالری
+              </Button>
+            </div>
           </div>
 
           {/* Related products */}
@@ -343,6 +421,23 @@ function StoryDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <MediaGalleryPicker
+        open={coverGalleryOpen}
+        onOpenChange={setCoverGalleryOpen}
+        onSelect={onCoverGallerySelect}
+        multiple={false}
+        allowedType="IMAGE"
+        title="انتخاب تصویر کاور"
+      />
+      <MediaGalleryPicker
+        open={videoGalleryOpen}
+        onOpenChange={setVideoGalleryOpen}
+        onSelect={onVideoGallerySelect}
+        multiple={false}
+        allowedType="VIDEO"
+        title="انتخاب ویدیو"
+      />
     </Dialog>
   );
 }

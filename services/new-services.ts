@@ -24,12 +24,14 @@ export const storiesService = {
   adminList: (params?: { page?: number; limit?: number }) =>
     http.get<PaginatedData<Story>>(ENDPOINTS.stories.adminList, params),
   create: (body: {
-    title: string; coverImageMediaId?: number; videoMediaId?: number;
+    title: string; coverImageMediaId?: number | null; videoMediaId?: number | null;
     expiresAt?: string; order?: number; productIds?: number[];
   }) => http.post<Story>(ENDPOINTS.stories.create, body),
-  /** Create story with cover image + video upload (multipart/form-data). */
+  /** Create story with cover image + video upload (multipart/form-data).
+   *  Can send BOTH files (uploaded) AND mediaIds (gallery-picked) in one request. */
   createWithMedia: (body: {
     title: string; expiresAt?: string; order?: number; productIds?: number[];
+    coverImageMediaId?: number | null; videoMediaId?: number | null;
   }, coverImage?: File, video?: File) => {
     const fd = buildMultipartFormData(body as unknown as Record<string, unknown>, {
       ...(coverImage ? { coverImage } : {}),
@@ -38,12 +40,14 @@ export const storiesService = {
     return http.upload<Story>(ENDPOINTS.stories.create, fd);
   },
   update: (id: number, body: Partial<{
-    title: string; coverImageMediaId: number; videoMediaId: number;
+    title: string; coverImageMediaId: number | null; videoMediaId: number | null;
     expiresAt?: string; order?: number; productIds?: number[];
   }>) => http.put<Story>(ENDPOINTS.stories.update(id), body),
-  /** Update story with cover image + video upload (multipart/form-data). */
+  /** Update story with cover image + video upload (multipart/form-data).
+   *  Can send BOTH files (uploaded) AND mediaIds (gallery-picked) in one request. */
   updateWithMedia: (id: number, body: {
     title: string; expiresAt?: string; order?: number; productIds?: number[];
+    coverImageMediaId?: number | null; videoMediaId?: number | null;
   }, coverImage?: File, video?: File) => {
     const fd = buildMultipartFormData(body as unknown as Record<string, unknown>, {
       ...(coverImage ? { coverImage } : {}),
