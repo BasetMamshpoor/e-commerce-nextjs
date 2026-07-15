@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Pencil, Trash2, Image as ImageIcon, Upload, X, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Image as ImageIcon, Upload, X, Loader2, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { AdminTable } from "@/features/admin/components/admin-table";
+import { MediaGalleryPicker } from "@/components/common/media-gallery-picker";
 import { bannersService } from "@/services";
 import type { Banner, BannerPosition } from "@/types/domain";
 
@@ -126,8 +127,12 @@ function BannerFormDialog({ open, onOpenChange, banner, onSaved }: {
   const [link, setLink] = React.useState("");
   const [order, setOrder] = React.useState("0");
   const [isActive, setIsActive] = React.useState(true);
-  const [image, setImage] = React.useState<File | null>(null);
+  // Image state: either a new file (multipart), an existing mediaId (JSON), or removed.
+  const [imageFile, setImageFile] = React.useState<File | null>(null);
+  const [imageMediaId, setImageMediaId] = React.useState<number | null>(null);
   const [imagePreview, setImagePreview] = React.useState<string | null>(null);
+  const [imageRemoved, setImageRemoved] = React.useState(false);
+  const [galleryOpen, setGalleryOpen] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -138,21 +143,36 @@ function BannerFormDialog({ open, onOpenChange, banner, onSaved }: {
       setLink(banner?.link ?? "");
       setOrder(String(banner?.order ?? 0));
       setIsActive(banner?.isActive ?? true);
-      setImage(null);
+      setImageFile(null);
+      setImageMediaId(null);
       setImagePreview(banner?.media?.url ?? banner?.imageUrl ?? null);
+      setImageRemoved(false);
     }
   }, [open, banner]);
 
   const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    setImage(f);
+    setImageFile(f);
+    setImageMediaId(null);
     setImagePreview(URL.createObjectURL(f));
+    setImageRemoved(false);
+  };
+
+  const onGallerySelect = (items: Array<{ id: number; url: string }>) => {
+    if (items.length === 0) return;
+    const picked = items[0];
+    setImageFile(null);
+    setImageMediaId(picked.id);
+    setImagePreview(picked.url);
+    setImageRemoved(false);
   };
 
   const removeImage = () => {
-    setImage(null);
+    setImageFile(null);
+    setImageMediaId(null);
     setImagePreview(null);
+    setImageRemoved(true);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -169,18 +189,21 @@ function BannerFormDialog({ open, onOpenChange, banner, onSaved }: {
         link: link.trim() || undefined,
         order: Number(order) || 0,
         isActive,
+        // Attach mediaId when picking from gallery OR removing existing.
+        ...(imageMediaId ? { mediaId: imageMediaId } : {}),
+        ...(imageRemoved && !imageFile && banner ? { mediaId: null } : {}),
       };
 
       if (banner) {
-        if (image) {
-          await bannersService.updateWithImage(banner.id, body, image);
+        if (imageFile) {
+          await bannersService.updateWithImage(banner.id, body, imageFile);
         } else {
           await bannersService.update(banner.id, body);
         }
         toast.success("بنر به‌روزرسانی شد");
       } else {
-        if (image) {
-          await bannersService.createWithImage(body, image);
+        if (imageFile) {
+          await bannersService.createWithImage(body, imageFile);
         } else {
           await bannersService.create(body);
         }
@@ -225,26 +248,43 @@ function BannerFormDialog({ open, onOpenChange, banner, onSaved }: {
             </div>
           </div>
 
-          {/* Image upload */}
+          {/* Image upload — wide aspect for banners */}
           <div className="space-y-2">
             <Label>تصویر بنر</Label>
             <input ref={fileInputRef} type="file" accept="image/*" onChange={onFileSelected} className="hidden" />
             {imagePreview ? (
               <div className="relative overflow-hidden rounded-xl">
-                { }
                 <img src={imagePreview} alt="preview" className="aspect-[16/6] w-full object-cover" />
-                <Button type="button" variant="destructive" size="icon" className="absolute left-2 top-2 size-8" onClick={removeImage}>
+                <Button type="button" variant="destructive" size="icon" className="absolute left-2 top-2 size-8" onClick={removeImage} disabled={saving}>
                   <X className="size-4" />
                 </Button>
-                {!image && <p className="absolute bottom-2 right-2 rounded bg-black/60 px-2 py-0.5 text-[10px] text-white">تصویر فعلی</p>}
+                {!imageFile && !imageMediaId && (
+                  <p className="absolute bottom-2 right-2 rounded bg-black/60 px-2 py-0.5 text-[10px] text-white">تصویر فعلی</p>
+                )}
+                {imageMediaId && (
+                  <p className="absolute bottom-2 right-2 rounded bg-primary/80 px-2 py-0.5 text-[10px] text-primary-foreground">از گالری</p>
+                )}
+                {imageFile && (
+                  <p className="absolute bottom-2 right-2 rounded bg-success/80 px-2 py-0.5 text-[10px] text-white">آپلود جدید</p>
+                )}
               </div>
             ) : (
-              <button type="button" onClick={() => fileInputRef.current?.click()} className="flex aspect-[16/6] w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-border text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent/30">
-                <Upload className="mb-2 size-8" />
-                <span className="text-sm font-medium">تصویر بنر را آپلود کنید</span>
-                <span className="mt-1 text-xs">پیشنهاد: ۱۲۰۰×۴۰۰ پیکسل</span>
-              </button>
+              <div className="flex aspect-[16/6] w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-border text-muted-foreground">
+                <ImageIcon className="mb-2 size-8" />
+                <span className="text-sm">تصویری انتخاب نشده</span>
+              </div>
             )}
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={saving}>
+                <Upload className="size-4" />
+                آپلود از حافظه
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setGalleryOpen(true)} disabled={saving}>
+                <FolderOpen className="size-4" />
+                انتخاب از گالری
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">پیشنهاد: ۱۲۰۰×۴۰۰ پیکسل</p>
           </div>
 
           <div className="space-y-2">
@@ -264,6 +304,15 @@ function BannerFormDialog({ open, onOpenChange, banner, onSaved }: {
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <MediaGalleryPicker
+        open={galleryOpen}
+        onOpenChange={setGalleryOpen}
+        onSelect={onGallerySelect}
+        multiple={false}
+        allowedType="IMAGE"
+        title="انتخاب تصویر بنر"
+      />
     </Dialog>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Pencil, Trash2, Megaphone, Upload, X, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Megaphone, Upload, X, Loader2, FolderOpen, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { AdminTable } from "@/features/admin/components/admin-table";
+import { MediaGalleryPicker } from "@/components/common/media-gallery-picker";
 import { popupsService } from "@/services";
 import type { Popup } from "@/types/domain";
 
@@ -115,8 +116,11 @@ function PopupFormDialog({ open, onOpenChange, popup, onSaved }: {
   const [link, setLink] = React.useState("");
   const [isActive, setIsActive] = React.useState(true);
   const [showOncePerSession, setShowOncePerSession] = React.useState(true);
-  const [image, setImage] = React.useState<File | null>(null);
+  const [imageFile, setImageFile] = React.useState<File | null>(null);
+  const [imageMediaId, setImageMediaId] = React.useState<number | null>(null);
   const [imagePreview, setImagePreview] = React.useState<string | null>(null);
+  const [imageRemoved, setImageRemoved] = React.useState(false);
+  const [galleryOpen, setGalleryOpen] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -127,21 +131,36 @@ function PopupFormDialog({ open, onOpenChange, popup, onSaved }: {
       setLink(popup?.link ?? "");
       setIsActive(popup?.isActive ?? true);
       setShowOncePerSession(popup?.showOncePerSession ?? true);
-      setImage(null);
+      setImageFile(null);
+      setImageMediaId(null);
       setImagePreview(popup?.mediaUrl ?? null);
+      setImageRemoved(false);
     }
   }, [open, popup]);
 
   const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    setImage(f);
+    setImageFile(f);
+    setImageMediaId(null);
     setImagePreview(URL.createObjectURL(f));
+    setImageRemoved(false);
+  };
+
+  const onGallerySelect = (items: Array<{ id: number; url: string }>) => {
+    if (items.length === 0) return;
+    const picked = items[0];
+    setImageFile(null);
+    setImageMediaId(picked.id);
+    setImagePreview(picked.url);
+    setImageRemoved(false);
   };
 
   const removeImage = () => {
-    setImage(null);
+    setImageFile(null);
+    setImageMediaId(null);
     setImagePreview(null);
+    setImageRemoved(true);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -158,18 +177,21 @@ function PopupFormDialog({ open, onOpenChange, popup, onSaved }: {
         link: link.trim() || undefined,
         isActive,
         showOncePerSession,
+        // Attach mediaId when picking from gallery OR removing existing.
+        ...(imageMediaId ? { mediaId: imageMediaId } : {}),
+        ...(imageRemoved && !imageFile && popup ? { mediaId: null } : {}),
       };
 
       if (popup) {
-        if (image) {
-          await popupsService.updateWithImage(popup.id, body, image);
+        if (imageFile) {
+          await popupsService.updateWithImage(popup.id, body, imageFile);
         } else {
           await popupsService.update(popup.id, body);
         }
         toast.success("به‌روزرسانی شد");
       } else {
-        if (image) {
-          await popupsService.createWithImage(body, image);
+        if (imageFile) {
+          await popupsService.createWithImage(body, imageFile);
         } else {
           await popupsService.create(body);
         }
@@ -207,19 +229,36 @@ function PopupFormDialog({ open, onOpenChange, popup, onSaved }: {
             <input ref={fileInputRef} type="file" accept="image/*" onChange={onFileSelected} className="hidden" />
             {imagePreview ? (
               <div className="relative overflow-hidden rounded-xl">
-                { }
                 <img src={imagePreview} alt="preview" className="aspect-[16/9] w-full object-cover" />
-                <Button type="button" variant="destructive" size="icon" className="absolute left-2 top-2 size-8" onClick={removeImage}>
+                <Button type="button" variant="destructive" size="icon" className="absolute left-2 top-2 size-8" onClick={removeImage} disabled={saving}>
                   <X className="size-4" />
                 </Button>
-                {!image && <p className="absolute bottom-2 right-2 rounded bg-black/60 px-2 py-0.5 text-[10px] text-white">تصویر فعلی</p>}
+                {!imageFile && !imageMediaId && (
+                  <p className="absolute bottom-2 right-2 rounded bg-black/60 px-2 py-0.5 text-[10px] text-white">تصویر فعلی</p>
+                )}
+                {imageMediaId && (
+                  <p className="absolute bottom-2 right-2 rounded bg-primary/80 px-2 py-0.5 text-[10px] text-primary-foreground">از گالری</p>
+                )}
+                {imageFile && (
+                  <p className="absolute bottom-2 right-2 rounded bg-success/80 px-2 py-0.5 text-[10px] text-white">آپلود جدید</p>
+                )}
               </div>
             ) : (
-              <button type="button" onClick={() => fileInputRef.current?.click()} className="flex aspect-[16/9] w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-border text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent/30">
-                <Upload className="mb-2 size-8" />
-                <span className="text-sm font-medium">تصویر را آپلود کنید</span>
-              </button>
+              <div className="flex aspect-[16/9] w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-border text-muted-foreground">
+                <ImageIcon className="mb-2 size-8" />
+                <span className="text-sm">تصویری انتخاب نشده</span>
+              </div>
             )}
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={saving}>
+                <Upload className="size-4" />
+                آپلود از حافظه
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setGalleryOpen(true)} disabled={saving}>
+                <FolderOpen className="size-4" />
+                انتخاب از گالری
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -245,6 +284,15 @@ function PopupFormDialog({ open, onOpenChange, popup, onSaved }: {
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <MediaGalleryPicker
+        open={galleryOpen}
+        onOpenChange={setGalleryOpen}
+        onSelect={onGallerySelect}
+        multiple={false}
+        allowedType="IMAGE"
+        title="انتخاب تصویر پاپ‌آپ"
+      />
     </Dialog>
   );
 }

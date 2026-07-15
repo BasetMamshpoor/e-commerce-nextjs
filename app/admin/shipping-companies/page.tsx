@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Pencil, Trash2, Truck, ImagePlus, X, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,19 +17,11 @@ import {
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { AdminTable } from "@/features/admin/components/admin-table";
+import { EntityImageField, type EntityImageValue } from "@/components/common/entity-image-field";
 import { shippingCompaniesService } from "@/services";
 import type { ShippingCompany, ShippingPricingType } from "@/types/domain";
 import { formatPrice, toPersianDigits } from "@/utils/format";
 import { cn } from "@/lib/utils";
-
-interface LogoState {
-  /** Display URL — backend logoUrl for existing, or object URL for newly picked file. */
-  url: string | null;
-  /** Pending File to upload on submit (multipart field "logo"). Null if no new file picked. */
-  file: File | null;
-  /** True if the user explicitly removed an existing logo (so we send logoMediaId=null on save). */
-  removed: boolean;
-}
 
 export default function AdminShippingCompaniesPage() {
   const [companies, setCompanies] = React.useState<ShippingCompany[]>([]);
@@ -230,9 +222,11 @@ function ShippingFormDialog({
     acceptsPrepay: true,
     acceptsFreightCollect: false,
   });
-  const [logo, setLogo] = React.useState<LogoState>({ url: null, file: null, removed: false });
+  const [logoValue, setLogoValue] = React.useState<EntityImageValue>({
+    kind: "unchanged",
+    previewUrl: null,
+  });
   const [saving, setSaving] = React.useState(false);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (open) {
@@ -249,29 +243,9 @@ function ShippingFormDialog({
         acceptsPrepay: company?.acceptsPrepay ?? true,
         acceptsFreightCollect: company?.acceptsFreightCollect ?? false,
       });
-      setLogo({
-        url: company?.logoUrl ?? null,
-        file: null,
-        removed: false,
-      });
+      setLogoValue({ kind: "unchanged", previewUrl: company?.logoUrl ?? null });
     }
   }, [open, company]);
-
-  const onLogoSelected = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    const file = files[0];
-    if (!file.type.startsWith("image/")) {
-      toast.error("فقط فایل تصویری مجاز است");
-      return;
-    }
-    // Preview locally — the actual upload happens on form submit via multipart.
-    setLogo({ url: URL.createObjectURL(file), file, removed: false });
-  };
-
-  const removeLogo = () => {
-    setLogo({ url: null, file: null, removed: true });
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
 
   const onSubmit = async () => {
     if (!form.name.trim()) {
@@ -307,23 +281,32 @@ function ShippingFormDialog({
         isActive: form.isActive,
         acceptsPrepay: form.acceptsPrepay,
         acceptsFreightCollect: form.acceptsFreightCollect,
-        // Only send logoMediaId when explicitly removing the existing logo
-        // (no new file to upload). When a new file is being uploaded via
-        // multipart, the backend ignores this field and uses the file.
-        ...(logo.removed && !logo.file && company ? { logoMediaId: null } : {}),
       };
+
+      // Route based on logo value (file → multipart, mediaId → JSON, removed → null).
+      const hasFile = logoValue.kind === "file";
+      const logoFile = hasFile ? (logoValue as { file: File }).file : undefined;
+      const logoJsonFields =
+        logoValue.kind === "mediaId"
+          ? { logoMediaId: (logoValue as { mediaId: number }).mediaId }
+          : logoValue.kind === "removed" && company
+          ? { logoMediaId: null }
+          : {};
+
+      const fullBody = { ...baseBody, ...logoJsonFields };
+
       if (company) {
-        if (logo.file) {
-          await shippingCompaniesService.updateWithLogo(company.id, baseBody, logo.file);
+        if (logoFile) {
+          await shippingCompaniesService.updateWithLogo(company.id, fullBody, logoFile);
         } else {
-          await shippingCompaniesService.update(company.id, baseBody);
+          await shippingCompaniesService.update(company.id, fullBody);
         }
         toast.success("به‌روزرسانی شد");
       } else {
-        if (logo.file) {
-          await shippingCompaniesService.createWithLogo(baseBody, logo.file);
+        if (logoFile) {
+          await shippingCompaniesService.createWithLogo(fullBody, logoFile);
         } else {
-          await shippingCompaniesService.create(baseBody);
+          await shippingCompaniesService.create(fullBody);
         }
         toast.success("ایجاد شد");
       }
@@ -345,60 +328,13 @@ function ShippingFormDialog({
           <DialogTitle>{company ? "ویرایش شرکت" : "شرکت جدید"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
-          {/* Logo uploader */}
-          <div className="space-y-2">
-            <Label>لوگو شرکت</Label>
-            <div className="flex items-center gap-4">
-              <div className="relative flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-border bg-muted">
-                {logo.url ? (
-                  <img src={logo.url} alt="logo" className="size-full object-contain" />
-                ) : (
-                  <ImagePlus className="size-7 text-muted-foreground" />
-                )}
-                {saving && logo.file && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-background/70">
-                    <Loader2 className="size-5 animate-spin text-primary" />
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 space-y-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => onLogoSelected(e.target.files)}
-                  className="hidden"
-                />
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={saving}
-                  >
-                    <ImagePlus className="size-4" />
-                    {logo.url ? "تغییر لوگو" : "انتخاب لوگو"}
-                  </Button>
-                  {logo.url && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={removeLogo}
-                      disabled={saving}
-                    >
-                      <X className="size-4" />
-                      حذف
-                    </Button>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  فرمت: JPG, PNG, WebP — حداکثر ۲ مگابایت
-                </p>
-              </div>
-            </div>
-          </div>
+          <EntityImageField
+            label="لوگو شرکت"
+            initialUrl={company?.logoUrl}
+            onChange={setLogoValue}
+            disabled={saving}
+            square
+          />
 
           <div className="space-y-2">
             <Label>نام شرکت *</Label>

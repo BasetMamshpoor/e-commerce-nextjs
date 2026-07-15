@@ -51,6 +51,10 @@ export interface UpdateProductBody {
   status?: ProductStatus;
   isFeatured?: boolean;
   categoryIds?: number[];
+  /** New images to add — referenced by mediaId (selected from gallery).
+   *  New uploaded FILES go via multipart field "images" (separate from this). */
+  images?: Array<{ mediaId: number; order: number; isMain: boolean }>;
+  /** IDs of existing ProductImages to delete. */
   deletedImages?: number[];
   displayAttributes?: Array<{ attributeId: number; value: string }>;
 }

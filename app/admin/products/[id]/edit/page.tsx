@@ -156,9 +156,20 @@ export default function AdminProductEditPage({
 
     setSaving(true);
     try {
-      const newImageFiles = images.filter((img): img is ProductImageItem & { file: File } =>
-        !img.id && !!img.file,
-      );
+      // Separate images:
+      //   - Files (new uploads) → multipart field "images"
+      //   - mediaId (gallery-picked, new) → JSON field "images: [{mediaId, ...}]"
+      //   - Existing images (img.id, unchanged) → not sent
+      const newImageFiles: File[] = [];
+      const galleryImages: Array<{ mediaId: number; order: number; isMain: boolean }> = [];
+      for (let i = 0; i < images.length; i++) {
+        const img = images[i];
+        if (img.file) {
+          newImageFiles.push(img.file);
+        } else if (img.mediaId) {
+          galleryImages.push({ mediaId: img.mediaId, order: i, isMain: img.isMain });
+        }
+      }
 
       const discountType =
         form.discountType === "NONE" ? null : (form.discountType as DiscountType);
@@ -180,13 +191,16 @@ export default function AdminProductEditPage({
         status: form.status,
         isFeatured: form.isFeatured,
         categoryIds: form.categoryIds,
+        // Gallery-picked mediaIds (new images to add via JSON body).
+        images: galleryImages.length > 0 ? galleryImages : undefined,
+        // IDs of existing ProductImages marked for deletion.
         deletedImages: deletedImageIds.length > 0 ? deletedImageIds : undefined,
         displayAttributes,
       };
 
       if (newImageFiles.length > 0) {
-        const fileArray = newImageFiles.map((img) => img.file);
-        await productsService.updateWithImages(Number(id), updateBody, fileArray);
+        // Multipart with files + JSON body (backend merges them).
+        await productsService.updateWithImages(Number(id), updateBody, newImageFiles);
       } else {
         await productsService.update(Number(id), updateBody);
       }

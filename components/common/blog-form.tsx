@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Loader2, Upload, X, Plus, Search } from "lucide-react";
+import { ArrowRight, Loader2, Upload, X, Plus, Search, FolderOpen, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RichTextEditor } from "@/components/common/rich-text-editor";
+import { MediaGalleryPicker } from "@/components/common/media-gallery-picker";
 import { blogService, productsService } from "@/services";
 import type { BlogCategory, BlogPost, BlogPostStatus, Product } from "@/types/domain";
 
@@ -51,7 +52,10 @@ export function BlogForm({ post, loading: externalLoading }: BlogFormProps) {
   const [tags, setTags] = React.useState<string[]>([]);
   const [tagInput, setTagInput] = React.useState("");
   const [coverImage, setCoverImage] = React.useState<File | null>(null);
+  const [coverImageMediaId, setCoverImageMediaId] = React.useState<number | null>(null);
   const [coverImagePreview, setCoverImagePreview] = React.useState<string | null>(null);
+  const [coverImageRemoved, setCoverImageRemoved] = React.useState(false);
+  const [galleryOpen, setGalleryOpen] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Related products selector
@@ -75,7 +79,10 @@ export function BlogForm({ post, loading: externalLoading }: BlogFormProps) {
       setMetaTitle(post.metaTitle ?? "");
       setMetaDescription(post.metaDescription ?? "");
       setTags(post.tags ?? []);
+      setCoverImage(null);
+      setCoverImageMediaId(null);
       setCoverImagePreview(post.coverImageUrl ?? null);
+      setCoverImageRemoved(false);
       // Pre-load related products
       if (post.productIds && post.productIds.length > 0) {
         productsService.adminList({ page: 1, limit: 100 }).then((data) => {
@@ -106,12 +113,25 @@ export function BlogForm({ post, loading: externalLoading }: BlogFormProps) {
     const file = e.target.files?.[0];
     if (!file) return;
     setCoverImage(file);
+    setCoverImageMediaId(null);
     setCoverImagePreview(URL.createObjectURL(file));
+    setCoverImageRemoved(false);
+  };
+
+  const onGallerySelect = (items: Array<{ id: number; url: string }>) => {
+    if (items.length === 0) return;
+    const picked = items[0];
+    setCoverImage(null);
+    setCoverImageMediaId(picked.id);
+    setCoverImagePreview(picked.url);
+    setCoverImageRemoved(false);
   };
 
   const removeCoverImage = () => {
     setCoverImage(null);
+    setCoverImageMediaId(null);
     setCoverImagePreview(null);
+    setCoverImageRemoved(true);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -155,6 +175,9 @@ export function BlogForm({ post, loading: externalLoading }: BlogFormProps) {
         metaDescription: metaDescription.trim() || undefined,
         tags: tags.length > 0 ? tags : undefined,
         productIds: selectedProducts.length > 0 ? selectedProducts.map((p) => p.id) : undefined,
+        // Attach coverImageMediaId when picking from gallery OR removing existing.
+        ...(coverImageMediaId ? { coverImageMediaId: coverImageMediaId } : {}),
+        ...(coverImageRemoved && !coverImage && post ? { coverImageMediaId: null } : {}),
       };
 
       if (post) {
@@ -266,20 +289,37 @@ export function BlogForm({ post, loading: externalLoading }: BlogFormProps) {
               <input ref={fileInputRef} type="file" accept="image/*" onChange={onFileSelected} className="hidden" />
               {coverImagePreview ? (
                 <div className="relative overflow-hidden rounded-xl">
-                  { }
                   <img src={coverImagePreview} alt="cover" className="aspect-[16/9] w-full object-cover" />
-                  <Button type="button" variant="destructive" size="icon" className="absolute left-2 top-2 size-8" onClick={removeCoverImage}>
+                  <Button type="button" variant="destructive" size="icon" className="absolute left-2 top-2 size-8" onClick={removeCoverImage} disabled={saving}>
                     <X className="size-4" />
                   </Button>
-                  {!coverImage && <p className="absolute bottom-2 right-2 rounded-md bg-black/60 px-2 py-1 text-[10px] text-white">تصویر فعلی</p>}
+                  {!coverImage && !coverImageMediaId && (
+                    <p className="absolute bottom-2 right-2 rounded-md bg-black/60 px-2 py-1 text-[10px] text-white">تصویر فعلی</p>
+                  )}
+                  {coverImageMediaId && (
+                    <p className="absolute bottom-2 right-2 rounded-md bg-primary/80 px-2 py-1 text-[10px] text-primary-foreground">از گالری</p>
+                  )}
+                  {coverImage && (
+                    <p className="absolute bottom-2 right-2 rounded-md bg-success/80 px-2 py-1 text-[10px] text-white">آپلود جدید</p>
+                  )}
                 </div>
               ) : (
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="flex aspect-[16/9] w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-border text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent/30">
-                  <Upload className="mb-2 size-8" />
-                  <span className="text-sm font-medium">تصویر کاور را آپلود کنید</span>
-                  <span className="mt-1 text-xs">فرمت: JPG, PNG, WebP</span>
-                </button>
+                <div className="flex aspect-[16/9] w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-border text-muted-foreground">
+                  <ImageIcon className="mb-2 size-8" />
+                  <span className="text-sm">تصویری انتخاب نشده</span>
+                </div>
               )}
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={saving}>
+                  <Upload className="size-4" />
+                  آپلود از حافظه
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setGalleryOpen(true)} disabled={saving}>
+                  <FolderOpen className="size-4" />
+                  انتخاب از گالری
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">فرمت: JPG, PNG, WebP — پیشنهاد: ۱۲۰۰×۶۷۵ پیکسل</p>
             </CardContent>
           </Card>
         </div>
@@ -381,6 +421,15 @@ export function BlogForm({ post, loading: externalLoading }: BlogFormProps) {
           </div>
         </div>
       </div>
+
+      <MediaGalleryPicker
+        open={galleryOpen}
+        onOpenChange={setGalleryOpen}
+        onSelect={onGallerySelect}
+        multiple={false}
+        allowedType="IMAGE"
+        title="انتخاب تصویر کاور"
+      />
     </div>
   );
 }

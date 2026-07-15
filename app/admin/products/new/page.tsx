@@ -135,27 +135,27 @@ export default function AdminProductNewPage() {
         attributeValueIds: v.attributeValueIds,
       }));
 
-      // 4. Separate new image files from existing image metadata.
-      // New files are uploaded inline via multipart (field name "images").
-      // Existing images (already uploaded when the user picked them in this
-      // session) are referenced by mediaId. The backend supports BOTH in the
-      // same multipart request: a `images` array of files + the JSON metadata.
-      // To keep the contract simple, we send ALL images as files (existing ones
-      // too), but if an image has no file we treat it as already uploaded and
-      // send the mediaId in the JSON body.
+      // 4. Separate images by source:
+      //   - Files (uploaded from disk) → multipart field "images"
+      //   - mediaId (selected from gallery) → JSON field "images: [{mediaId, order, isMain}]"
+      //   - Existing images (already saved on this product, loaded from backend) → not sent on CREATE
+      // The backend supports BOTH files and mediaIds in the same multipart request.
       const newImageFiles: File[] = [];
-      const existingImages: Array<{ mediaId: number; order: number; isMain?: boolean }> = [];
+      const galleryImages: Array<{ mediaId: number; order: number; isMain: boolean }> = [];
       for (let i = 0; i < images.length; i++) {
         const img = images[i];
         if (img.file) {
+          // New uploaded file — goes via multipart field "images".
           newImageFiles.push(img.file);
-        } else if (img.id) {
-          existingImages.push({ mediaId: img.id, order: i, isMain: img.isMain });
+        } else if (img.mediaId) {
+          // Gallery-picked media — goes via JSON field "images".
+          galleryImages.push({ mediaId: img.mediaId, order: i, isMain: img.isMain });
         }
+        // Existing images (img.id but no mediaId/file) are skipped on create.
       }
 
-      // 5. Build the body — note: `images` in the JSON body refers to existing
-      // uploaded images (with mediaId). New files go via multipart field "images".
+      // 5. Build the body — `images` in the JSON body holds gallery-picked mediaIds.
+      // New uploaded files go via multipart field "images" (separate from JSON).
       const body = {
         name: form.name.trim(),
         brandId: form.brandId ? Number(form.brandId) : undefined,
@@ -167,7 +167,7 @@ export default function AdminProductNewPage() {
         status: form.status,
         isFeatured: form.isFeatured,
         categoryIds: form.categoryIds,
-        images: existingImages.length > 0 ? existingImages : undefined,
+        images: galleryImages.length > 0 ? galleryImages : undefined,
         variants: variantsPayload,
         displayAttributes,
       };
