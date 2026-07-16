@@ -9,6 +9,7 @@ This update expands media administration for admin users so they can browse uplo
 - Browse all media records with filters: `entityType`, `type`, `search`, `year`, `month`.
 - List date-based folders under the upload root with `GET /api/v1/media/folders`.
 - Remove a specific date-based folder via `DELETE /api/v1/media/folders/:entityType/:year/:month`.
+- Force-delete a media record and all of its usages via `DELETE /api/v1/media/:id/force-delete`.
 - Update metadata on a media record via `PATCH /api/v1/media/:id`.
 - Download an individual file via `GET /api/v1/media/:id/download`.
 - View media usage via `GET /api/v1/media/:id/usage`.
@@ -32,6 +33,13 @@ Authorization: Bearer <admin-token>
 
 ```http
 DELETE /api/v1/media/folders/blog/2026/07
+Authorization: Bearer <admin-token>
+```
+
+### Force-delete a media record and its usages
+
+```http
+DELETE /api/v1/media/42/force-delete
 Authorization: Bearer <admin-token>
 ```
 

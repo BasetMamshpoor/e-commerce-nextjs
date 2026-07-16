@@ -157,6 +157,7 @@ export const ENDPOINTS = {
     download: (id: number) => `/media/${id}/download`,
     update: (id: number) => `/media/${id}`,
     delete: (id: number) => `/media/${id}`,
+    forceDelete: (id: number) => `/media/${id}/force-delete`,
   },
 
   notifications: {
