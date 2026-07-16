@@ -70,18 +70,55 @@ export interface Media {
   id: number;
   fileName: string;
   originalName: string;
+  /** Server-side relative path (e.g. "blog/2026/07/file.jpg"). */
+  filePath?: string;
   url: string;
   mimeType: string;
   size: number;
   type: MediaType;
-  entityType?: string;
+  entityType?: string | null;
+  uploadedById?: number | null;
+  metadata?: Record<string, unknown> | null;
   createdAt: string;
 }
 
-export interface MediaUsage {
+/** A single usage entry returned by GET /media/:id/usage.
+ *  Backend returns plain strings like "Product images (5)" — so we type
+ *  the response as an array of strings. */
+export type MediaUsageEntry = string;
+
+/** Response shape for GET /media/:id/usage. */
+export interface MediaUsageResponse {
+  usage: MediaUsageEntry[];
+}
+
+/** A date-based folder entry returned by GET /media/folders. */
+export interface MediaFolder {
   entityType: string;
-  entityId: number;
-  entityName: string;
+  year: string;
+  month: string;
+  /** Relative path like "blog/2026/07". */
+  path: string;
+  fileCount: number;
+  totalSize: number;
+}
+
+/** Query parameters for GET /media (list). */
+export interface MediaListQuery {
+  page?: number;
+  limit?: number;
+  type?: MediaType | string;
+  entityType?: string;
+  search?: string;
+  year?: string;
+  month?: string;
+}
+
+/** Body for PATCH /media/:id. */
+export interface UpdateMediaBody {
+  originalName?: string;
+  entityType?: string;
+  metadata?: Record<string, unknown>;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
