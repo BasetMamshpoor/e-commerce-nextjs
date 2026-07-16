@@ -18,6 +18,8 @@ import {
   Film,
   Search,
   RefreshCw,
+  AlertTriangle,
+  FolderOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -27,7 +29,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -43,6 +44,12 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { EmptyState } from "@/components/common/empty-state";
 import { mediaService } from "@/services";
@@ -52,18 +59,17 @@ import type {
   Media,
   MediaFolder,
   MediaListQuery,
-  MediaType,
   PaginatedData,
   UpdateMediaBody,
 } from "@/types/domain";
 import { formatDateTimeFa, toPersianDigits } from "@/utils/format";
 import { cn } from "@/lib/utils";
 
-const PAGE_SIZE = 36;
+const PAGE_SIZE = 30;
 
 /** Convert bytes to a human-readable string in Persian. */
 function formatFileSize(bytes: number): string {
-  if (bytes === 0) return "۰ بایت";
+  if (bytes === 0 || !bytes) return "۰ بایت";
   const units = ["بایت", "کیلوبایت", "مگابایت", "گیگابایت"];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   const value = bytes / Math.pow(1024, i);
@@ -106,6 +112,7 @@ export default function AdminMediaPage() {
   const [detailTarget, setDetailTarget] = React.useState<Media | null>(null);
   const [folderDeleteTarget, setFolderDeleteTarget] = React.useState<MediaFolder | null>(null);
   const [folderDeleting, setFolderDeleting] = React.useState(false);
+  const [mobileFoldersOpen, setMobileFoldersOpen] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Debounce search input.
@@ -169,10 +176,31 @@ export default function AdminMediaPage() {
       setDetailTarget(null);
       load();
     } catch (e: unknown) {
-      const apiErr = e as { message?: string };
-      toast.error(apiErr?.message ?? "حذف ناموفق بود — ممکن است در جایی استفاده شده باشد");
+      const apiErr = e as { message?: string; status?: number };
+      if (apiErr?.status === 409) {
+        toast.error("این فایل در حال استفاده است. از «حذف اجباری» استفاده کنید.", {
+          description: apiErr?.message,
+        });
+      } else {
+        toast.error(apiErr?.message ?? "حذف ناموفق بود");
+      }
     }
   };
+
+  const onForceDelete = async (id: number) => {
+    try {
+      await mediaService.forceDelete(id);
+      toast.success("فایل و تمام ارجاعات آن حذف شد");
+      setDetailTarget(null);
+      setForceDeleteTarget(null);
+      load();
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "حذف اجباری ناموفق بود");
+    }
+  };
+
+  const [forceDeleteTarget, setForceDeleteTarget] = React.useState<Media | null>(null);
 
   const onDownload = async (m: Media) => {
     try {
@@ -219,14 +247,29 @@ export default function AdminMediaPage() {
     }
   };
 
+  const selectEntity = (e: string) => {
+    setEntityType(e);
+    setPage(1);
+    setMobileFoldersOpen(false);
+  };
+
   const media = data?.items ?? [];
   const totalPages = data?.meta?.totalPages ?? 1;
   const total = data?.meta?.total ?? 0;
 
+  const foldersSidebar = (
+    <FoldersSidebar
+      activeEntityType={entityType}
+      onSelectEntity={selectEntity}
+      onDeleteFolder={setFolderDeleteTarget}
+    />
+  );
+
   return (
     <div className="space-y-4">
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-xl font-bold text-foreground sm:text-2xl">کتابخانه رسانه</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             آپلود، مرور و مدیریت تصاویر و فایل‌ها
@@ -238,7 +281,7 @@ export default function AdminMediaPage() {
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
             <RefreshCw className={cn("size-4", loading && "animate-spin")} />
-            به‌روزرسانی
+            <span className="hidden sm:inline">به‌روزرسانی</span>
           </Button>
           <Button onClick={() => fileInputRef.current?.click()} disabled={uploading}>
             {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
@@ -255,24 +298,24 @@ export default function AdminMediaPage() {
         </div>
       </div>
 
-      {/* Filters bar */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Filters bar — equal-width responsive grid */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">جستجو</Label>
+          <Label className="text-[11px] text-muted-foreground">جستجو</Label>
           <div className="relative">
             <Search className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="نام فایل..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pr-9"
+              className="h-9 pr-9"
             />
           </div>
         </div>
         <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">نوع</Label>
+          <Label className="text-[11px] text-muted-foreground">نوع</Label>
           <Select value={type} onValueChange={(v) => { setType(v); setPage(1); }}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
             <SelectContent>
               {TYPE_OPTIONS.map((o) => (
                 <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
@@ -281,9 +324,9 @@ export default function AdminMediaPage() {
           </Select>
         </div>
         <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">موجودیت</Label>
+          <Label className="text-[11px] text-muted-foreground">موجودیت</Label>
           <Select value={entityType} onValueChange={(v) => { setEntityType(v); setPage(1); }}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
             <SelectContent>
               {ENTITY_OPTIONS.map((o) => (
                 <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
@@ -291,27 +334,53 @@ export default function AdminMediaPage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-end">
-          <p className="text-xs text-muted-foreground nums-fa">
-            صفحه {toPersianDigits(page)} از {toPersianDigits(totalPages)} — مجموع {toPersianDigits(total)}
+        <div className="flex flex-col justify-end">
+          <p className="text-[11px] text-muted-foreground nums-fa pb-1.5">
+            صفحه {toPersianDigits(page)} از {toPersianDigits(totalPages)}
           </p>
         </div>
       </div>
 
-      {/* Folders sidebar + grid */}
-      <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
-        <FoldersSidebar
-          activeEntityType={entityType}
-          onSelectEntity={(e) => { setEntityType(e); setPage(1); }}
-          onDeleteFolder={setFolderDeleteTarget}
-        />
+      {/* Mobile folders trigger + grid */}
+      <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
+        {/* Desktop sidebar — hidden on mobile */}
+        <div className="hidden lg:block">
+          {foldersSidebar}
+        </div>
+
+        {/* Mobile folders sheet */}
+        <Sheet open={mobileFoldersOpen} onOpenChange={setMobileFoldersOpen}>
+          <SheetContent side="right" className="w-[280px] overflow-y-auto p-3">
+            <SheetHeader className="mb-3">
+              <SheetTitle className="flex items-center gap-2 text-sm">
+                <Folder className="size-4" />
+                پوشه‌های رسانه
+              </SheetTitle>
+            </SheetHeader>
+            {foldersSidebar}
+          </SheetContent>
+        </Sheet>
 
         {/* Media grid */}
         <div className="min-w-0">
+          {/* Mobile folders button */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="mb-3 lg:hidden"
+            onClick={() => setMobileFoldersOpen(true)}
+          >
+            <FolderOpen className="size-4" />
+            پوشه‌ها
+            {entityType !== "ALL" && (
+              <Badge variant="secondary" className="mr-1 text-[10px]">{entityType}</Badge>
+            )}
+          </Button>
+
           {loading ? (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-4 xl:grid-cols-5">
               {Array.from({ length: 10 }).map((_, i) => (
-                <Skeleton key={i} className="aspect-square w-full rounded-xl" />
+                <Skeleton key={i} className="aspect-square w-full rounded-lg" />
               ))}
             </div>
           ) : media.length === 0 ? (
@@ -331,7 +400,7 @@ export default function AdminMediaPage() {
             />
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-4 xl:grid-cols-5">
                 {media.map((m) => (
                   <MediaCard
                     key={m.id}
@@ -379,10 +448,21 @@ export default function AdminMediaPage() {
         onCopyUrl={onCopyUrl}
         onDownload={onDownload}
         onDelete={onDelete}
+        onForceDelete={(m) => {
+          setDetailTarget(null);
+          setForceDeleteTarget(m);
+        }}
         onUpdated={(updated) => {
           setDetailTarget(updated);
           load();
         }}
+      />
+
+      {/* Force-delete confirmation */}
+      <ForceDeleteDialog
+        media={forceDeleteTarget}
+        onClose={() => setForceDeleteTarget(null)}
+        onConfirm={onForceDelete}
       />
 
       {/* Folder delete confirmation */}
@@ -417,52 +497,64 @@ function MediaCard({
 }) {
   return (
     <Card className="group cursor-pointer overflow-hidden" onClick={onClick}>
-      <div className="relative aspect-square bg-muted">
+      <div className="relative aspect-square overflow-hidden bg-muted">
         {media.type === "IMAGE" ? (
-          <img src={media.url} alt={media.originalName} className="size-full object-cover" loading="lazy" />
+          <img
+            src={media.url}
+            alt={media.originalName}
+            className="h-full w-full object-cover"
+            loading="lazy"
+            width={150}
+            height={150}
+          />
         ) : media.type === "VIDEO" ? (
           <div className="flex size-full flex-col items-center justify-center text-muted-foreground">
-            <Film className="size-10" />
+            <Film className="size-8" />
             <span className="mt-1 text-[10px]">ویدیو</span>
           </div>
         ) : (
           <div className="flex size-full items-center justify-center text-muted-foreground">
-            <FileText className="size-10" />
+            <FileText className="size-8" />
           </div>
         )}
         {/* Type badge */}
         <div className="absolute right-1 top-1">
           <Badge variant="secondary" className="text-[9px]">{media.type}</Badge>
         </div>
-        {/* Hover actions */}
-        <div className="absolute inset-0 flex items-center justify-center gap-1 bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+        {/* Hover actions (desktop) */}
+        <div className="absolute inset-0 hidden items-center justify-center gap-1 bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 sm:flex">
           <Button
             size="icon"
             variant="secondary"
-            className="size-8"
+            className="size-7"
             onClick={(e) => { e.stopPropagation(); onClick(); }}
             aria-label="جزئیات"
           >
-            <Info className="size-4" />
+            <Info className="size-3.5" />
           </Button>
           <Button
             size="icon"
             variant="secondary"
-            className="size-8"
+            className="size-7"
             onClick={(e) => { e.stopPropagation(); onCopyUrl(); }}
             aria-label="کپی آدرس"
           >
-            <Copy className="size-4" />
+            <Copy className="size-3.5" />
           </Button>
         </div>
       </div>
-      <CardContent className="p-2">
-        <p className="truncate text-xs font-medium text-foreground" title={media.originalName}>
+      <CardContent className="p-1.5">
+        <p className="truncate text-[11px] font-medium text-foreground" title={media.originalName}>
           {media.originalName}
         </p>
-        <p className="mt-0.5 truncate text-[10px] text-muted-foreground" dir="ltr">
-          {media.entityType ?? "misc"}
-        </p>
+        <div className="mt-0.5 flex items-center justify-between gap-1">
+          <span className="truncate text-[9px] text-muted-foreground" dir="ltr">
+            {media.entityType ?? "misc"}
+          </span>
+          <span className="shrink-0 text-[9px] text-muted-foreground nums-fa">
+            {formatFileSize(media.size)}
+          </span>
+        </div>
       </CardContent>
     </Card>
   );
@@ -505,7 +597,6 @@ function FoldersSidebar({
       if (!yearMap.has(f.year)) yearMap.set(f.year, []);
       yearMap.get(f.year)!.push(f);
     }
-    // Sort months descending within each year.
     for (const yearMap of map.values()) {
       for (const months of yearMap.values()) {
         months.sort((a, b) => b.month.localeCompare(a.month));
@@ -520,7 +611,7 @@ function FoldersSidebar({
 
   return (
     <Card className="h-fit">
-      <CardContent className="p-3">
+      <CardContent className="p-2.5">
         <div className="mb-2 flex items-center justify-between">
           <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <Folder className="size-3.5" />
@@ -546,7 +637,7 @@ function FoldersSidebar({
         {loading ? (
           <div className="space-y-2 py-2">
             {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-7 w-full rounded-md" />
+              <Skeleton key={i} className="h-6 w-full rounded-md" />
             ))}
           </div>
         ) : grouped.length === 0 ? (
@@ -633,7 +724,7 @@ function FoldersSidebar({
   );
 }
 
-/* ───────── Media detail dialog (with edit / download / usage) ───────── */
+/* ───────── Media detail dialog (with edit / download / usage / force-delete) ───────── */
 
 function MediaDetailDialog({
   media,
@@ -641,6 +732,7 @@ function MediaDetailDialog({
   onCopyUrl,
   onDownload,
   onDelete,
+  onForceDelete,
   onUpdated,
 }: {
   media: Media | null;
@@ -648,12 +740,12 @@ function MediaDetailDialog({
   onCopyUrl: (url: string) => void;
   onDownload: (m: Media) => void;
   onDelete: (id: number) => void;
+  onForceDelete: (m: Media) => void;
   onUpdated: (m: Media) => void;
 }) {
   const [tab, setTab] = React.useState<"info" | "usage">("info");
   const [usage, setUsage] = React.useState<string[] | null>(null);
   const [usageLoading, setUsageLoading] = React.useState(false);
-  // Edit form
   const [editName, setEditName] = React.useState("");
   const [editEntity, setEditEntity] = React.useState("");
   const [saving, setSaving] = React.useState(false);
@@ -709,6 +801,8 @@ function MediaDetailDialog({
     }
   };
 
+  const hasUsage = usage && usage.length > 0;
+
   return (
     <Dialog open={!!media} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
@@ -719,14 +813,18 @@ function MediaDetailDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Preview */}
+        {/* Preview — constrained height, never full-size */}
         <div className="overflow-hidden rounded-xl border border-border bg-muted">
           {media.type === "IMAGE" ? (
-            <img src={media.url} alt={media.originalName} className="max-h-64 w-full object-contain" />
+            <img
+              src={media.url}
+              alt={media.originalName}
+              className="mx-auto max-h-56 w-full object-contain"
+            />
           ) : media.type === "VIDEO" ? (
-            <video src={media.url} className="max-h-64 w-full" controls muted />
+            <video src={media.url} className="max-h-56 w-full" controls muted />
           ) : (
-            <div className="flex h-40 items-center justify-center text-muted-foreground">
+            <div className="flex h-32 items-center justify-center text-muted-foreground">
               <FileText className="size-12" />
             </div>
           )}
@@ -755,6 +853,9 @@ function MediaDetailDialog({
             onClick={() => setTab("usage")}
           >
             محل استفاده
+            {hasUsage && (
+              <Badge variant="destructive" className="mr-1 text-[9px]">{usage!.length}</Badge>
+            )}
           </button>
         </div>
 
@@ -792,7 +893,7 @@ function MediaDetailDialog({
             <div className="space-y-2 border-t pt-3">
               <div>
                 <Label className="text-xs">نام اصلی فایل</Label>
-                <Input value={editName} onChange={(e) => setEditName(e.target.value)} dir="ltr" className="text-left mt-1" />
+                <Input value={editName} onChange={(e) => setEditName(e.target.value)} dir="ltr" className="mt-1 text-left" />
               </div>
               <div>
                 <Label className="text-xs">نوع موجودیت (entityType)</Label>
@@ -801,7 +902,7 @@ function MediaDetailDialog({
                   onChange={(e) => setEditEntity(e.target.value)}
                   placeholder="مثلاً: products یا blog"
                   dir="ltr"
-                  className="text-left mt-1"
+                  className="mt-1 text-left"
                 />
                 <p className="mt-1 text-[10px] text-muted-foreground">
                   برای دسته‌بندی فایل در پوشه مناسب استفاده می‌شود.
@@ -819,17 +920,23 @@ function MediaDetailDialog({
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="size-6 animate-spin text-muted-foreground" />
               </div>
-            ) : !usage || usage.length === 0 ? (
+            ) : !hasUsage ? (
               <div className="py-6 text-center text-sm text-muted-foreground">
                 این فایل در هیچ‌کجا استفاده نشده است.
               </div>
             ) : (
               <>
-                <p className="text-xs text-muted-foreground">
-                  این فایل در موارد زیر استفاده شده — قبل از حذف، آن‌ها را پاک کنید:
-                </p>
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/30">
+                  <p className="flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+                    <AlertTriangle className="size-3.5" />
+                    این فایل در {toPersianDigits(usage!.length)} مورد استفاده شده است.
+                  </p>
+                  <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-500">
+                    حذف عادی ممکن است ناموفق باشد. برای حذف کامل، از «حذف اجباری» استفاده کنید.
+                  </p>
+                </div>
                 <div className="space-y-1.5">
-                  {usage.map((u, idx) => (
+                  {usage!.map((u, idx) => (
                     <div
                       key={idx}
                       className="flex items-center gap-2 rounded-lg border border-border/40 p-2 text-sm"
@@ -844,11 +951,11 @@ function MediaDetailDialog({
           </div>
         )}
 
-        <DialogFooter className="flex-row justify-between gap-2 sm:justify-between">
-          <div className="flex gap-1.5">
+        <DialogFooter className="flex-row flex-wrap justify-between gap-2 sm:justify-between">
+          <div className="flex flex-wrap gap-1.5">
             <Button variant="outline" size="sm" onClick={() => onCopyUrl(media.url)}>
               <Copy className="size-4" />
-              کپی آدرس
+              کپی
             </Button>
             <Button variant="outline" size="sm" onClick={() => onDownload(media)}>
               <Download className="size-4" />
@@ -861,13 +968,140 @@ function MediaDetailDialog({
               variant="destructive"
               size="sm"
               onClick={() => {
-                if (confirm(`حذف «${media.originalName}»؟`)) onDelete(media.id);
+                onDelete(media.id);
               }}
             >
               <Trash2 className="size-4" />
               حذف
             </Button>
+            {hasUsage && (
+              <Button
+                variant="destructive"
+                size="sm"
+                className="bg-red-700 hover:bg-red-800"
+                onClick={() => onForceDelete(media)}
+              >
+                <AlertTriangle className="size-4" />
+                حذف اجباری
+              </Button>
+            )}
           </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ───────── Force-delete confirmation dialog ───────── */
+
+function ForceDeleteDialog({
+  media,
+  onClose,
+  onConfirm,
+}: {
+  media: Media | null;
+  onClose: () => void;
+  onConfirm: (id: number) => void;
+}) {
+  const [usage, setUsage] = React.useState<string[] | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+
+  React.useEffect(() => {
+    if (media) {
+      setUsage(null);
+      setLoading(true);
+      mediaService
+        .usage(media.id)
+        .then((r) => setUsage(r.usage))
+        .catch(() => setUsage([]))
+        .finally(() => setLoading(false));
+    }
+  }, [media]);
+
+  if (!media) return null;
+
+  const onConfirmDelete = async () => {
+    setDeleting(true);
+    await onConfirm(media.id);
+    setDeleting(false);
+  };
+
+  return (
+    <Dialog open={!!media} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-destructive">
+            <AlertTriangle className="size-5" />
+            حذف اجباری فایل
+          </DialogTitle>
+          <DialogDescription>
+            این عمل قابل بازگشت نیست.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 py-2">
+          {/* Warning */}
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+            <p className="text-sm font-medium text-foreground">
+              {media.originalName}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground nums-fa">
+              شناسه: #{toPersianDigits(media.id)} — حجم: {formatFileSize(media.size)}
+            </p>
+          </div>
+
+          {/* Usage list */}
+          {loading ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : usage && usage.length > 0 ? (
+            <div>
+              <p className="mb-2 text-xs font-medium text-destructive">
+                این فایل از موارد زیر حذف خواهد شد:
+              </p>
+              <div className="max-h-40 space-y-1 overflow-y-auto">
+                {usage.map((u, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-2 rounded-md border border-border/40 p-1.5 text-xs"
+                  >
+                    <Badge variant="outline" className="text-[9px]">{idx + 1}</Badge>
+                    <span>{u}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              این فایل در حال حاضر در جایی استفاده نمی‌شود.
+            </p>
+          )}
+
+          <div className="rounded-lg bg-destructive/10 p-2.5 text-xs text-destructive">
+            <AlertTriangle className="mb-1 size-3.5" />
+            با تأیید، فایل از دیسک حذف شده و تمام ارجاعات آن (تصاویر محصول، لوگوها، بنرها و...) null یا حذف خواهند شد.
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={deleting}>
+            انصراف
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={onConfirmDelete}
+            disabled={deleting}
+            className="bg-red-700 hover:bg-red-800"
+          >
+            {deleting ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <AlertTriangle className="size-4" />
+            )}
+            بله، حذف اجباری کن
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

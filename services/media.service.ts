@@ -88,4 +88,9 @@ export const mediaService = {
 
   /** Delete a media record. Fails with 409 if the file is in use anywhere. */
   delete: (id: number) => http.delete<void>(ENDPOINTS.media.delete(id)),
+
+  /** Force-delete a media record AND remove all references to it
+   *  (product images, brand logos, banner images, ticket attachments, etc.).
+   *  Use with caution — the backend nullifies or cascades all FK references. */
+  forceDelete: (id: number) => http.delete<void>(ENDPOINTS.media.forceDelete(id)),
 };
