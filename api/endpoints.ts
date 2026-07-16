@@ -148,9 +148,14 @@ export const ENDPOINTS = {
     upload: "/media",
     bulkUpload: "/media/bulk",
     list: "/media",
+    folders: "/media/folders",
+    foldersByEntity: (entityType: string) => `/media/folders/${entityType}`,
+    folder: (entityType: string, year: string, month: string) =>
+      `/media/folders/${entityType}/${year}/${month}`,
     byId: (id: number) => `/media/${id}`,
     usage: (id: number) => `/media/${id}/usage`,
     download: (id: number) => `/media/${id}/download`,
+    update: (id: number) => `/media/${id}`,
     delete: (id: number) => `/media/${id}`,
   },
 
