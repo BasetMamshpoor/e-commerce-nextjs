@@ -122,6 +122,56 @@ export interface UpdateMediaBody {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
+   2b. Currencies & Exchange Rates (Dynamic Currency-Based Pricing)
+   ────────────────────────────────────────────────────────────────────────── */
+
+export interface Currency {
+  id: number;
+  code: string;
+  name: string;
+  symbol: string;
+  isActive: boolean;
+  lastRate?: number | null;
+  lastRateUpdatedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** Public currency (subset shown on storefront). */
+export interface PublicCurrency {
+  id: number;
+  code: string;
+  name: string;
+  symbol: string;
+  lastRate?: number | null;
+}
+
+export interface ExchangeRateHistory {
+  id: number;
+  currencyId: number;
+  rate: number;
+  source: "brsapi" | "navasan" | "manual";
+  wasApplied: boolean;
+  lastAppliedRate: boolean;
+  createdAt: string;
+}
+
+export interface CreateCurrencyBody {
+  code: string;
+  name: string;
+  symbol: string;
+  isActive?: boolean;
+}
+
+export interface UpdateCurrencyBody {
+  name?: string;
+  isActive?: boolean;
+  /** When set, a new ExchangeRateHistory entry with source="manual" is created
+   *  and immediately applied to all products using this currency. */
+  manualRate?: number;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
    3. Categories
    ────────────────────────────────────────────────────────────────────────── */
 
@@ -168,12 +218,22 @@ export interface Brand {
 
 export type AttributeInputType = "TEXT" | "COLOR" | "SELECT";
 
+/** How an attribute value modifies the product price. */
+export type AttributeModifierType =
+  | "PERCENTAGE"
+  | "FIXED_SOURCE_CURRENCY"
+  | "FIXED_IRT";
+
 export interface AttributeValue {
   id: number;
   attributeId: number;
   value: string;
   colorHex?: string | null;
   order: number;
+  /** How this value modifies the product price. null = no effect. */
+  modifierType?: AttributeModifierType | null;
+  /** Modifier amount (percentage, source-currency amount, or IRT amount). */
+  modifierValue?: number | null;
 }
 
 export interface Attribute {
@@ -196,6 +256,9 @@ export interface Attribute {
 export type ProductStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
 
 export type DiscountType = "PERCENT" | "FIXED";
+
+/** How a product's price is determined. */
+export type ProductPricingMode = "FIXED_IRT" | "CURRENCY_BASED";
 
 export type ProductSortOption =
   | "newest"
@@ -251,6 +314,18 @@ export interface Product {
   displayAttributes?: DisplayAttribute[];
   displayAttributeValues?: DisplayAttribute[];
   basePrice: number;
+  /** Pricing mode — FIXED_IRT (fixed tomans) or CURRENCY_BASED (auto from source currency). */
+  pricingMode: ProductPricingMode;
+  /** Source currency (required when pricingMode = CURRENCY_BASED). */
+  currencyId?: number | null;
+  currency?: Pick<Currency, "id" | "code" | "symbol" | "name"> | null;
+  /** Price in source currency (e.g. 999.99 USD). */
+  sourcePrice?: number | null;
+  /** Buffer percentage for price fluctuation (0–100). */
+  priceBufferPercent: number;
+  /** Current price in IRT (auto-updated by cron for CURRENCY_BASED products). */
+  currentPriceIRT?: number | null;
+  priceUpdatedAt?: string | null;
   discountType?: DiscountType | null;
   discountValue?: number | null;
   minPrice: number;
@@ -521,7 +596,16 @@ export interface OrderItem {
   id: number;
   productName: string;
   variantAttributes: string;
+  /** Final price in IRT (was previously called `price`). */
   price: number;
+  /** Final price in IRT — same as `price`, explicit name from backend. */
+  finalPriceIRT?: number;
+  /** Pricing mode at the time of order placement. */
+  pricingModeSnapshot?: ProductPricingMode | string;
+  /** Source currency code (e.g. "USD") if CURRENCY_BASED. */
+  sourceCurrencyCode?: string | null;
+  /** Exchange rate applied at the time of order. */
+  appliedRate?: number | null;
   quantity: number;
   discountAmount: number;
   image?: string | null;
@@ -1173,4 +1257,48 @@ export interface UpsertPopupBody {
   startsAt?: string | null;
   endsAt?: string | null;
   showOncePerSession?: boolean;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Price Preview (POST /admin/products/preview-price)
+   ────────────────────────────────────────────────────────────────────────── */
+
+export interface PricePreviewBreakdownItem {
+  attributeValueId?: number;
+  attributeValueLabel?: string;
+  modifierType?: AttributeModifierType | null;
+  modifierValue?: number | null;
+  amount: number;
+  label?: string;
+}
+
+export interface PricePreviewBreakdown {
+  basePrice: number;
+  attributeCost: number;
+  attributeCostBreakdown: PricePreviewBreakdownItem[];
+  discountAmount: number;
+  discountType?: DiscountType | null;
+  discountValue?: number | null;
+  finalPrice: number;
+  pricingMode: ProductPricingMode;
+}
+
+export interface PricePreviewResponse {
+  finalPrice: number;
+  breakdown: PricePreviewBreakdown;
+}
+
+export interface PricePreviewBody {
+  basePrice: number;
+  pricingMode: ProductPricingMode;
+  currencyId?: number;
+  sourcePrice?: number;
+  priceBufferPercent?: number;
+  discountType?: DiscountType;
+  discountValue?: number;
+  attributeModifiers: Array<{
+    attributeValueId?: number;
+    modifierType: AttributeModifierType;
+    modifierValue: number;
+  }>;
 }

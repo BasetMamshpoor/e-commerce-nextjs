@@ -1,15 +1,23 @@
 /**
- * Attributes API service — added isDisplay field.
+ * Attributes API service — added isDisplay field + price modifiers.
  */
 import { http } from "@/lib/api-client";
 import { ENDPOINTS } from "@/api/endpoints";
-import type { Attribute, AttributeInputType, AttributeValue } from "@/types/domain";
+import type { Attribute, AttributeInputType, AttributeModifierType, AttributeValue } from "@/types/domain";
 
 export interface CreateAttributeBody {
   name: string; slug?: string; inputType: AttributeInputType;
   isFilterable?: boolean; isVariant?: boolean; isDisplay?: boolean;
 }
-export interface AddAttributeValueBody { value: string; colorHex?: string; order?: number; }
+export interface AddAttributeValueBody {
+  value: string;
+  colorHex?: string;
+  order?: number;
+  /** How this value modifies the product price. Omit/null for no effect. */
+  modifierType?: AttributeModifierType | null;
+  /** Modifier amount — percentage, source-currency amount, or IRT amount. */
+  modifierValue?: number | null;
+}
 
 export const attributesService = {
   list: () => http.get<Attribute[]>(ENDPOINTS.attributes.list),

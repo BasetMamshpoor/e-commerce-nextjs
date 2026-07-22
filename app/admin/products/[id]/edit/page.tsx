@@ -40,18 +40,22 @@ import {
   brandsService,
   categoriesService,
   attributesService,
+  currenciesService,
 } from "@/services";
 import type {
   Brand,
   Category,
   Attribute,
+  Currency,
   Product,
   ProductStatus,
   DiscountType,
+  ProductPricingMode,
   ProductVariant,
 } from "@/types/domain";
 import { getProductCategories } from "@/types/domain";
 import { formatPrice, toPersianDigits } from "@/utils/format";
+import { cn } from "@/lib/utils";
 
 const STATUS_OPTIONS: { value: ProductStatus; label: string }[] = [
   { value: "DRAFT", label: "پیش‌نویس" },
@@ -75,6 +79,8 @@ export default function AdminProductEditPage({
   const [brands, setBrands] = React.useState<Brand[]>([]);
   const [categoryTree, setCategoryTree] = React.useState<Category[]>([]);
   const [attributes, setAttributes] = React.useState<Attribute[]>([]);
+  const [currencies, setCurrencies] = React.useState<Currency[]>([]);
+  const [productPricingMode, setProductPricingMode] = React.useState<ProductPricingMode>("FIXED_IRT");
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
 
@@ -84,6 +90,9 @@ export default function AdminProductEditPage({
     shortDescription: "",
     description: "",
     basePrice: "" as string | number,
+    currencyId: "" as string | number,
+    sourcePrice: "" as string | number,
+    priceBufferPercent: "0" as string | number,
     status: "DRAFT" as ProductStatus,
     isFeatured: false,
     categoryIds: [] as number[],
@@ -105,19 +114,25 @@ export default function AdminProductEditPage({
       brandsService.list({ includeInactive: true }),
       categoriesService.tree(),
       attributesService.list(),
+      currenciesService.adminList(),
     ])
-      .then(([p, b, c, a]) => {
+      .then(([p, b, c, a, cur]) => {
         setBrands(b);
         setCategoryTree(c);
         setAttributes(a);
+        setCurrencies(cur);
         const product = p as Product;
         const cats = getProductCategories(product);
+        setProductPricingMode(product.pricingMode ?? "FIXED_IRT");
         setForm({
           name: product.name,
           brandId: product.brandId != null ? String(product.brandId) : "",
           shortDescription: product.shortDescription ?? "",
           description: product.description ?? "",
           basePrice: product.basePrice ?? 0,
+          currencyId: product.currencyId != null ? String(product.currencyId) : "",
+          sourcePrice: product.sourcePrice ?? "",
+          priceBufferPercent: product.priceBufferPercent ?? 0,
           status: product.status,
           isFeatured: product.isFeatured,
           categoryIds: cats.map((cat) => cat.id),
@@ -148,11 +163,28 @@ export default function AdminProductEditPage({
       toast.error("نام الزامی است");
       return;
     }
-    const basePrice = Number(form.basePrice);
-    if (!basePrice || basePrice < 0) {
-      toast.error("قیمت پایه الزامی است");
-      return;
+
+    const isCurrencyBased = productPricingMode === "CURRENCY_BASED";
+    let basePrice: number | undefined;
+    let sourcePrice: number | undefined;
+    let currencyId: number | undefined;
+
+    if (isCurrencyBased) {
+      currencyId = form.currencyId ? Number(form.currencyId) : undefined;
+      sourcePrice = form.sourcePrice ? Number(form.sourcePrice) : undefined;
+      if (!currencyId || !sourcePrice || sourcePrice <= 0) {
+        toast.error("ارز و قیمت به ارز مبدأ الزامی هستند");
+        return;
+      }
+    } else {
+      basePrice = Number(form.basePrice);
+      if (!basePrice || basePrice < 1000) {
+        toast.error("قیمت پایه (حداقل ۱۰۰۰ تومان) الزامی است");
+        return;
+      }
     }
+
+    const bufferPercent = Number(form.priceBufferPercent) || 0;
 
     setSaving(true);
     try {
@@ -185,7 +217,10 @@ export default function AdminProductEditPage({
         brandId: form.brandId ? Number(form.brandId) : null,
         shortDescription: form.shortDescription || undefined,
         description: form.description || undefined,
-        basePrice,
+        basePrice: isCurrencyBased ? 0 : basePrice,
+        currencyId: isCurrencyBased ? currencyId : undefined,
+        sourcePrice: isCurrencyBased ? sourcePrice : undefined,
+        priceBufferPercent: bufferPercent,
         discountType,
         discountValue,
         status: form.status,
@@ -291,11 +326,88 @@ export default function AdminProductEditPage({
           <Card>
             <CardHeader><CardTitle className="text-base">قیمت و تخفیف</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              {/* Pricing mode — read-only (cannot be changed after creation) */}
+              <div className="space-y-2">
+                <Label>مدل قیمت‌گذاری</Label>
+                <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-3">
+                  <Badge variant={productPricingMode === "CURRENCY_BASED" ? "default" : "secondary"}>
+                    {productPricingMode === "CURRENCY_BASED" ? "ارزی" : "ثابت (تومان)"}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {productPricingMode === "CURRENCY_BASED"
+                      ? "قیمت از ارز مبدأ محاسبه می‌شود — قابل تغییر نیست"
+                      : "قیمت به تومان — قابل تغییر نیست"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Conditional fields */}
+              {productPricingMode === "FIXED_IRT" ? (
                 <div className="space-y-2">
                   <Label>قیمت پایه (تومان) *</Label>
                   <Input type="number" dir="ltr" className="text-left" value={form.basePrice} onChange={(e) => setForm({ ...form, basePrice: e.target.value })} />
                 </div>
+              ) : (
+                <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label>ارز مبدأ</Label>
+                      <Select
+                        value={form.currencyId ? String(form.currencyId) : ""}
+                        onValueChange={(v) => setForm({ ...form, currencyId: Number(v) })}
+                      >
+                        <SelectTrigger><SelectValue placeholder="انتخاب ارز" /></SelectTrigger>
+                        <SelectContent>
+                          {currencies.map((c) => (
+                            <SelectItem key={c.id} value={String(c.id)}>
+                              {c.name} ({c.code} {c.symbol})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>قیمت به ارز مبدأ *</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        dir="ltr"
+                        className="text-left"
+                        value={form.sourcePrice}
+                        onChange={(e) => setForm({ ...form, sourcePrice: e.target.value })}
+                        placeholder="مثال: 999.99"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>درصد بافر نوسان (۰–۱۰۰)</Label>
+                    <Input
+                      type="number"
+                      dir="ltr"
+                      className="text-left"
+                      value={form.priceBufferPercent}
+                      onChange={(e) => setForm({ ...form, priceBufferPercent: e.target.value })}
+                    />
+                  </div>
+                  {form.currencyId && form.sourcePrice && (() => {
+                    const cur = currencies.find((c) => c.id === Number(form.currencyId));
+                    if (cur?.lastRate) {
+                      const estimate = Number(form.sourcePrice) * cur.lastRate;
+                      return (
+                        <div className="rounded-md bg-muted/50 p-2 text-xs">
+                          <span className="text-muted-foreground">تقریب قیمت تومانی:</span>{" "}
+                          <span className="font-bold nums-fa">{formatPrice(estimate)} تومان</span>
+                          <span className="text-muted-foreground"> (نرخ: {toPersianDigits(formatPrice(cur.lastRate))})</span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+              )}
+
+              {/* Discount (applies to both modes) */}
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>نوع تخفیف</Label>
                   <Select value={form.discountType} onValueChange={(v) => setForm({ ...form, discountType: v as DiscountType | "NONE" })}>
@@ -305,29 +417,13 @@ export default function AdminProductEditPage({
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-              {form.discountType !== "NONE" && (
-                <div className="space-y-2">
-                  <Label>مقدار تخفیف {form.discountType === "PERCENT" ? "(٪)" : "(تومان)"}</Label>
-                  <Input type="number" dir="ltr" className="text-left" value={form.discountValue} onChange={(e) => setForm({ ...form, discountValue: e.target.value })} />
-                </div>
-              )}
-              {basePriceNum > 0 && (
-                <div className="rounded-lg bg-muted/50 p-3 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">قیمت پایه:</span>
-                    <span className="font-bold nums-fa">{formatPrice(basePriceNum)} تومان</span>
+                {form.discountType !== "NONE" && (
+                  <div className="space-y-2">
+                    <Label>مقدار تخفیف {form.discountType === "PERCENT" ? "(٪)" : "(تومان)"}</Label>
+                    <Input type="number" dir="ltr" className="text-left" value={form.discountValue} onChange={(e) => setForm({ ...form, discountValue: e.target.value })} />
                   </div>
-                  {variants.length > 0 && (
-                    <div className="mt-1 flex items-center justify-between">
-                      <span className="text-muted-foreground">محدوده قیمت تنوع‌ها:</span>
-                      <span className="font-bold nums-fa">
-                        {formatPrice(basePriceNum + Math.min(...variants.map((v) => v.priceAdjustment)))} — {formatPrice(basePriceNum + Math.max(...variants.map((v) => v.priceAdjustment)))} تومان
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
+                )}
+              </div>
             </CardContent>
           </Card>
 

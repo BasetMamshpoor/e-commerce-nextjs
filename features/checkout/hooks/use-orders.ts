@@ -67,6 +67,35 @@ export function useCreateOrder() {
     },
     onError: (err) => {
       const apiErr = err as ApiError;
+
+      // Check if this is a PRICE_CHANGED error (currency-based products whose
+      // price has fluctuated more than the threshold since the cart was loaded).
+      const errors = apiErr.errors as Array<{
+        priceChanged?: boolean;
+        oldPrice?: number;
+        newPrice?: number;
+        message?: string;
+      }> | undefined;
+
+      const priceChangedItems = errors?.filter((e) => e.priceChanged);
+
+      if (priceChangedItems && priceChangedItems.length > 0) {
+        // Refresh the cart so the user sees updated prices.
+        queryClient.invalidateQueries({ queryKey: CART_QUERY_KEY });
+
+        const descriptions = priceChangedItems.map((item) => {
+          if (item.oldPrice && item.newPrice) {
+            return `${item.message ?? "قیمت تغییر کرد"}: ${item.oldPrice.toLocaleString("fa-IR")} → ${item.newPrice.toLocaleString("fa-IR")} تومان`;
+          }
+          return item.message ?? "قیمت تغییر کرد";
+        });
+
+        toast.error("قیمت برخی محصولات تغییر کرده است", {
+          description: descriptions.join(" — "),
+        });
+        return;
+      }
+
       if (apiErr.isConflict) {
         toast.error("موجودی هم‌زمان تغییر کرد", {
           description: "لطفاً سبد خود را بررسی و دوباره تلاش کنید",

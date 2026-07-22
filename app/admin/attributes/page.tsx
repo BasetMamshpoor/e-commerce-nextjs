@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { attributesService } from "@/services";
-import type { Attribute, AttributeInputType } from "@/types/domain";
+import type { Attribute, AttributeInputType, AttributeModifierType } from "@/types/domain";
 
 export default function AdminAttributesPage() {
   const [attributes, setAttributes] = React.useState<Attribute[]>([]);
@@ -161,6 +161,8 @@ function AddValueForm({
   const [value, setValue] = React.useState("");
   const [colorHex, setColorHex] = React.useState("");
   const [order, setOrder] = React.useState("");
+  const [modifierType, setModifierType] = React.useState<AttributeModifierType | "">("");
+  const [modifierValue, setModifierValue] = React.useState("");
   const [saving, setSaving] = React.useState(false);
 
   const isColor = inputType === "COLOR";
@@ -171,16 +173,24 @@ function AddValueForm({
       toast.error("برای ویژگی رنگ، کد رنگ الزامی است");
       return;
     }
+    if (modifierType && !modifierValue) {
+      toast.error("مقدار modifier را وارد کنید یا نوع modifier را خالی بگذارید");
+      return;
+    }
     setSaving(true);
     try {
       await attributesService.addValue(attributeId, {
         value,
         colorHex: isColor ? (colorHex || undefined) : undefined,
         order: order ? Number(order) : 0,
+        modifierType: modifierType || null,
+        modifierValue: modifierType && modifierValue ? Number(modifierValue) : null,
       });
       setValue("");
       setColorHex("");
       setOrder("");
+      setModifierType("");
+      setModifierValue("");
       onAdded();
     } catch {
       toast.error("افزودن ناموفق بود");
@@ -241,6 +251,53 @@ function AddValueForm({
           <Plus className="size-3.5" />
         </Button>
       </div>
+
+      {/* Price modifier */}
+      <div className="grid grid-cols-2 gap-1.5">
+        <Select
+          value={modifierType || "none"}
+          onValueChange={(v) => setModifierType(v === "none" ? "" : (v as AttributeModifierType))}
+        >
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue placeholder="تأثیر روی قیمت" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">بدون تأثیر</SelectItem>
+            <SelectItem value="PERCENTAGE">درصد</SelectItem>
+            <SelectItem value="FIXED_SOURCE_CURRENCY">مبلغ ثابت (ارز مبدأ)</SelectItem>
+            <SelectItem value="FIXED_IRT">مبلغ ثابت (تومان)</SelectItem>
+          </SelectContent>
+        </Select>
+        {modifierType ? (
+          <Input
+            type="number"
+            value={modifierValue}
+            onChange={(e) => setModifierValue(e.target.value)}
+            placeholder={
+              modifierType === "PERCENTAGE"
+                ? "درصد (مثلاً 10-)"
+                : modifierType === "FIXED_SOURCE_CURRENCY"
+                ? "مقدار ارز"
+                : "مقدار تومان"
+            }
+            className="h-8 text-xs nums-fa"
+            dir="ltr"
+            onKeyDown={(e) => e.key === "Enter" && onAdd()}
+          />
+        ) : (
+          <div />
+        )}
+      </div>
+      {modifierType === "PERCENTAGE" && (
+        <p className="text-[10px] text-muted-foreground">
+          عدد مثبت = گران‌تر، عدد منفی = ارزان‌تر (بین ۱۰۰- تا ۱۰۰۰)
+        </p>
+      )}
+      {modifierType === "FIXED_SOURCE_CURRENCY" && (
+        <p className="text-[10px] text-muted-foreground">
+          فقط روی محصولات ارزی (CURRENCY_BASED) اعمال می‌شود
+        </p>
+      )}
     </div>
   );
 }

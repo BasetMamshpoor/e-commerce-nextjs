@@ -8,10 +8,14 @@ import { http } from "@/lib/api-client";
 import { buildMultipartFormData } from "@/lib/form-data-helper";
 import { ENDPOINTS } from "@/api/endpoints";
 import type {
+  AttributeModifierType,
   PaginatedData,
+  PricePreviewBody,
+  PricePreviewResponse,
   Product,
   ProductFilterMetadata,
   ProductListQuery,
+  ProductPricingMode,
   ProductStatus,
   ProductVariant,
 } from "@/types/domain";
@@ -21,7 +25,16 @@ export interface CreateProductBody {
   brandId?: number;
   shortDescription?: string;
   description?: string;
+  /** Required when pricingMode = FIXED_IRT (>= 1000). Set to 0 when CURRENCY_BASED. */
   basePrice: number;
+  /** Pricing mode — FIXED_IRT (default) or CURRENCY_BASED. */
+  pricingMode?: ProductPricingMode;
+  /** Source currency ID (required when CURRENCY_BASED). */
+  currencyId?: number;
+  /** Price in source currency (required when CURRENCY_BASED, > 0). */
+  sourcePrice?: number;
+  /** Buffer percentage for price fluctuation (0–100, default 0). */
+  priceBufferPercent?: number;
   discountType?: "PERCENT" | "FIXED";
   discountValue?: number;
   status?: ProductStatus;
@@ -46,6 +59,10 @@ export interface UpdateProductBody {
   shortDescription?: string;
   description?: string;
   basePrice?: number;
+  /** Note: pricingMode is NOT editable after creation (backend rule). */
+  currencyId?: number | null;
+  sourcePrice?: number;
+  priceBufferPercent?: number;
   discountType?: "PERCENT" | "FIXED" | null;
   discountValue?: number | null;
   status?: ProductStatus;
@@ -112,6 +129,12 @@ export const productsService = {
 
   delete: (id: number) =>
     http.delete<void>(ENDPOINTS.products.delete(id)),
+
+  /** Admin: preview the final price of a product without saving.
+   *  Useful for showing the user what the final IRT price will be
+   *  before they commit to creating/updating a CURRENCY_BASED product. */
+  previewPrice: (body: PricePreviewBody) =>
+    http.post<PricePreviewResponse>(ENDPOINTS.products.previewPrice, body),
 
   addVariant: (id: number, body: UpdateVariantBody) =>
     http.post<ProductVariant>(ENDPOINTS.products.addVariant(id), body),

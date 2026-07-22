@@ -67,6 +67,8 @@ export const ENDPOINTS = {
     addVariant: (id: number) => `/products/${id}/variants`,
     updateVariant: (id: number, variantId: number) => `/products/${id}/variants/${variantId}`,
     deleteVariant: (id: number, variantId: number) => `/products/${id}/variants/${variantId}`,
+    /** Admin: preview final price without saving. */
+    previewPrice: "/products/preview-price",
   },
 
   cart: {
@@ -293,5 +295,16 @@ export const ENDPOINTS = {
     createCategory: "/blog/categories",
     updateCategory: (id: number) => `/blog/categories/${id}`,
     deleteCategory: (id: number) => `/blog/categories/${id}`,
+  },
+
+  currencies: {
+    /** Public list of active currencies (for storefront display). */
+    public: "/currencies",
+    /** Admin: list all currencies. */
+    adminList: "/admin/currencies",
+    /** Admin: create a new currency. */
+    create: "/admin/currencies",
+    /** Admin: update a currency or override its rate manually. */
+    update: (id: number) => `/admin/currencies/${id}`,
   },
 } as const;

@@ -347,7 +347,14 @@ function ProductInfo({
     }
   };
 
-  const originalPrice = (product.basePrice ?? 0) + (selectedVariant?.priceAdjustment ?? 0);
+  // Price calculation depends on pricing mode:
+  // - FIXED_IRT: basePrice + variant priceAdjustment
+  // - CURRENCY_BASED: currentPriceIRT (auto-updated by backend) + variant priceAdjustment
+  const isCurrencyBased = product.pricingMode === "CURRENCY_BASED";
+  const baseAmount = isCurrencyBased
+    ? (product.currentPriceIRT ?? 0)
+    : (product.basePrice ?? 0);
+  const originalPrice = baseAmount + (selectedVariant?.priceAdjustment ?? 0);
   const currentPrice = selectedVariant?.effectivePrice ?? originalPrice;
   const hasDiscount = originalPrice > currentPrice;
   const discountPct = hasDiscount ? discountPercent(originalPrice, currentPrice) : 0;
@@ -456,6 +463,20 @@ function ProductInfo({
             <span className="text-2xl font-bold text-foreground nums-fa">{formatPrice(currentPrice)}</span>
             <span className="text-sm text-muted-foreground">تومان</span>
           </div>
+          {/* Show source currency price for CURRENCY_BASED products */}
+          {isCurrencyBased && product.sourcePrice && product.currency && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <span>قیمت ارزی:</span>
+              <span className="font-medium nums-fa" dir="ltr">
+                {toPersianDigits(product.sourcePrice.toLocaleString("en-US"))} {product.currency.symbol}
+              </span>
+              {product.priceBufferPercent > 0 && (
+                <span className="text-[10px]">
+                  (با فر نوسان: {toPersianDigits(product.priceBufferPercent)}٪)
+                </span>
+              )}
+            </div>
+          )}
         </div>
         {!isOutOfStock && (
           <div className="flex items-center gap-2">
