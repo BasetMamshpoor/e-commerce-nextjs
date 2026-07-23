@@ -541,6 +541,7 @@ export default function AdminProductEditPage({
         existingVariants={variants}
         attributes={attributes}
         basePrice={basePriceNum}
+        pricingMode={productPricingMode}
         onSaved={setVariants}
       />
     </div>

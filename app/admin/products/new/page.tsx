@@ -470,7 +470,13 @@ export default function AdminProductNewPage() {
           <Card>
             <CardHeader><CardTitle className="text-base">تنوع‌ها (Variants)</CardTitle></CardHeader>
             <CardContent>
-              <VariantBuilder variants={variants} onChange={setVariants} attributes={attributes} basePrice={basePriceNum} />
+              <VariantBuilder
+                variants={variants}
+                onChange={setVariants}
+                attributes={attributes}
+                basePrice={basePriceNum}
+                pricingMode={form.pricingMode}
+              />
             </CardContent>
           </Card>
 
