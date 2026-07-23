@@ -9,11 +9,15 @@ import { buildMultipartFormData } from "@/lib/form-data-helper";
 import { ENDPOINTS } from "@/api/endpoints";
 import type {
   PaginatedData,
+  PricePreviewBody,
+  PricePreviewResponse,
   Product,
   ProductFilterMetadata,
   ProductListQuery,
+  ProductPricingMode,
   ProductStatus,
   ProductVariant,
+  VariantAttributeValue,
 } from "@/types/domain";
 
 export interface CreateProductBody {
@@ -21,7 +25,16 @@ export interface CreateProductBody {
   brandId?: number;
   shortDescription?: string;
   description?: string;
+  /** Required when pricingMode = FIXED_IRT (>= 1000). Set to 0 when CURRENCY_BASED. */
   basePrice: number;
+  /** Pricing mode — FIXED_IRT (default) or CURRENCY_BASED. */
+  pricingMode?: ProductPricingMode;
+  /** Source currency ID (string cuid, required when CURRENCY_BASED). */
+  currencyId?: string;
+  /** Price in source currency (required when CURRENCY_BASED, > 0). */
+  sourcePrice?: number;
+  /** Buffer percentage for price fluctuation (0–100, default 0). */
+  priceBufferPercent?: number;
   discountType?: "PERCENT" | "FIXED";
   discountValue?: number;
   status?: ProductStatus;
@@ -35,7 +48,8 @@ export interface CreateProductBody {
     weight?: number;
     isDefault?: boolean;
     isActive?: boolean;
-    attributeValueIds: number[];
+    /** New format: attribute values with optional per-variant modifiers. */
+    attributeValues: VariantAttributeValue[];
   }>;
   displayAttributes?: Array<{ attributeId: number; value: string }>;
 }
@@ -46,6 +60,10 @@ export interface UpdateProductBody {
   shortDescription?: string;
   description?: string;
   basePrice?: number;
+  /** Note: pricingMode is NOT editable after creation (backend rule). */
+  currencyId?: string | null;
+  sourcePrice?: number;
+  priceBufferPercent?: number;
   discountType?: "PERCENT" | "FIXED" | null;
   discountValue?: number | null;
   status?: ProductStatus;
@@ -66,7 +84,7 @@ export interface UpdateVariantBody {
   weight?: number;
   isDefault?: boolean;
   isActive?: boolean;
-  attributeValueIds?: number[];
+  attributeValues?: VariantAttributeValue[];
 }
 
 export const productsService = {
@@ -112,6 +130,12 @@ export const productsService = {
 
   delete: (id: number) =>
     http.delete<void>(ENDPOINTS.products.delete(id)),
+
+  /** Admin: preview the final price of a product without saving.
+   *  Useful for showing the user what the final IRT price will be
+   *  before they commit to creating/updating a CURRENCY_BASED product. */
+  previewPrice: (body: PricePreviewBody) =>
+    http.post<PricePreviewResponse>(ENDPOINTS.products.previewPrice, body),
 
   addVariant: (id: number, body: UpdateVariantBody) =>
     http.post<ProductVariant>(ENDPOINTS.products.addVariant(id), body),

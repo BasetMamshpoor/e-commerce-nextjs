@@ -1,5 +1,8 @@
 /**
  * Attributes API service — added isDisplay field.
+ *
+ * Note: Price modifiers are NOT set on attribute values — they are set
+ * per-product-variant on the junction table (see products service).
  */
 import { http } from "@/lib/api-client";
 import { ENDPOINTS } from "@/api/endpoints";
@@ -9,7 +12,11 @@ export interface CreateAttributeBody {
   name: string; slug?: string; inputType: AttributeInputType;
   isFilterable?: boolean; isVariant?: boolean; isDisplay?: boolean;
 }
-export interface AddAttributeValueBody { value: string; colorHex?: string; order?: number; }
+export interface AddAttributeValueBody {
+  value: string;
+  colorHex?: string;
+  order?: number;
+}
 
 export const attributesService = {
   list: () => http.get<Attribute[]>(ENDPOINTS.attributes.list),

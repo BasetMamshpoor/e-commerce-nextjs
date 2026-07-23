@@ -14,6 +14,7 @@ export { comparisonService } from "./comparison.service";
 export { mediaService } from "./media.service";
 export { walletService } from "./wallet.service";
 export type { WithdrawalRequestBody, ReviewWithdrawalBody } from "./wallet.service";
+export { currenciesService } from "./currencies.service";
 
 // Batch services
 export {

@@ -32,6 +32,7 @@ import {
   Truck,
   MessageCircle,
   FileText as FileTextIcon,
+  Coins,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -64,6 +65,7 @@ const NAV_GROUPS: {
       { href: "/admin/brands", label: "برندها", icon: Tag },
       { href: "/admin/attributes", label: "ویژگی‌ها", icon: Settings },
       { href: "/admin/media", label: "رسانه‌ها", icon: ImageIcon },
+      { href: "/admin/currencies", label: "ارزها", icon: Coins },
     ],
   },
   {
@@ -275,6 +277,7 @@ export function AdminTopbar({ onMenuClick }: { onMenuClick: () => void }) {
       brands: "برندها",
       attributes: "ویژگی‌ها",
       media: "رسانه‌ها",
+      currencies: "ارزها",
       orders: "سفارش‌ها",
       "discount-codes": "کدهای تخفیف",
       users: "کاربران",

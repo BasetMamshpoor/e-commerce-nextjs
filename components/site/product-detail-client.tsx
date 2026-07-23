@@ -59,7 +59,6 @@ import {
   getProductCategories,
   getProductImageAlt,
   getProductImageUrl,
-  getVariantAttributeValues,
 } from "@/types/domain";
 
 type ProductDetailProduct = Product;
@@ -347,7 +346,14 @@ function ProductInfo({
     }
   };
 
-  const originalPrice = (product.basePrice ?? 0) + (selectedVariant?.priceAdjustment ?? 0);
+  // Price calculation depends on pricing mode:
+  // - FIXED_IRT: basePrice + variant priceAdjustment
+  // - CURRENCY_BASED: currentPriceIRT (auto-updated by backend) + variant priceAdjustment
+  const isCurrencyBased = product.pricingMode === "CURRENCY_BASED";
+  const baseAmount = isCurrencyBased
+    ? (product.currentPriceIRT ?? 0)
+    : (product.basePrice ?? 0);
+  const originalPrice = baseAmount + (selectedVariant?.priceAdjustment ?? 0);
   const currentPrice = selectedVariant?.effectivePrice ?? originalPrice;
   const hasDiscount = originalPrice > currentPrice;
   const discountPct = hasDiscount ? discountPercent(originalPrice, currentPrice) : 0;
@@ -419,8 +425,7 @@ function ProductInfo({
           <h3 className="text-sm font-semibold text-foreground">انتخاب گزینه:</h3>
           <div className="flex flex-wrap gap-2">
             {product.variants.map((v) => {
-              const avs = getVariantAttributeValues(v);
-              const label = avs.length > 0 ? avs.map((av) => av.value).join("، ") : v.sku;
+              const label = v.sku || `تنوع ${v.id}`;
               const isSelected = selectedVariant?.id === v.id;
               const vOutOfStock = v.stock <= 0;
               return (
@@ -535,10 +540,6 @@ function ProductSpecs({
   if (categories.length > 0) rows.push({ label: "دسته‌بندی", value: categories.map((c) => c.name).join("، ") });
   if (variant) {
     rows.push({ label: "کد SKU", value: variant.sku });
-    const avs = getVariantAttributeValues(variant);
-    for (const av of avs) {
-      rows.push({ label: "ویژگی", value: av.value });
-    }
   }
   // Display attributes (isDisplay=true) from backend
   if (displayAttributes && displayAttributes.length > 0) {

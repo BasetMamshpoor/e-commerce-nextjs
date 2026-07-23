@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { VariantBuilder, type VariantFormData } from "@/components/common/variant-builder";
 import { productsService } from "@/services";
-import type { Attribute, ProductVariant } from "@/types/domain";
+import type { Attribute, ProductPricingMode, ProductVariant } from "@/types/domain";
 import { toPersianDigits } from "@/utils/format";
 
 interface VariantManagerModalProps {
@@ -28,6 +28,8 @@ interface VariantManagerModalProps {
   /** All available attributes (from GET /attributes). */
   attributes: Attribute[];
   basePrice: number;
+  /** Pricing mode — controls which modifier types are available. */
+  pricingMode?: ProductPricingMode;
   /** Called after variants are successfully saved. */
   onSaved: (variants: ProductVariant[]) => void;
 }
@@ -50,6 +52,7 @@ export function VariantManagerModal({
   existingVariants,
   attributes,
   basePrice,
+  pricingMode = "FIXED_IRT",
   onSaved,
 }: VariantManagerModalProps) {
   const [variants, setVariants] = React.useState<VariantFormData[]>([]);
@@ -61,13 +64,7 @@ export function VariantManagerModal({
   React.useEffect(() => {
     if (open && !initializedRef.current) {
       const formData: VariantFormData[] = existingVariants.map((v) => {
-        // Extract attributeValueIds: backend may return undefined or [] but
-        // attributeValues array always has the data.
-        const rawIds = v.attributeValueIds ?? [];
-        const avIds =
-          rawIds.length > 0
-            ? rawIds
-            : (v.attributeValues ?? []).map((av) => av.id);
+        // Preserve the full attributeValues (including modifiers) from backend.
         return {
           id: v.id,
           sku: v.sku,
@@ -76,7 +73,11 @@ export function VariantManagerModal({
           weight: v.weight ?? undefined,
           isDefault: v.isDefault,
           isActive: v.isActive,
-          attributeValueIds: avIds,
+          attributeValues: (v.attributeValues ?? []).map((av) => ({
+            attributeValueId: av.attributeValueId,
+            modifierType: av.modifierType ?? null,
+            modifierValue: av.modifierValue ?? null,
+          })),
         };
       });
       setVariants(formData);
@@ -140,7 +141,7 @@ export function VariantManagerModal({
           weight: v.weight,
           isDefault: v.isDefault,
           isActive: v.isActive,
-          attributeValueIds: v.attributeValueIds,
+          attributeValues: v.attributeValues,
         };
 
         if (v.id != null) {
@@ -208,6 +209,7 @@ export function VariantManagerModal({
             onChange={setVariants}
             attributes={attributes}
             basePrice={basePrice}
+            pricingMode={pricingMode}
           />
         </div>
 

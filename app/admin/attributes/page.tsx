@@ -241,6 +241,9 @@ function AddValueForm({
           <Plus className="size-3.5" />
         </Button>
       </div>
+      <p className="text-[10px] text-muted-foreground">
+        modifiers قیمت روی هر variant محصول تنظیم می‌شود، نه روی مقدار ویژگی.
+      </p>
     </div>
   );
 }
