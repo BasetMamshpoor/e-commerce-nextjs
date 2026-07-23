@@ -61,13 +61,8 @@ export function VariantManagerModal({
   React.useEffect(() => {
     if (open && !initializedRef.current) {
       const formData: VariantFormData[] = existingVariants.map((v) => {
-        // Extract attributeValueIds: backend may return undefined or [] but
-        // attributeValues array always has the data.
-        const rawIds = v.attributeValueIds ?? [];
-        const avIds =
-          rawIds.length > 0
-            ? rawIds
-            : (v.attributeValues ?? []).map((av) => av.id);
+        // Extract attribute value IDs from the new attributeValues format.
+        const avIds = (v.attributeValues ?? []).map(av => av.attributeValueId);
         return {
           id: v.id,
           sku: v.sku,
@@ -76,7 +71,7 @@ export function VariantManagerModal({
           weight: v.weight ?? undefined,
           isDefault: v.isDefault,
           isActive: v.isActive,
-          attributeValueIds: avIds,
+          attributeValues: avIds.map(id => ({ attributeValueId: id })),
         };
       });
       setVariants(formData);
@@ -140,7 +135,7 @@ export function VariantManagerModal({
           weight: v.weight,
           isDefault: v.isDefault,
           isActive: v.isActive,
-          attributeValueIds: v.attributeValueIds,
+          attributeValues: v.attributeValues,
         };
 
         if (v.id != null) {

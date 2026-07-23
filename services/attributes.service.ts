@@ -1,9 +1,12 @@
 /**
- * Attributes API service — added isDisplay field + price modifiers.
+ * Attributes API service — added isDisplay field.
+ *
+ * Note: Price modifiers are NOT set on attribute values — they are set
+ * per-product-variant on the junction table (see products service).
  */
 import { http } from "@/lib/api-client";
 import { ENDPOINTS } from "@/api/endpoints";
-import type { Attribute, AttributeInputType, AttributeModifierType, AttributeValue } from "@/types/domain";
+import type { Attribute, AttributeInputType, AttributeValue } from "@/types/domain";
 
 export interface CreateAttributeBody {
   name: string; slug?: string; inputType: AttributeInputType;
@@ -13,10 +16,6 @@ export interface AddAttributeValueBody {
   value: string;
   colorHex?: string;
   order?: number;
-  /** How this value modifies the product price. Omit/null for no effect. */
-  modifierType?: AttributeModifierType | null;
-  /** Modifier amount — percentage, source-currency amount, or IRT amount. */
-  modifierValue?: number | null;
 }
 
 export const attributesService = {

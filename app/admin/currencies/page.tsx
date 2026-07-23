@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Pencil, RefreshCw, Loader2, Coins, TrendingUp, AlertCircle } from "lucide-react";
+import { Plus, Pencil, RefreshCw, Loader2, Coins, TrendingUp, AlertCircle, Check } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -99,9 +99,9 @@ export default function AdminCurrenciesPage() {
             key: "rate",
             header: "آخرین نرخ",
             render: (c) =>
-              c.lastRate ? (
+              c.currentRate ? (
                 <div>
-                  <p className="font-bold nums-fa">{toPersianDigits(formatPrice(c.lastRate))}</p>
+                  <p className="font-bold nums-fa">{toPersianDigits(formatPrice(c.currentRate))}</p>
                   <p className="text-[10px] text-muted-foreground">تومان</p>
                 </div>
               ) : (
@@ -113,8 +113,8 @@ export default function AdminCurrenciesPage() {
             header: "زمان بروزرسانی",
             hideOnMobile: true,
             render: (c) =>
-              c.lastRateUpdatedAt ? (
-                <span className="text-xs text-muted-foreground">{formatDateTimeFa(c.lastRateUpdatedAt)}</span>
+              c.lastFetchedAt ? (
+                <span className="text-xs text-muted-foreground">{formatDateTimeFa(c.lastFetchedAt)}</span>
               ) : (
                 <span className="text-xs text-muted-foreground">—</span>
               ),
@@ -343,19 +343,37 @@ function EditCurrencyDialog({
 
         <div className="space-y-3 py-2">
           {/* Current rate info */}
-          {currency.lastRate && (
-            <div className="flex items-center gap-2 rounded-lg bg-muted/50 p-3 text-sm">
-              <TrendingUp className="size-4 text-muted-foreground" />
-              <div className="flex-1">
-                <p className="text-xs text-muted-foreground">آخرین نرخ خودکار:</p>
-                <p className="font-bold nums-fa">
-                  {toPersianDigits(formatPrice(currency.lastRate))} تومان
-                </p>
+          {currency.currentRate && (
+            <div className="space-y-2 rounded-lg bg-muted/50 p-3 text-sm">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="size-4 text-muted-foreground" />
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground">نرخ فعلی (آخرین fetch):</p>
+                  <p className="font-bold nums-fa">
+                    {toPersianDigits(formatPrice(currency.currentRate))} تومان
+                  </p>
+                </div>
+                {currency.lastFetchedAt && (
+                  <span className="text-[10px] text-muted-foreground">
+                    {formatDateTimeFa(currency.lastFetchedAt)}
+                  </span>
+                )}
               </div>
-              {currency.lastRateUpdatedAt && (
-                <span className="text-[10px] text-muted-foreground">
-                  {formatDateTimeFa(currency.lastRateUpdatedAt)}
-                </span>
+              {currency.lastAppliedRate && (
+                <div className="flex items-center gap-2 border-t border-border/40 pt-2">
+                  <Check className="size-3.5 text-success" />
+                  <div className="flex-1">
+                    <p className="text-xs text-muted-foreground">آخرین نرخ اعمال‌شده روی محصولات:</p>
+                    <p className="font-medium nums-fa">
+                      {toPersianDigits(formatPrice(currency.lastAppliedRate))} تومان
+                    </p>
+                  </div>
+                  {currency.lastAppliedAt && (
+                    <span className="text-[10px] text-muted-foreground">
+                      {formatDateTimeFa(currency.lastAppliedAt)}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           )}

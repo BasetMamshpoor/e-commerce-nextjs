@@ -8,7 +8,6 @@ import { http } from "@/lib/api-client";
 import { buildMultipartFormData } from "@/lib/form-data-helper";
 import { ENDPOINTS } from "@/api/endpoints";
 import type {
-  AttributeModifierType,
   PaginatedData,
   PricePreviewBody,
   PricePreviewResponse,
@@ -18,6 +17,7 @@ import type {
   ProductPricingMode,
   ProductStatus,
   ProductVariant,
+  VariantAttributeValue,
 } from "@/types/domain";
 
 export interface CreateProductBody {
@@ -29,8 +29,8 @@ export interface CreateProductBody {
   basePrice: number;
   /** Pricing mode — FIXED_IRT (default) or CURRENCY_BASED. */
   pricingMode?: ProductPricingMode;
-  /** Source currency ID (required when CURRENCY_BASED). */
-  currencyId?: number;
+  /** Source currency ID (string cuid, required when CURRENCY_BASED). */
+  currencyId?: string;
   /** Price in source currency (required when CURRENCY_BASED, > 0). */
   sourcePrice?: number;
   /** Buffer percentage for price fluctuation (0–100, default 0). */
@@ -48,7 +48,8 @@ export interface CreateProductBody {
     weight?: number;
     isDefault?: boolean;
     isActive?: boolean;
-    attributeValueIds: number[];
+    /** New format: attribute values with optional per-variant modifiers. */
+    attributeValues: VariantAttributeValue[];
   }>;
   displayAttributes?: Array<{ attributeId: number; value: string }>;
 }
@@ -60,7 +61,7 @@ export interface UpdateProductBody {
   description?: string;
   basePrice?: number;
   /** Note: pricingMode is NOT editable after creation (backend rule). */
-  currencyId?: number | null;
+  currencyId?: string | null;
   sourcePrice?: number;
   priceBufferPercent?: number;
   discountType?: "PERCENT" | "FIXED" | null;
@@ -83,7 +84,7 @@ export interface UpdateVariantBody {
   weight?: number;
   isDefault?: boolean;
   isActive?: boolean;
-  attributeValueIds?: number[];
+  attributeValues?: VariantAttributeValue[];
 }
 
 export const productsService = {

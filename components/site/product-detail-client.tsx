@@ -59,7 +59,6 @@ import {
   getProductCategories,
   getProductImageAlt,
   getProductImageUrl,
-  getVariantAttributeValues,
 } from "@/types/domain";
 
 type ProductDetailProduct = Product;
@@ -426,8 +425,7 @@ function ProductInfo({
           <h3 className="text-sm font-semibold text-foreground">انتخاب گزینه:</h3>
           <div className="flex flex-wrap gap-2">
             {product.variants.map((v) => {
-              const avs = getVariantAttributeValues(v);
-              const label = avs.length > 0 ? avs.map((av) => av.value).join("، ") : v.sku;
+              const label = v.sku || `تنوع ${v.id}`;
               const isSelected = selectedVariant?.id === v.id;
               const vOutOfStock = v.stock <= 0;
               return (
@@ -463,20 +461,6 @@ function ProductInfo({
             <span className="text-2xl font-bold text-foreground nums-fa">{formatPrice(currentPrice)}</span>
             <span className="text-sm text-muted-foreground">تومان</span>
           </div>
-          {/* Show source currency price for CURRENCY_BASED products */}
-          {isCurrencyBased && product.sourcePrice && product.currency && (
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <span>قیمت ارزی:</span>
-              <span className="font-medium nums-fa" dir="ltr">
-                {toPersianDigits(product.sourcePrice.toLocaleString("en-US"))} {product.currency.symbol}
-              </span>
-              {product.priceBufferPercent > 0 && (
-                <span className="text-[10px]">
-                  (با فر نوسان: {toPersianDigits(product.priceBufferPercent)}٪)
-                </span>
-              )}
-            </div>
-          )}
         </div>
         {!isOutOfStock && (
           <div className="flex items-center gap-2">
@@ -556,10 +540,6 @@ function ProductSpecs({
   if (categories.length > 0) rows.push({ label: "دسته‌بندی", value: categories.map((c) => c.name).join("، ") });
   if (variant) {
     rows.push({ label: "کد SKU", value: variant.sku });
-    const avs = getVariantAttributeValues(variant);
-    for (const av of avs) {
-      rows.push({ label: "ویژگی", value: av.value });
-    }
   }
   // Display attributes (isDisplay=true) from backend
   if (displayAttributes && displayAttributes.length > 0) {

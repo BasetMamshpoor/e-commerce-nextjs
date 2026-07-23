@@ -34,7 +34,7 @@ export const currenciesService = {
    *  When `manualRate` is provided, a new ExchangeRateHistory entry with
    *  source="manual" is created and immediately applied to all products
    *  using this currency. */
-  update: (id: number, body: UpdateCurrencyBody) =>
+  update: (id: string, body: UpdateCurrencyBody) =>
     http.patch<Currency>(ENDPOINTS.currencies.update(id), body),
 
   /** Admin: delete is not exposed by the backend — currencies can only be

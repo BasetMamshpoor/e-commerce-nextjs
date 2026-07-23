@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { MultiSelectCombobox } from "@/components/common/multi-select-combobox";
-import type { Attribute, AttributeValue } from "@/types/domain";
+import type { Attribute, AttributeValue, VariantAttributeValue } from "@/types/domain";
 import { toPersianDigits, formatPrice } from "@/utils/format";
 import { cn } from "@/lib/utils";
 
@@ -24,8 +24,8 @@ export interface VariantFormData {
   weight?: number;
   isDefault: boolean;
   isActive: boolean;
-  /** IDs of attribute values that define this combination (e.g., color=red, size=S). */
-  attributeValueIds: number[];
+  /** Attribute values with optional per-variant price modifiers. */
+  attributeValues: VariantAttributeValue[];
 }
 
 interface VariantBuilderProps {
@@ -62,7 +62,8 @@ export function VariantBuilder({
     if (variants.length === 0) return {};
     const map: Record<number, number[]> = {};
     for (const v of variants) {
-      for (const avId of v.attributeValueIds) {
+      for (const av of v.attributeValues) {
+        const avId = av.attributeValueId;
         for (const attr of variantAttributes) {
           if (attr.values.some((val) => val.id === avId)) {
             if (!map[attr.id]) map[attr.id] = [];
@@ -112,7 +113,8 @@ export function VariantBuilder({
     // Build lookup of existing variants by sorted attributeValueIds
     const existingMap = new Map<string, VariantFormData>();
     for (const v of variants) {
-      const key = [...v.attributeValueIds].sort((a, b) => a - b).join(",");
+      const ids = v.attributeValues.map(av => av.attributeValueId);
+      const key = [...ids].sort((a, b) => a - b).join(",");
       existingMap.set(key, v);
     }
 
@@ -127,7 +129,7 @@ export function VariantBuilder({
         weight: existing?.weight,
         isDefault: existing?.isDefault ?? isFirst,
         isActive: existing?.isActive ?? true,
-        attributeValueIds: combo,
+        attributeValues: combo.map(id => ({ attributeValueId: id })),
       };
     });
 
@@ -146,9 +148,9 @@ export function VariantBuilder({
     }
 
     const oldKeys = new Set(
-      variants.map((v) => [...v.attributeValueIds].sort((a, b) => a - b).join(",")),
+      variants.map((v) => [...v.attributeValues.map(av => av.attributeValueId)].sort((a, b) => a - b).join(",")),
     );
-    const newKeys = new Set(newVariants.map((v) => [...v.attributeValueIds].sort((a, b) => a - b).join(",")));
+    const newKeys = new Set(newVariants.map((v) => [...v.attributeValues.map(av => av.attributeValueId)].sort((a, b) => a - b).join(",")));
     const changed =
       oldKeys.size !== newKeys.size ||
       [...oldKeys].some((k) => !newKeys.has(k));
@@ -244,7 +246,7 @@ export function VariantBuilder({
                   stock: 0,
                   isDefault: true,
                   isActive: true,
-                  attributeValueIds: [],
+                  attributeValues: [],
                 },
               ])
             }
@@ -337,7 +339,7 @@ export function VariantBuilder({
                   </thead>
                   <tbody>
                     {variants.map((variant, index) => {
-                      const labels = getComboLabels(variant.attributeValueIds);
+                      const labels = getComboLabels(variant.attributeValues.map(av => av.attributeValueId));
                       const effectivePrice = basePrice + (variant.priceAdjustment || 0);
                       return (
                         <tr key={index} className={cn("border-b border-border/40 last:border-0", variant.isDefault && "bg-primary/5")}>
@@ -432,7 +434,7 @@ export function VariantBuilder({
               {/* Mobile: cards */}
               <div className="space-y-2 md:hidden">
                 {variants.map((variant, index) => {
-                  const labels = getComboLabels(variant.attributeValueIds);
+                  const labels = getComboLabels(variant.attributeValues.map(av => av.attributeValueId));
                   const effectivePrice = basePrice + (variant.priceAdjustment || 0);
                   return (
                     <div key={index} className={cn("rounded-lg border p-3", variant.isDefault ? "border-primary/40 bg-primary/5" : "border-border")}>

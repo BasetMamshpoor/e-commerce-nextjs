@@ -90,7 +90,7 @@ export default function AdminProductEditPage({
     shortDescription: "",
     description: "",
     basePrice: "" as string | number,
-    currencyId: "" as string | number,
+    currencyId: "" as string,
     sourcePrice: "" as string | number,
     priceBufferPercent: "0" as string | number,
     status: "DRAFT" as ProductStatus,
@@ -167,10 +167,10 @@ export default function AdminProductEditPage({
     const isCurrencyBased = productPricingMode === "CURRENCY_BASED";
     let basePrice: number | undefined;
     let sourcePrice: number | undefined;
-    let currencyId: number | undefined;
+    let currencyId: string | undefined;
 
     if (isCurrencyBased) {
-      currencyId = form.currencyId ? Number(form.currencyId) : undefined;
+      currencyId = form.currencyId || undefined;
       sourcePrice = form.sourcePrice ? Number(form.sourcePrice) : undefined;
       if (!currencyId || !sourcePrice || sourcePrice <= 0) {
         toast.error("ارز و قیمت به ارز مبدأ الزامی هستند");
@@ -354,7 +354,7 @@ export default function AdminProductEditPage({
                       <Label>ارز مبدأ</Label>
                       <Select
                         value={form.currencyId ? String(form.currencyId) : ""}
-                        onValueChange={(v) => setForm({ ...form, currencyId: Number(v) })}
+                        onValueChange={(v) => setForm({ ...form, currencyId: v })}
                       >
                         <SelectTrigger><SelectValue placeholder="انتخاب ارز" /></SelectTrigger>
                         <SelectContent>
@@ -390,14 +390,14 @@ export default function AdminProductEditPage({
                     />
                   </div>
                   {form.currencyId && form.sourcePrice && (() => {
-                    const cur = currencies.find((c) => c.id === Number(form.currencyId));
-                    if (cur?.lastRate) {
-                      const estimate = Number(form.sourcePrice) * cur.lastRate;
+                    const cur = currencies.find((c) => c.id === form.currencyId);
+                    if (cur?.currentRate) {
+                      const estimate = Number(form.sourcePrice) * cur.currentRate;
                       return (
                         <div className="rounded-md bg-muted/50 p-2 text-xs">
                           <span className="text-muted-foreground">تقریب قیمت تومانی:</span>{" "}
                           <span className="font-bold nums-fa">{formatPrice(estimate)} تومان</span>
-                          <span className="text-muted-foreground"> (نرخ: {toPersianDigits(formatPrice(cur.lastRate))})</span>
+                          <span className="text-muted-foreground"> (نرخ: {toPersianDigits(formatPrice(cur.currentRate))})</span>
                         </div>
                       );
                     }
@@ -475,7 +475,12 @@ export default function AdminProductEditPage({
                         {v.weight != null && <span className="nums-fa text-muted-foreground">وزن: {toPersianDigits(v.weight)} kg</span>}
                         {v.attributeValues && v.attributeValues.length > 0 && (
                           <span className="text-muted-foreground">
-                            {v.attributeValues.map((av) => av.value).join("، ")}
+                            {v.attributeValues.map((av) => {
+                              const attrVal = attributes
+                                .flatMap((a) => a.values)
+                                .find((val) => val.id === av.attributeValueId);
+                              return attrVal?.value ?? `#${av.attributeValueId}`;
+                            }).join("، ")}
                           </span>
                         )}
                       </div>
