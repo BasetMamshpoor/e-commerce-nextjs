@@ -305,6 +305,6 @@ export const ENDPOINTS = {
     /** Admin: create a new currency. */
     create: "/admin/currencies",
     /** Admin: update a currency or override its rate manually. */
-    update: (id: string) => `/admin/currencies/${id}`,
+    update: (id: number) => `/admin/currencies/${id}`,
   },
 } as const;

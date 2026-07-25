@@ -234,7 +234,7 @@ function BrandFormDialog({
         logoValue.kind === "mediaId"
           ? { logoMediaId: (logoValue as { mediaId: number }).mediaId }
           : logoValue.kind === "removed" && brand
-          ? { logoMediaId: null }
+          ? {}
           : {};
 
       const fullBody = { ...baseBody, ...logoJsonFields };

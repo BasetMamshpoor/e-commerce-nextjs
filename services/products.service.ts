@@ -29,8 +29,8 @@ export interface CreateProductBody {
   basePrice: number;
   /** Pricing mode — FIXED_IRT (default) or CURRENCY_BASED. */
   pricingMode?: ProductPricingMode;
-  /** Source currency ID (string cuid, required when CURRENCY_BASED). */
-  currencyId?: string;
+  /** Source currency ID (number, required when CURRENCY_BASED). */
+  currencyId?: number;
   /** Price in source currency (required when CURRENCY_BASED, > 0). */
   sourcePrice?: number;
   /** Buffer percentage for price fluctuation (0–100, default 0). */
@@ -61,7 +61,7 @@ export interface UpdateProductBody {
   description?: string;
   basePrice?: number;
   /** Note: pricingMode is NOT editable after creation (backend rule). */
-  currencyId?: string | null;
+  currencyId?: number | null;
   sourcePrice?: number;
   priceBufferPercent?: number;
   discountType?: "PERCENT" | "FIXED" | null;

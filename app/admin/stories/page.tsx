@@ -243,6 +243,7 @@ function StoryDialog({
 
   const onSubmit = async () => {
     if (!title.trim()) { toast.error("عنوان الزامی است"); return; }
+    if (!editing && !expiresAt) { toast.error("تاریخ انقضا برای استوری جدید الزامی است"); return; }
     setSaving(true);
     try {
       const body = {
@@ -252,9 +253,9 @@ function StoryDialog({
         productIds: selectedProducts.length > 0 ? selectedProducts.map((p) => p.id) : undefined,
         // Attach mediaId fields when picking from gallery OR removing existing.
         ...(coverImageMediaId ? { coverImageMediaId: coverImageMediaId } : {}),
-        ...(coverRemoved && !coverImage && editing ? { coverImageMediaId: null } : {}),
+        ...(coverRemoved && !coverImage && editing ? {} : {}),
         ...(videoMediaId ? { videoMediaId: videoMediaId } : {}),
-        ...(videoRemoved && !video && editing ? { videoMediaId: null } : {}),
+        ...(videoRemoved && !video && editing ? {} : {}),
       };
 
       if (editing) {

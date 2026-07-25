@@ -68,7 +68,7 @@ export default function AdminProductNewPage() {
     description: "",
     basePrice: "" as string | number,
     pricingMode: "FIXED_IRT" as ProductPricingMode,
-    currencyId: "" as string,
+    currencyId: "" as string | number,
     sourcePrice: "" as string | number,
     priceBufferPercent: "0" as string | number,
     status: "DRAFT" as ProductStatus,
@@ -110,10 +110,10 @@ export default function AdminProductNewPage() {
     const isCurrencyBased = form.pricingMode === "CURRENCY_BASED";
     let basePrice = 0;
     let sourcePrice: number | undefined;
-    let currencyId: string | undefined;
+    let currencyId: number | undefined;
 
     if (isCurrencyBased) {
-      currencyId = form.currencyId || undefined;
+      currencyId = form.currencyId ? Number(form.currencyId) : undefined;
       sourcePrice = form.sourcePrice ? Number(form.sourcePrice) : undefined;
       if (!currencyId) {
         toast.error("انتخاب ارز برای قیمت‌گذاری ارزی الزامی است");
@@ -358,7 +358,7 @@ export default function AdminProductNewPage() {
                       <Label>ارز مبدأ *</Label>
                       <Select
                         value={form.currencyId ? String(form.currencyId) : ""}
-                        onValueChange={(v) => setForm({ ...form, currencyId: v })}
+                        onValueChange={(v) => setForm({ ...form, currencyId: Number(v) })}
                       >
                         <SelectTrigger><SelectValue placeholder="انتخاب ارز" /></SelectTrigger>
                         <SelectContent>
@@ -399,7 +399,7 @@ export default function AdminProductNewPage() {
                   </div>
                   {/* Show current IRT estimate */}
                   {form.currencyId && form.sourcePrice && (() => {
-                    const cur = currencies.find((c) => c.id === form.currencyId);
+                    const cur = currencies.find((c) => c.id === Number(form.currencyId));
                     if (cur?.currentRate) {
                       const estimate = Number(form.sourcePrice) * cur.currentRate;
                       return (

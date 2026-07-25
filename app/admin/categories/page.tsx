@@ -253,7 +253,7 @@ function CategoryFormDialog({
         imageValue.kind === "mediaId"
           ? { imageMediaId: (imageValue as { mediaId: number }).mediaId }
           : imageValue.kind === "removed" && category
-          ? { imageMediaId: null }
+          ? {}
           : {};
 
       const fullBody = { ...baseBody, ...imageJsonFields };

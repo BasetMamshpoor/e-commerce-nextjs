@@ -126,7 +126,7 @@ export interface UpdateMediaBody {
    ────────────────────────────────────────────────────────────────────────── */
 
 export interface Currency {
-  id: string;
+  id: number;
   code: string;
   name: string;
   symbol?: string;
@@ -145,7 +145,7 @@ export interface Currency {
 
 /** Public currency (subset shown on storefront). */
 export interface PublicCurrency {
-  id: string;
+  id: number;
   code: string;
   name: string;
   symbol?: string;
@@ -153,8 +153,8 @@ export interface PublicCurrency {
 }
 
 export interface ExchangeRateHistory {
-  id: string;
-  currencyId: string;
+  id: number;
+  currencyId: number;
   rate: number;
   source: "brsapi" | "navasan" | "manual";
   wasApplied: boolean;
@@ -167,16 +167,14 @@ export interface ExchangeRateHistory {
 export interface CreateCurrencyBody {
   code: string;
   name: string;
-  symbol: string;
-  isActive?: boolean;
+  symbol?: string;
 }
 
 export interface UpdateCurrencyBody {
-  name?: string;
   isActive?: boolean;
   /** When set, a new ExchangeRateHistory entry with source="manual" is created
    *  and immediately applied to all products using this currency. */
-  manualRate?: number;
+  currentRate?: number;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────

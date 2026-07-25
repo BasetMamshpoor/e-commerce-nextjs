@@ -143,21 +143,29 @@ export function useRequestReturn() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       id,
       body,
       files,
     }: {
       id: number;
       body: Omit<RequestReturnBody, "imageMediaIds">;
-      /** Optional image files — when provided, sent via multipart/form-data
-       *  with field name "images" (no pre-upload to /media needed). */
+      /** Optional image files — uploaded to /media first, then IDs sent
+       *  via JSON body field "imageMediaIds". The backend's /orders/:id/return
+       *  route does NOT have multer middleware, so we must pre-upload. */
       files?: File[];
     }) => {
       if (files && files.length > 0) {
-        return ordersService.requestReturnWithImages(id, body, files);
+        // Pre-upload images to /media, then send their IDs in JSON body.
+        const { mediaService } = await import("@/services");
+        const mediaIds: number[] = [];
+        for (const f of files) {
+          const media = await mediaService.upload(f, "returns");
+          mediaIds.push(media.id);
+        }
+        return ordersService.requestReturn(id, { ...body, imageMediaIds: mediaIds });
       }
-      // No files — fall back to plain JSON request.
+      // No files — plain JSON request.
       return ordersService.requestReturn(id, body);
     },
     onSuccess: (order) => {

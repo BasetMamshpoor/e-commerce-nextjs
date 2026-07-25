@@ -177,7 +177,7 @@ export function BlogForm({ post, loading: externalLoading }: BlogFormProps) {
         productIds: selectedProducts.length > 0 ? selectedProducts.map((p) => p.id) : undefined,
         // Attach coverImageMediaId when picking from gallery OR removing existing.
         ...(coverImageMediaId ? { coverImageMediaId: coverImageMediaId } : {}),
-        ...(coverImageRemoved && !coverImage && post ? { coverImageMediaId: null } : {}),
+        ...(coverImageRemoved && !coverImage && post ? {} : {}),
       };
 
       if (post) {

@@ -191,7 +191,7 @@ function BannerFormDialog({ open, onOpenChange, banner, onSaved }: {
         isActive,
         // Attach mediaId when picking from gallery OR removing existing.
         ...(imageMediaId ? { mediaId: imageMediaId } : {}),
-        ...(imageRemoved && !imageFile && banner ? { mediaId: null } : {}),
+        ...(imageRemoved && !imageFile && banner ? {} : {}),
       };
 
       if (banner) {
