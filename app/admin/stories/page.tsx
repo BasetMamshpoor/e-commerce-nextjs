@@ -253,9 +253,9 @@ function StoryDialog({
         productIds: selectedProducts.length > 0 ? selectedProducts.map((p) => p.id) : undefined,
         // Attach mediaId fields when picking from gallery OR removing existing.
         ...(coverImageMediaId ? { coverImageMediaId: coverImageMediaId } : {}),
-        ...(coverRemoved && !coverImage && editing ? {} : {}),
+        ...(coverRemoved && !coverImage && editing ? { coverImageMediaId: null } : {}),
         ...(videoMediaId ? { videoMediaId: videoMediaId } : {}),
-        ...(videoRemoved && !video && editing ? {} : {}),
+        ...(videoRemoved && !video && editing ? { videoMediaId: null } : {}),
       };
 
       if (editing) {

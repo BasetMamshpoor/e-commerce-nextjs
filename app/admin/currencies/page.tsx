@@ -270,12 +270,14 @@ function EditCurrencyDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const [name, setName] = React.useState("");
   const [isActive, setIsActive] = React.useState(true);
   const [currentRate, setCurrentRate] = React.useState("");
   const [saving, setSaving] = React.useState(false);
 
   React.useEffect(() => {
     if (currency) {
+      setName(currency.name);
       setIsActive(currency.isActive);
       setCurrentRate("");
     }
@@ -284,9 +286,14 @@ function EditCurrencyDialog({
   if (!currency) return null;
 
   const onSubmit = async () => {
+    if (!name.trim()) {
+      toast.error("نام الزامی است");
+      return;
+    }
     setSaving(true);
     try {
-      const body: { isActive?: boolean; currentRate?: number } = {
+      const body: { name?: string; isActive?: boolean; currentRate?: number } = {
+        name: name.trim(),
         isActive,
       };
       if (currentRate.trim()) {
@@ -361,6 +368,11 @@ function EditCurrencyDialog({
               )}
             </div>
           )}
+
+          <div className="space-y-1">
+            <Label>نام (فارسی) *</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
 
           <label className="flex items-center gap-2">
             <input

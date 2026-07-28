@@ -179,7 +179,7 @@ function PopupFormDialog({ open, onOpenChange, popup, onSaved }: {
         showOncePerSession,
         // Attach mediaId when picking from gallery OR removing existing.
         ...(imageMediaId ? { mediaId: imageMediaId } : {}),
-        ...(imageRemoved && !imageFile && popup ? {} : {}),
+        ...(imageRemoved && !imageFile && popup ? { mediaId: null } : {}),
       };
 
       if (popup) {

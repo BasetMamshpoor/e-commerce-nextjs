@@ -290,7 +290,7 @@ function ShippingFormDialog({
         logoValue.kind === "mediaId"
           ? { logoMediaId: (logoValue as { mediaId: number }).mediaId }
           : logoValue.kind === "removed" && company
-          ? {}
+          ? { logoMediaId: null }
           : {};
 
       const fullBody = { ...baseBody, ...logoJsonFields };
