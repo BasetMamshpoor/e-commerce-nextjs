@@ -49,9 +49,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const guestToken = getGuestToken();
     if (!guestToken) return;
     http
-      .post<Cart>(ENDPOINTS.cart.merge, { guestToken })
-      .then((cart) => {
-        queryClient.setQueryData(CART_QUERY_KEY, cart);
+      .post<{ cart: Cart }>(ENDPOINTS.cart.merge, { guestToken })
+      .then((response) => {
+        queryClient.setQueryData(CART_QUERY_KEY, response.cart);
         // Clear guest token after merge.
         setGuestToken("");
       })

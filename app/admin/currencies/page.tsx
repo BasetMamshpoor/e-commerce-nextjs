@@ -170,7 +170,6 @@ function CreateCurrencyDialog({
   const [code, setCode] = React.useState("");
   const [name, setName] = React.useState("");
   const [symbol, setSymbol] = React.useState("");
-  const [isActive, setIsActive] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
 
   React.useEffect(() => {
@@ -178,7 +177,6 @@ function CreateCurrencyDialog({
       setCode("");
       setName("");
       setSymbol("");
-      setIsActive(true);
     }
   }, [open]);
 
@@ -193,7 +191,6 @@ function CreateCurrencyDialog({
         code: code.trim().toUpperCase(),
         name: name.trim(),
         symbol: symbol.trim(),
-        isActive,
       });
       toast.success("ارز ایجاد شد");
       onOpenChange(false);
@@ -246,15 +243,9 @@ function CreateCurrencyDialog({
               placeholder="دلار آمریکا"
             />
           </div>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={isActive}
-              onChange={(e) => setIsActive(e.target.checked)}
-              className="size-4 rounded"
-            />
-            <span className="text-sm">فعال (دریافت خودکار نرخ)</span>
-          </label>
+          <p className="text-xs text-muted-foreground">
+            ارز جدید به‌صورت پیش‌فرض فعال ایجاد می‌شود. برای غیرفعال‌ کردن، بعد از ایجاد آن را ویرایش کنید.
+          </p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>انصراف</Button>
@@ -281,14 +272,14 @@ function EditCurrencyDialog({
 }) {
   const [name, setName] = React.useState("");
   const [isActive, setIsActive] = React.useState(true);
-  const [manualRate, setManualRate] = React.useState("");
+  const [currentRate, setCurrentRate] = React.useState("");
   const [saving, setSaving] = React.useState(false);
 
   React.useEffect(() => {
     if (currency) {
       setName(currency.name);
       setIsActive(currency.isActive);
-      setManualRate("");
+      setCurrentRate("");
     }
   }, [currency]);
 
@@ -301,24 +292,24 @@ function EditCurrencyDialog({
     }
     setSaving(true);
     try {
-      const body: { name?: string; isActive?: boolean; manualRate?: number } = {
+      const body: { name?: string; isActive?: boolean; currentRate?: number } = {
         name: name.trim(),
         isActive,
       };
-      if (manualRate.trim()) {
-        const rate = Number(manualRate);
+      if (currentRate.trim()) {
+        const rate = Number(currentRate);
         if (!rate || rate <= 0) {
-          toast.error("نرخ دستی باید عددی مثبت باشد");
+          toast.error("نرخ باید عددی مثبت باشد");
           setSaving(false);
           return;
         }
-        body.manualRate = rate;
+        body.currentRate = rate;
       }
       await currenciesService.update(currency.id, body);
       toast.success("ارز به‌روزرسانی شد");
-      if (manualRate.trim()) {
-        toast.success("نرخ دستی روی محصولات اعمال شد", {
-          description: `${toPersianDigits(formatPrice(Number(manualRate)))} تومان`,
+      if (currentRate.trim()) {
+        toast.success("نرخ روی محصولات اعمال شد", {
+          description: `${toPersianDigits(formatPrice(Number(currentRate)))} تومان`,
         });
       }
       onClose();
@@ -337,7 +328,7 @@ function EditCurrencyDialog({
         <DialogHeader>
           <DialogTitle>ویرایش ارز</DialogTitle>
           <DialogDescription>
-            <span className="font-mono" dir="ltr">{currency.code}</span> ({currency.symbol})
+            <span className="font-mono" dir="ltr">{currency.code}</span> ({currency.symbol}) — {currency.name}
           </DialogDescription>
         </DialogHeader>
 
@@ -400,8 +391,8 @@ function EditCurrencyDialog({
             </Label>
             <Input
               type="number"
-              value={manualRate}
-              onChange={(e) => setManualRate(e.target.value)}
+              value={currentRate}
+              onChange={(e) => setCurrentRate(e.target.value)}
               placeholder="مثلاً 195000"
               dir="ltr"
               className="text-left nums-fa"

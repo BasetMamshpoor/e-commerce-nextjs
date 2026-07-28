@@ -214,10 +214,10 @@ function DiscountFormDialog({
         code: form.code.toUpperCase(),
         type: form.type,
         value: Number(form.value),
-        maxDiscountAmount: form.maxDiscountAmount ? Number(form.maxDiscountAmount) : null,
-        minCartAmount: form.minCartAmount ? Number(form.minCartAmount) : null,
-        maxUsage: form.maxUsage ? Number(form.maxUsage) : null,
-        maxUsagePerUser: form.maxUsagePerUser ? Number(form.maxUsagePerUser) : null,
+        maxDiscountAmount: form.maxDiscountAmount ? Number(form.maxDiscountAmount) : undefined,
+        minCartAmount: form.minCartAmount ? Number(form.minCartAmount) : undefined,
+        maxUsage: form.maxUsage ? Number(form.maxUsage) : undefined,
+        maxUsagePerUser: form.maxUsagePerUser ? Number(form.maxUsagePerUser) : undefined,
         isActive: form.isActive,
       };
       if (discount) {

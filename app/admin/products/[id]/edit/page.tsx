@@ -90,7 +90,7 @@ export default function AdminProductEditPage({
     shortDescription: "",
     description: "",
     basePrice: "" as string | number,
-    currencyId: "" as string,
+    currencyId: "" as string | number,
     sourcePrice: "" as string | number,
     priceBufferPercent: "0" as string | number,
     status: "DRAFT" as ProductStatus,
@@ -130,7 +130,7 @@ export default function AdminProductEditPage({
           shortDescription: product.shortDescription ?? "",
           description: product.description ?? "",
           basePrice: product.basePrice ?? 0,
-          currencyId: product.currencyId != null ? String(product.currencyId) : "",
+          currencyId: product.currencyId != null ? product.currencyId : "",
           sourcePrice: product.sourcePrice ?? "",
           priceBufferPercent: product.priceBufferPercent ?? 0,
           status: product.status,
@@ -167,10 +167,10 @@ export default function AdminProductEditPage({
     const isCurrencyBased = productPricingMode === "CURRENCY_BASED";
     let basePrice: number | undefined;
     let sourcePrice: number | undefined;
-    let currencyId: string | undefined;
+    let currencyId: number | undefined;
 
     if (isCurrencyBased) {
-      currencyId = form.currencyId || undefined;
+      currencyId = form.currencyId ? Number(form.currencyId) : undefined;
       sourcePrice = form.sourcePrice ? Number(form.sourcePrice) : undefined;
       if (!currencyId || !sourcePrice || sourcePrice <= 0) {
         toast.error("ارز و قیمت به ارز مبدأ الزامی هستند");
@@ -354,7 +354,7 @@ export default function AdminProductEditPage({
                       <Label>ارز مبدأ</Label>
                       <Select
                         value={form.currencyId ? String(form.currencyId) : ""}
-                        onValueChange={(v) => setForm({ ...form, currencyId: v })}
+                        onValueChange={(v) => setForm({ ...form, currencyId: Number(v) })}
                       >
                         <SelectTrigger><SelectValue placeholder="انتخاب ارز" /></SelectTrigger>
                         <SelectContent>
@@ -390,7 +390,7 @@ export default function AdminProductEditPage({
                     />
                   </div>
                   {form.currencyId && form.sourcePrice && (() => {
-                    const cur = currencies.find((c) => c.id === form.currencyId);
+                    const cur = currencies.find((c) => c.id === Number(form.currencyId));
                     if (cur?.currentRate) {
                       const estimate = Number(form.sourcePrice) * cur.currentRate;
                       return (

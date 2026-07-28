@@ -243,6 +243,7 @@ function StoryDialog({
 
   const onSubmit = async () => {
     if (!title.trim()) { toast.error("عنوان الزامی است"); return; }
+    if (!editing && !expiresAt) { toast.error("تاریخ انقضا برای استوری جدید الزامی است"); return; }
     setSaving(true);
     try {
       const body = {

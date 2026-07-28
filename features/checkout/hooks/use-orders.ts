@@ -150,14 +150,15 @@ export function useRequestReturn() {
     }: {
       id: number;
       body: Omit<RequestReturnBody, "imageMediaIds">;
-      /** Optional image files — when provided, sent via multipart/form-data
-       *  with field name "images" (no pre-upload to /media needed). */
+      /** Optional image files — sent via multipart/form-data with field
+       *  name "images" (backend has uploadReturnImagesMiddleware).
+       *  When no files: plain JSON request. */
       files?: File[];
     }) => {
       if (files && files.length > 0) {
         return ordersService.requestReturnWithImages(id, body, files);
       }
-      // No files — fall back to plain JSON request.
+      // No files — plain JSON request.
       return ordersService.requestReturn(id, body);
     },
     onSuccess: (order) => {
