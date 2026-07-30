@@ -420,32 +420,109 @@ function ProductInfo({
         )}
       </div>
 
-      {product.variants && product.variants.length > 1 && (
-        <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-foreground">انتخاب گزینه:</h3>
-          <div className="flex flex-wrap gap-2">
-            {product.variants.map((v) => {
-              const label = v.sku || `تنوع ${v.id}`;
-              const isSelected = selectedVariant?.id === v.id;
-              const vOutOfStock = v.stock <= 0;
+      {product.variants && product.variants.length > 1 && (() => {
+        // Group variant attribute values by attribute type for separate selection.
+        // Each attribute (e.g., "رنگ", "سایز") gets its own selector row.
+        // The backend returns nested attribute data inside each variant's attributeValues.
+
+        // Build a map of attributeValueId → { attrId, attrName, attrInputType, value, colorHex } from variant data.
+        const avMap = new Map<number, { attrId: number; attrName: string; attrInputType: string; value: string; colorHex?: string | null }>();
+        for (const v of product.variants) {
+          for (const av of v.attributeValues ?? []) {
+            if (av.attributeValueId && av.attribute && !avMap.has(av.attributeValueId)) {
+              avMap.set(av.attributeValueId, {
+                attrId: av.attribute.id,
+                attrName: av.attribute.name,
+                attrInputType: av.attribute.inputType,
+                value: av.value ?? "",
+                colorHex: av.colorHex,
+              });
+            }
+          }
+        }
+
+        // Group attribute value IDs by attribute ID.
+        const attrGroups = new Map<number, { attrName: string; attrInputType: string; valueIds: number[] }>();
+        for (const [avId, info] of avMap) {
+          if (!attrGroups.has(info.attrId)) {
+            attrGroups.set(info.attrId, { attrName: info.attrName, attrInputType: info.attrInputType, valueIds: [] });
+          }
+          attrGroups.get(info.attrId)!.valueIds.push(avId);
+        }
+
+        if (attrGroups.size === 0) return null;
+
+        // Get the currently selected attribute value IDs from the selected variant.
+        const selectedAvIds = selectedVariant?.attributeValues?.map(av => av.attributeValueId) ?? [];
+
+        return (
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-foreground">انتخاب گزینه‌ها:</h3>
+            {Array.from(attrGroups.entries()).map(([attrId, group]) => {
+              const selectedValueId = selectedAvIds.find(id => avMap.get(id)?.attrId === attrId);
+
               return (
-                <button
-                  key={v.id}
-                  onClick={() => onSelectVariant(v)}
-                  disabled={vOutOfStock}
-                  className={cn(
-                    "rounded-lg border-2 px-3 py-2 text-sm transition-all",
-                    isSelected ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-primary/40",
-                    vOutOfStock && "opacity-50 line-through",
-                  )}
-                >
-                  {label}
-                </button>
+                <div key={attrId} className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-muted-foreground">{group.attrName}:</span>
+                    {selectedValueId && (
+                      <span className="text-xs font-medium text-foreground">
+                        {avMap.get(selectedValueId)?.value}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {group.valueIds.map((valId) => {
+                      const info = avMap.get(valId)!;
+                      const isSelected = selectedValueId === valId;
+                      // Check if any variant with this value is in stock.
+                      const hasStock = product.variants!.some(v => {
+                        const vIds = v.attributeValues?.map(av => av.attributeValueId) ?? [];
+                        return vIds.includes(valId) && v.stock > 0;
+                      });
+                      return (
+                        <button
+                          key={valId}
+                          onClick={() => {
+                            // Find the variant that matches this attribute value
+                            // (plus any already-selected values for other attributes).
+                            const targetAvIds = selectedAvIds.filter(id => avMap.get(id)?.attrId !== attrId);
+                            targetAvIds.push(valId);
+                            const matching = product.variants!.find(v => {
+                              const vIds = v.attributeValues?.map(av => av.attributeValueId) ?? [];
+                              return targetAvIds.every(id => vIds.includes(id)) && vIds.length === targetAvIds.length;
+                            });
+                            if (matching) onSelectVariant(matching);
+                          }}
+                          disabled={!hasStock}
+                          className={cn(
+                            "rounded-lg border-2 px-3 py-1.5 text-sm transition-all",
+                            isSelected ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-primary/40",
+                            !hasStock && "opacity-40 line-through cursor-not-allowed",
+                          )}
+                          title={hasStock ? info.value : `${info.value} — ناموجو`}
+                        >
+                          {group.attrInputType === "COLOR" && info.colorHex ? (
+                            <span className="flex items-center gap-1.5">
+                              <span
+                                className="size-4 rounded-full border border-border"
+                                style={{ backgroundColor: info.colorHex }}
+                              />
+                              {info.value}
+                            </span>
+                          ) : (
+                            info.value
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               );
             })}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       <Separator />
 

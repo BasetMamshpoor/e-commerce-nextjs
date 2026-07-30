@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { toast } from "sonner";
 
@@ -10,11 +10,17 @@ import type { LoginValues } from "@/features/auth/schemas/auth.schema";
 /**
  * Login with email/phone + password via NextAuth credentials provider.
  * On success, NextAuth creates a JWT session (with auto-refresh).
- * User never needs to re-login — refresh token rotation is handled by
- * the jwt callback in auth.ts.
+ *
+ * Role-based redirect:
+ *   ADMIN / EDITOR / SUPPORT → /admin
+ *   CUSTOMER → /account
+ *
+ * If a `callbackUrl` search param is present, it takes precedence
+ * (e.g. user tried to access /account/orders while logged out).
  */
 export function useLogin() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   return useMutation({
     mutationFn: async (values: LoginValues) => {
@@ -30,12 +36,22 @@ export function useLogin() {
     },
     onSuccess: async () => {
       toast.success("ورود موفقیت‌آمیز بود");
+
+      // Check for redirect param in search params (takes precedence).
+      // AuthGuard sets ?redirect=/account/orders when blocking a page.
+      const redirectUrl = searchParams.get("redirect") || searchParams.get("callbackUrl");
+      if (redirectUrl && redirectUrl.startsWith("/") && !redirectUrl.startsWith("/login")) {
+        router.push(redirectUrl);
+        router.refresh();
+        return;
+      }
+
       // Fetch session to determine role-based redirect.
       const res = await fetch("/api/auth/session");
       const session = await res.json();
       const role = session?.user?.role;
-      const isAdmin = role === "ADMIN" || role === "EDITOR" || role === "SUPPORT";
-      router.push(isAdmin ? "/admin" : "/account");
+      const isStaff = role === "ADMIN" || role === "EDITOR" || role === "SUPPORT";
+      router.push(isStaff ? "/admin" : "/account");
       router.refresh();
     },
     onError: () => {

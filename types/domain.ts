@@ -285,9 +285,22 @@ export interface ProductImage {
  *  Modifiers are per-product-variant (not per-attribute-value) — the same
  *  attribute value "Silver" can have different modifiers for different products. */
 export interface VariantAttributeValue {
+  /** ID from the junction table (ProductVariantAttributeValue.id). */
+  id?: number;
+  /** The AttributeValue ID. */
   attributeValueId: number;
   modifierType?: AttributeModifierType | null;
   modifierValue?: number | null;
+  /** Nested attribute value info (returned by backend in product detail). */
+  value?: string;
+  colorHex?: string | null;
+  order?: number;
+  attribute?: {
+    id: number;
+    name: string;
+    slug: string;
+    inputType: string;
+  };
 }
 
 export interface ProductVariant {

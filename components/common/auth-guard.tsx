@@ -93,12 +93,12 @@ export function AuthGuard({
  */
 export function GuestOnly({
   children,
-  redirectTo = "/account",
+  redirectTo,
 }: {
   children: React.ReactNode;
   redirectTo?: string;
 }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
 
   React.useEffect(() => {
@@ -107,9 +107,21 @@ export function GuestOnly({
       // Read redirect param directly from URL (avoids useSearchParams Suspense requirement).
       const params = new URLSearchParams(window.location.search);
       const redirect = params.get("redirect");
-      router.replace(redirect ?? redirectTo);
+
+      if (redirect && redirect.startsWith("/") && !redirect.startsWith("/login")) {
+        router.replace(redirect);
+        return;
+      }
+
+      // Role-based redirect: staff → /admin, customer → /account.
+      if (redirectTo) {
+        router.replace(redirectTo);
+        return;
+      }
+      const isStaff = user?.role === "ADMIN" || user?.role === "EDITOR" || user?.role === "SUPPORT";
+      router.replace(isStaff ? "/admin" : "/account");
     }
-  }, [isAuthenticated, isLoading, router, redirectTo]);
+  }, [isAuthenticated, isLoading, user, router, redirectTo]);
 
   if (isLoading || isAuthenticated) {
     return (
