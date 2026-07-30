@@ -252,6 +252,7 @@ function BannersSection({ banners }: { banners: Banner[] }) {
 function HeroCarousel({ banners }: { banners: Banner[] }) {
   const [activeIdx, setActiveIdx] = React.useState(0);
   const [paused, setPaused] = React.useState(false);
+  const touchStartX = React.useRef<number | null>(null);
 
   // Auto-advance every 5s
   React.useEffect(() => {
@@ -268,9 +269,18 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
 
   return (
     <div
-      className="relative aspect-[16/6] overflow-hidden rounded-2xl bg-muted"
+      className="relative aspect-[16/9] overflow-hidden rounded-2xl bg-muted sm:aspect-[16/7] lg:aspect-[16/6]"
       onPointerEnter={() => setPaused(true)}
       onPointerLeave={() => setPaused(false)}
+      onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
+      onTouchEnd={(e) => {
+        if (touchStartX.current === null) return;
+        const diff = e.changedTouches[0].clientX - touchStartX.current;
+        if (Math.abs(diff) > 40) {
+          setActiveIdx((i) => diff > 0 ? (i - 1 + banners.length) % banners.length : (i + 1) % banners.length);
+        }
+        touchStartX.current = null;
+      }}
     >
       {/* Slides */}
       {banners.map((b, i) => {
@@ -314,19 +324,23 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
         );
       })}
 
-      {/* Dots */}
+      {/* Dots — with larger touch targets */}
       {banners.length > 1 && (
-        <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
+        <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1">
           {banners.map((_, i) => (
             <button
               key={i}
               onClick={() => setActiveIdx(i)}
               className={cn(
-                "h-2 rounded-full transition-all",
-                i === activeIdx ? "w-6 bg-white" : "w-2 bg-white/50 hover:bg-white/80",
+                "flex size-6 items-center justify-center",
               )}
               aria-label={`اسلاید ${i + 1}`}
-            />
+            >
+              <span className={cn(
+                "h-2 rounded-full transition-all",
+                i === activeIdx ? "w-6 bg-white" : "w-2 bg-white/50",
+              )} />
+            </button>
           ))}
         </div>
       )}

@@ -119,13 +119,15 @@ export function Header() {
         <SearchAutocomplete className="hidden flex-1 lg:block" />
 
         {/* Actions */}
-        <div className="mr-auto flex items-center gap-1 lg:mr-0">
-          <WishlistBadge />
-          <ComparisonBadge />
+        <div className="mr-auto flex items-center gap-1 lg:mr-0 lg:gap-2">
+          <div className="hidden sm:flex items-center gap-1">
+            <WishlistBadge />
+            <ComparisonBadge />
+            <NotificationBell />
+          </div>
           <CartBadge />
-          <NotificationBell />
           <ThemeToggle />
-          <Button variant="ghost" size="icon" asChild aria-label="حساب کاربری">
+          <Button variant="ghost" size="icon" asChild aria-label="حساب کاربری" className="hidden sm:inline-flex">
             <Link href={isAuthenticated ? "/account" : "/login"}>
               <User className="size-5" />
             </Link>

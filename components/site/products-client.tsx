@@ -122,7 +122,7 @@ export function ProductsClient({
             <p className="mt-1 text-sm text-muted-foreground">{toPersianDigits(total)} کالا</p>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <MobileFilterSheet categorySlug={query.categorySlug} />
           <SortBar
             value={query.sort ?? "newest"}

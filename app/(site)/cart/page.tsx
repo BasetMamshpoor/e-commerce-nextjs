@@ -260,7 +260,7 @@ function CartSummary({ cart }: { cart: import("@/types/domain").Cart }) {
   const grandTotal = cart.total + shippingCost;
 
   return (
-    <Card className="sticky top-32 border-border/60">
+    <Card className="lg:sticky lg:top-32 border-border/60">
       <CardHeader>
         <CardTitle className="text-base">خلاصه سفارش</CardTitle>
       </CardHeader>

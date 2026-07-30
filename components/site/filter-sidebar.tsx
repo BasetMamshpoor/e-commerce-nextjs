@@ -294,12 +294,17 @@ export function MobileFilterSheet(props: FilterSidebarProps) {
           فیلترها
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" className="w-80 overflow-y-auto">
+      <SheetContent side="right" className="flex w-[90vw] max-w-sm flex-col overflow-y-auto pb-6">
         <SheetHeader>
           <SheetTitle>فیلترها</SheetTitle>
         </SheetHeader>
-        <div className="mt-4">
+        <div className="mt-4 flex-1 overflow-y-auto">
           <FilterSidebar {...props} />
+        </div>
+        <div className="border-t pt-3">
+          <Button size="lg" className="w-full" onClick={() => setOpen(false)}>
+            مشاهده نتایج
+          </Button>
         </div>
       </SheetContent>
     </Sheet>

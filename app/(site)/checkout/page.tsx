@@ -673,7 +673,7 @@ function CheckoutContent() {
 
         {/* Order Summary sidebar */}
         <div className="lg:col-span-1">
-          <Card className="sticky top-32 border-border/60">
+          <Card className="lg:sticky lg:top-32 border-border/60">
             <CardHeader>
               <CardTitle className="text-base">خلاصه سفارش</CardTitle>
             </CardHeader>

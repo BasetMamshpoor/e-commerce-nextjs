@@ -130,20 +130,20 @@ export function ProductCard({
           </div>
         )}
 
-        {/* Quick actions */}
+        {/* Quick actions — visible on mobile, hover-reveal on desktop */}
         {showQuickActions && !isOutOfStock && (
-          <div className="absolute left-3 top-3 flex flex-col gap-2 opacity-0 transition-all duration-300 group-hover:opacity-100">
+          <div className="absolute left-3 top-3 flex flex-col gap-2 opacity-100 transition-all duration-300 lg:opacity-0 lg:group-hover:opacity-100">
             <WishlistButton
               productId={product.id}
               size="icon"
               variant="secondary"
-              className="size-8 rounded-full bg-background/90 shadow-sm backdrop-blur hover:bg-background"
+              className="size-9 rounded-full bg-background/90 shadow-sm backdrop-blur hover:bg-background"
             />
             <ComparisonButton
               productId={product.id}
               size="icon"
               variant="secondary"
-              className="size-8 rounded-full bg-background/90 shadow-sm backdrop-blur hover:bg-background"
+              className="size-9 rounded-full bg-background/90 shadow-sm backdrop-blur hover:bg-background"
             />
           </div>
         )}
