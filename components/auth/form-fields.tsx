@@ -41,7 +41,7 @@ export function IdentifierField({
         const channel = isEmail ? "ایمیل" : isMobile ? "پیامک" : null;
         return (
           <FormItem>
-            <FormLabel>{label}</FormLabel>
+            <FormLabel dir="rtl">{label}</FormLabel>
             <FormControl>
               <div className="relative">
                 <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
@@ -57,7 +57,7 @@ export function IdentifierField({
                   {...field}
                 />
                 {channel && (
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                  <span className="absolute right-8 top-1/2 -translate-y-1/2 rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
                     {channel}
                   </span>
                 )}
@@ -92,7 +92,7 @@ export function PasswordField({
       name={name}
       render={({ field }) => (
         <FormItem>
-          <FormLabel>{label}</FormLabel>
+          <FormLabel dir="rtl">{label}</FormLabel>
           <FormControl>
             <div className="relative">
               <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">

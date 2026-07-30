@@ -70,3 +70,4 @@ server.log
 /.env
 /next-env.d.ts
 /.idea
+.zscripts

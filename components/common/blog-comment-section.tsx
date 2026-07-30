@@ -230,7 +230,6 @@ function BlogCommentItem({
   submitting: boolean;
   isAuthenticated: boolean;
 }) {
-  const maxDepth = 3;
   const hasReplies = comment.replies && comment.replies.length > 0;
   const [repliesExpanded, setRepliesExpanded] = React.useState(depth === 0);
 
@@ -239,9 +238,9 @@ function BlogCommentItem({
       <div className={cn("rounded-lg border border-border/40 p-3", depth > 0 && "border-r-2 border-r-primary/20")}>
         <div className="flex items-center gap-2">
           <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-            {((comment.user?.fullName ?? comment.authorName ?? "؟")).charAt(0)}
+            {((comment.user?.fullName ?? "؟")).charAt(0)}
           </div>
-          <span className="text-sm font-medium text-foreground">{(comment.user?.fullName ?? comment.authorName ?? "ناشناس")}</span>
+          <span className="text-sm font-medium text-foreground">{(comment.user?.fullName ?? "ناشناس")}</span>
           <span className="text-[10px] text-muted-foreground">{formatRelativeFa(comment.createdAt)}</span>
         </div>
         <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{comment.content}</p>
@@ -268,7 +267,7 @@ function BlogCommentItem({
             <Heart className={cn("size-3.5", comment.isLiked && "fill-current")} />
             {toPersianDigits(comment.likeCount ?? 0)}
           </button>
-          {isAuthenticated && depth < maxDepth && (
+          {isAuthenticated &&  (
             <button
               onClick={() => setReplyTo(replyTo === comment.id ? null : comment.id)}
               className="text-muted-foreground transition-colors hover:text-primary"

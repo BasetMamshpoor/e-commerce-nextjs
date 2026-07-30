@@ -194,7 +194,7 @@ export function VariantManagerModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] !max-w-7xl w-full overflow-y-auto">
         <DialogHeader>
           <DialogTitle>مدیریت تنوع‌ها</DialogTitle>
           <DialogDescription>

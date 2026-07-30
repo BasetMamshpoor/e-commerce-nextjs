@@ -94,9 +94,11 @@ export default function AdminProductDetailPage({ params }: { params: Promise<{ i
               مشاهده در سایت
             </Link>
           </Button>
-          <Button variant="outline" size="sm">
-            <Pencil className="size-4" />
-            ویرایش
+          <Button variant="outline" asChild size="sm">
+              <Link href={`/admin/products/${product.id}/edit`} target="_blank">
+                 <Pencil className="size-4" />
+                 ویرایش
+              </Link>
           </Button>
           <Button variant="destructive" size="sm" onClick={handleDelete}>
             <Trash2 className="size-4" />

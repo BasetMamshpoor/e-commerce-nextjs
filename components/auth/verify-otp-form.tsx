@@ -95,7 +95,7 @@ export function VerifyOtpForm() {
             render={({ field }) => (
               <FormItem>
                 <FormControl>
-                  <div className="flex justify-center">
+                  <div className="flex justify-center" dir="ltr">
                     <InputOTP
                       maxLength={APP_CONFIG.otpLength}
                       value={field.value}

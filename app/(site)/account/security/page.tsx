@@ -208,12 +208,11 @@ function ChangeIdentifierSection() {
             </div>
             <div className="space-y-2">
               <Label>کد تایید ۵ رقمی</Label>
-              <div className="flex justify-center">
+              <div className="flex justify-center" dir={"ltr"}>
                 <InputOTP
                   maxLength={APP_CONFIG.otpLength}
                   value={code}
                   onChange={setCode}
-                  dir="ltr"
                 >
                   <InputOTPGroup>
                     {Array.from({ length: APP_CONFIG.otpLength }).map((_, i) => (

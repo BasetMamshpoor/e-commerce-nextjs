@@ -20,6 +20,7 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
+    unoptimized:true,
     remotePatterns: [
       // Backend (uploads + media URLs)
       {
