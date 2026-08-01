@@ -420,17 +420,19 @@ function ProductInfo({
         )}
       </div>
 
-      {product.variants && product.variants.length > 1 && (() => {
+      {product.variants && product.variants.length > 0 && (() => {
         // Group variant attribute values by attribute type for separate selection.
         // Each attribute (e.g., "رنگ", "سایز") gets its own selector row.
         // The backend returns nested attribute data inside each variant's attributeValues.
 
         // Build a map of attributeValueId → { attrId, attrName, attrInputType, value, colorHex } from variant data.
+        // Backend returns `id` (AttributeValue.id), not `attributeValueId`.
         const avMap = new Map<number, { attrId: number; attrName: string; attrInputType: string; value: string; colorHex?: string | null }>();
         for (const v of product.variants) {
           for (const av of v.attributeValues ?? []) {
-            if (av.attributeValueId && av.attribute && !avMap.has(av.attributeValueId)) {
-              avMap.set(av.attributeValueId, {
+            const avId = av.id ?? av.attributeValueId;
+            if (avId && av.attribute && !avMap.has(avId)) {
+              avMap.set(avId, {
                 attrId: av.attribute.id,
                 attrName: av.attribute.name,
                 attrInputType: av.attribute.inputType,
@@ -453,7 +455,7 @@ function ProductInfo({
         if (attrGroups.size === 0) return null;
 
         // Get the currently selected attribute value IDs from the selected variant.
-        const selectedAvIds = selectedVariant?.attributeValues?.map(av => av.attributeValueId) ?? [];
+        const selectedAvIds = (selectedVariant?.attributeValues ?? []).map(av => av.id ?? av.attributeValueId).filter(Boolean) as number[];
 
         return (
           <div className="space-y-3">
@@ -477,7 +479,7 @@ function ProductInfo({
                       const isSelected = selectedValueId === valId;
                       // Check if any variant with this value is in stock.
                       const hasStock = product.variants!.some(v => {
-                        const vIds = v.attributeValues?.map(av => av.attributeValueId) ?? [];
+                        const vIds = (v.attributeValues ?? []).map(av => av.id ?? av.attributeValueId).filter(Boolean) as number[];
                         return vIds.includes(valId) && v.stock > 0;
                       });
                       return (
@@ -489,7 +491,7 @@ function ProductInfo({
                             const targetAvIds = selectedAvIds.filter(id => avMap.get(id)?.attrId !== attrId);
                             targetAvIds.push(valId);
                             const matching = product.variants!.find(v => {
-                              const vIds = v.attributeValues?.map(av => av.attributeValueId) ?? [];
+                              const vIds = (v.attributeValues ?? []).map(av => av.id ?? av.attributeValueId).filter(Boolean) as number[];
                               return targetAvIds.every(id => vIds.includes(id)) && vIds.length === targetAvIds.length;
                             });
                             if (matching) onSelectVariant(matching);

@@ -49,6 +49,8 @@ interface AdminTableProps<T> {
   searchPlaceholder?: string;
   // Header actions
   headerActions?: React.ReactNode;
+  /** Extra filter elements (Selects, chips, etc.) — rendered between search and table. */
+  filterSlot?: React.ReactNode;
   title: string;
   description?: string;
 }
@@ -70,6 +72,7 @@ export function AdminTable<T>({
   onSearchChange,
   searchPlaceholder = "جست‌وجو...",
   headerActions,
+  filterSlot,
   title,
   description,
 }: AdminTableProps<T>) {
@@ -84,17 +87,22 @@ export function AdminTable<T>({
         {headerActions}
       </div>
 
-      {/* Search */}
-      {onSearchChange && (
-        <div className="relative max-w-sm">
-          <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder={searchPlaceholder}
-            value={searchValue ?? ""}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="pr-9"
-          />
+      {/* Search + Filters row — compact, no extra spacing */}
+      {(onSearchChange || filterSlot) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {onSearchChange && (
+            <div className="relative min-w-[180px] flex-1 sm:max-w-sm">
+              <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder={searchPlaceholder}
+                value={searchValue ?? ""}
+                onChange={(e) => onSearchChange(e.target.value)}
+                className="h-9 pr-9"
+              />
+            </div>
+          )}
+          {filterSlot}
         </div>
       )}
 

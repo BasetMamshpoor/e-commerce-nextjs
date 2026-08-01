@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { toast } from "sonner";
 
@@ -15,12 +15,11 @@ import type { LoginValues } from "@/features/auth/schemas/auth.schema";
  *   ADMIN / EDITOR / SUPPORT → /admin
  *   CUSTOMER → /account
  *
- * If a `callbackUrl` search param is present, it takes precedence
+ * If a `redirect` search param is present, it takes precedence
  * (e.g. user tried to access /account/orders while logged out).
  */
 export function useLogin() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   return useMutation({
     mutationFn: async (values: LoginValues) => {
@@ -37,22 +36,31 @@ export function useLogin() {
     onSuccess: async () => {
       toast.success("ورود موفقیت‌آمیز بود");
 
-      // Check for redirect param in search params (takes precedence).
-      // AuthGuard sets ?redirect=/account/orders when blocking a page.
-      const redirectUrl = searchParams.get("redirect") || searchParams.get("callbackUrl");
-      if (redirectUrl && redirectUrl.startsWith("/") && !redirectUrl.startsWith("/login")) {
-        router.push(redirectUrl);
-        router.refresh();
-        return;
+      // Read redirect param directly from window (avoids useSearchParams
+      // which requires Suspense boundary and can cause loading stuck).
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        const redirectUrl = params.get("redirect") || params.get("callbackUrl");
+        if (redirectUrl && redirectUrl.startsWith("/") && !redirectUrl.startsWith("/login")) {
+          router.push(redirectUrl);
+          router.refresh();
+          return;
+        }
       }
 
       // Fetch session to determine role-based redirect.
-      const res = await fetch("/api/auth/session");
-      const session = await res.json();
-      const role = session?.user?.role;
-      const isStaff = role === "ADMIN" || role === "EDITOR" || role === "SUPPORT";
-      router.push(isStaff ? "/admin" : "/account");
-      router.refresh();
+      try {
+        const res = await fetch("/api/auth/session");
+        const session = await res.json();
+        const role = session?.user?.role;
+        const isStaff = role === "ADMIN" || role === "EDITOR" || role === "SUPPORT";
+        router.push(isStaff ? "/admin" : "/account");
+        router.refresh();
+      } catch {
+        // Fallback if session fetch fails — go to home.
+        router.push("/");
+        router.refresh();
+      }
     },
     onError: () => {
       toast.error("شناسه یا رمز عبور اشتباه است");

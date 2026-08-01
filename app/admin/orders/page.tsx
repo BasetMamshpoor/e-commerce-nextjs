@@ -37,6 +37,16 @@ export default function AdminOrdersPage() {
   const [statusFilter, setStatusFilter] = React.useState<OrderStatus | "">("");
   const [search, setSearch] = React.useState("");
 
+  // Read userId from URL (for "view orders" button on user detail page).
+  const [userIdFilter, setUserIdFilter] = React.useState<number | undefined>(undefined);
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const uid = params.get("userId");
+      if (uid) setUserIdFilter(Number(uid));
+    }
+  }, []);
+
   React.useEffect(() => {
     setLoading(true);
     ordersService
@@ -45,10 +55,11 @@ export default function AdminOrdersPage() {
         limit: 20,
         status: statusFilter || undefined,
         search: search || undefined,
+        userId: userIdFilter,
       })
       .then(setData)
       .finally(() => setLoading(false));
-  }, [page, statusFilter, search]);
+  }, [page, statusFilter, search, userIdFilter]);
 
   const orders = data?.items ?? [];
 
@@ -134,43 +145,33 @@ export default function AdminOrdersPage() {
         }}
         searchPlaceholder="جست‌وجو شماره سفارش..."
         emptyTitle="سفارشی یافت نشد"
-      />
-
-      {/* Status filter chips */}
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => {
-            setStatusFilter("");
-            setPage(1);
-          }}
-          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-            statusFilter === ""
-              ? "bg-primary text-primary-foreground"
-              : "bg-muted text-muted-foreground hover:bg-accent"
-          }`}
-        >
-          همه
-        </button>
-        {STATUS_FILTERS.map((status) => {
-          const cfg = STATUS_CONFIG[status];
-          return (
+        filterSlot={
+          <div className="flex flex-wrap gap-1">
             <button
-              key={status}
-              onClick={() => {
-                setStatusFilter(status);
-                setPage(1);
-              }}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                statusFilter === status
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-accent"
+              onClick={() => { setStatusFilter(""); setPage(1); }}
+              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                statusFilter === "" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-accent"
               }`}
             >
-              {cfg.label}
+              همه
             </button>
-          );
-        })}
-      </div>
+            {STATUS_FILTERS.map((status) => {
+              const cfg = STATUS_CONFIG[status];
+              return (
+                <button
+                  key={status}
+                  onClick={() => { setStatusFilter(status); setPage(1); }}
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                    statusFilter === status ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-accent"
+                  }`}
+                >
+                  {cfg.label}
+                </button>
+              );
+            })}
+          </div>
+        }
+      />
     </div>
   );
 }

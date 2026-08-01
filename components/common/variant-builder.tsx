@@ -104,7 +104,7 @@ export function VariantBuilder({
     const map: Record<number, number[]> = {};
     for (const v of variants) {
       for (const av of v.attributeValues) {
-        const avId = av.attributeValueId;
+        const avId = av.attributeValueId ?? av.id ?? 0;
         for (const attr of variantAttributes) {
           if (attr.values.some((val) => val.id === avId)) {
             if (!map[attr.id]) map[attr.id] = [];
@@ -154,20 +154,20 @@ export function VariantBuilder({
     // Build lookup of existing variants by sorted attributeValueIds
     const existingMap = new Map<string, VariantFormData>();
     for (const v of variants) {
-      const ids = v.attributeValues.map((av) => av.attributeValueId);
-      const key = [...ids].sort((a, b) => a - b).join(",");
+      const ids = v.attributeValues.map((av) => av.attributeValueId ?? av.id).filter(Boolean) as number[];
+      const key = [...ids].filter(Boolean).sort((a, b) => (a ?? 0) - (b ?? 0)).join(",");
       existingMap.set(key, v);
     }
 
     const newVariants: VariantFormData[] = combos.map((combo, index) => {
-      const key = [...combo].sort((a, b) => a - b).join(",");
+      const key = [...combo].filter(Boolean).sort((a, b) => (a ?? 0) - (b ?? 0)).join(",");
       const existing = existingMap.get(key);
       const isFirst = index === 0;
 
       // Preserve existing modifiers when regenerating.
       const attributeValues: VariantAttributeValue[] = combo.map((id) => {
         const existingAv = existing?.attributeValues.find(
-          (av) => av.attributeValueId === id,
+          (av) => av.attributeValueId ?? av.id ?? 0 === id,
         );
         return (
           existingAv ?? { attributeValueId: id }
@@ -201,12 +201,12 @@ export function VariantBuilder({
 
     const oldKeys = new Set(
       variants.map((v) =>
-        [...v.attributeValues.map((av) => av.attributeValueId)].sort((a, b) => a - b).join(","),
+        [...v.attributeValues.map((av) => av.attributeValueId ?? av.id).filter(Boolean) as number[]].filter(Boolean).sort((a, b) => (a ?? 0) - (b ?? 0)).join(","),
       ),
     );
     const newKeys = new Set(
       newVariants.map((v) =>
-        [...v.attributeValues.map((av) => av.attributeValueId)].sort((a, b) => a - b).join(","),
+        [...v.attributeValues.map((av) => av.attributeValueId ?? av.id).filter(Boolean) as number[]].filter(Boolean).sort((a, b) => (a ?? 0) - (b ?? 0)).join(","),
       ),
     );
     const changed =
@@ -247,7 +247,7 @@ export function VariantBuilder({
             const type = value === "none" || value === "" ? null : (value as AttributeModifierType);
             // When clearing the type, also clear the value.
             return {
-              attributeValueId: av.attributeValueId,
+              attributeValueId: av.attributeValueId ?? av.id ?? 0,
               modifierType: type,
               modifierValue: type ? av.modifierValue ?? null : null,
             };
@@ -413,7 +413,7 @@ export function VariantBuilder({
                       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
                         {variant.attributeValues.length > 0 ? (
                           variant.attributeValues.map((av, ai) => {
-                            const info = getAttrValueInfo(av.attributeValueId);
+                            const info = getAttrValueInfo(av.attributeValueId ?? av.id ?? 0);
                             return (
                               <React.Fragment key={ai}>
                                 {ai > 0 && <span className="text-muted-foreground text-[10px]">+</span>}
@@ -424,7 +424,7 @@ export function VariantBuilder({
                                       style={{ backgroundColor: info.colorHex }}
                                     />
                                   )}
-                                  {info ? `${info.attrName}: ${info.value}` : `#${av.attributeValueId}`}
+                                  {info ? `${info.attrName}: ${info.value}` : `#${av.attributeValueId ?? av.id ?? 0}`}
                                 </span>
                               </React.Fragment>
                             );
@@ -526,7 +526,7 @@ export function VariantBuilder({
                         {isExpanded && (
                           <div className="space-y-2 border-t border-border/40 p-2.5">
                             {variant.attributeValues.map((av, avIndex) => {
-                              const info = getAttrValueInfo(av.attributeValueId);
+                              const info = getAttrValueInfo(av.attributeValueId ?? av.id ?? 0);
                               const currentModifierType = av.modifierType ?? "none";
                               return (
                                 <div
@@ -542,7 +542,7 @@ export function VariantBuilder({
                                       />
                                     )}
                                     <span className="truncate text-muted-foreground">
-                                      {info ? info.value : `#${av.attributeValueId}`}
+                                      {info ? info.value : `#${av.attributeValueId ?? av.id ?? 0}`}
                                     </span>
                                   </div>
 

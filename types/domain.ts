@@ -283,12 +283,16 @@ export interface ProductImage {
 
 /** A variant's attribute value with an optional price modifier.
  *  Modifiers are per-product-variant (not per-attribute-value) — the same
- *  attribute value "Silver" can have different modifiers for different products. */
+ *  attribute value "Silver" can have different modifiers for different products.
+ *
+ *  Note: When sending to backend (POST/PUT), use `attributeValueId`.
+ *  When receiving from backend (GET), the field is `id` (AttributeValue.id).
+ *  Both refer to the same AttributeValue record. */
 export interface VariantAttributeValue {
-  /** ID from the junction table (ProductVariantAttributeValue.id). */
+  /** Used when sending to backend in create/update body. */
+  attributeValueId?: number;
+  /** Returned by backend in GET responses (AttributeValue.id). */
   id?: number;
-  /** The AttributeValue ID. */
-  attributeValueId: number;
   modifierType?: AttributeModifierType | null;
   modifierValue?: number | null;
   /** Nested attribute value info (returned by backend in product detail). */
