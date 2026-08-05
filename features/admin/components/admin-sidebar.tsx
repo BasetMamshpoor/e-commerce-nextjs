@@ -33,6 +33,7 @@ import {
   MessageCircle,
   FileText as FileTextIcon,
   Coins,
+  Headphones,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -83,6 +84,7 @@ const NAV_GROUPS: {
     items: [
       { href: "/admin/users", label: "کاربران", icon: Users },
       { href: "/admin/tickets", label: "تیکت‌ها", icon: Ticket },
+      { href: "/admin/live-chat", label: "چت زنده", icon: Headphones, roles: ["ADMIN", "EDITOR", "SUPPORT"] },
       { href: "/admin/ticket-departments", label: "بخش‌های تیکت", icon: MessageCircle, roles: ["ADMIN"] },
       { href: "/admin/comments", label: "نظرات", icon: MessageSquare },
       { href: "/admin/broadcast", label: "ارسال اعلان گروهی", icon: Megaphone },
@@ -282,6 +284,7 @@ export function AdminTopbar({ onMenuClick }: { onMenuClick: () => void }) {
       "discount-codes": "کدهای تخفیف",
       users: "کاربران",
       tickets: "تیکت‌ها",
+      "live-chat": "چت زنده پشتیبانی",
       "ticket-departments": "بخش‌های تیکت",
       comments: "نظرات",
       banners: "بنرها",

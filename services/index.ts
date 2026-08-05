@@ -44,3 +44,5 @@ export {
   adminNotificationsService,
   blogService,
 } from "./new-services";
+
+export { chatService } from "./chat.service";
