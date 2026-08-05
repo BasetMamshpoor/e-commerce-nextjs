@@ -38,7 +38,7 @@ function getCustomerLabel(conversation: OperatorQueueConversation): string {
   const customer = conversation.customer;
   if (customer?.displayName) return customer.displayName;
   if (customer?.storeUserId) return `کاربر #${customer.storeUserId}`;
-  if (customer?.externalId) return `مهمان ${customer.externalId.slice(0, 8)}...`;
+  if (customer?.guestToken) return `مهمان ${customer.guestToken.slice(0, 8)}...`;
   return "مشتری ناشناس";
 }
 

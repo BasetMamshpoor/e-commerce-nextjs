@@ -2,7 +2,12 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
-import { chatService, getChatGuestToken, type ChatMessage } from "@/services/chat.service";
+import {
+  chatService,
+  getChatGuestToken,
+  chatWsBase,
+  type ChatMessage,
+} from "@/services/chat.service";
 import { useAuth } from "@/providers/auth-context";
 
 export interface UseChatEngineReturn {
@@ -24,12 +29,21 @@ export function useChatEngine(): UseChatEngineReturn {
   const socketRef = useRef<Socket | null>(null);
   const guestTokenRef = useRef<string>("");
   const { user } = useAuth();
+  const isOpenRef = useRef(isOpen);
+
+  // Keep isOpenRef in sync so socket callbacks can read current value.
+  // Reset unread count when opening — done via callback, not effect.
+  const handleSetOpen = useCallback((open: boolean) => {
+    isOpenRef.current = open;
+    if (open) setUnreadCount(0);
+    setOpen(open);
+  }, []);
 
   useEffect(() => {
     const guestToken = getChatGuestToken();
     guestTokenRef.current = guestToken;
 
-    // 1. Fetch history
+    // 1. Fetch history via REST (uses chatHttp → auth token injected)
     chatService
       .getHistory(guestToken)
       .then((data) => {
@@ -40,7 +54,7 @@ export function useChatEngine(): UseChatEngineReturn {
       .catch(() => {});
 
     // 2. Connect WebSocket
-    const socket = io(`${chatService.wsBase}/chat`, {
+    const socket = io(`${chatWsBase}/chat`, {
       query: { guestToken },
       transports: ["websocket", "polling"],
       reconnection: true,
@@ -55,13 +69,13 @@ export function useChatEngine(): UseChatEngineReturn {
     socket.on("engine:reply", (payload: { text: string; needsOperator?: boolean }) => {
       setMessages((prev) => [...prev, { senderType: "ENGINE", content: payload.text }]);
       setWaitingForOperator(payload.needsOperator ?? false);
-      if (!isOpen) setUnreadCount((c) => c + 1);
+      if (!isOpenRef.current) setUnreadCount((c) => c + 1);
     });
 
     socket.on("operator:reply", (payload: { text: string }) => {
       setMessages((prev) => [...prev, { senderType: "OPERATOR", content: payload.text }]);
       setWaitingForOperator(false);
-      if (!isOpen) setUnreadCount((c) => c + 1);
+      if (!isOpenRef.current) setUnreadCount((c) => c + 1);
     });
 
     socket.on("error", (err: { message?: string }) => {
@@ -74,7 +88,6 @@ export function useChatEngine(): UseChatEngineReturn {
     return () => {
       socket.disconnect();
     };
-     
   }, []);
 
   const sendMessage = useCallback(
@@ -91,7 +104,7 @@ export function useChatEngine(): UseChatEngineReturn {
           storeUserId: user?.id,
         });
       } else {
-        // Fallback: REST
+        // Fallback: REST (uses chatHttp → auth token injected)
         chatService
           .sendMessage({
             guestToken: guestTokenRef.current,
@@ -114,5 +127,5 @@ export function useChatEngine(): UseChatEngineReturn {
     [user],
   );
 
-  return { messages, connected, waitingForOperator, sendMessage, isOpen, setOpen, unreadCount };
+  return { messages, connected, waitingForOperator, sendMessage, isOpen, setOpen: handleSetOpen, unreadCount };
 }
