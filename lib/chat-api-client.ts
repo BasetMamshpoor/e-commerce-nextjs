@@ -25,7 +25,7 @@ import { getAccessToken } from "@/lib/api-client";
 const isBrowser = typeof window !== "undefined";
 
 const CHAT_API_BASE =
-  process.env.NEXT_PUBLIC_CHAT_API_URL ?? "http://localhost:4100/api";
+  process.env.NEXT_PUBLIC_CHAT_API_URL ?? "http://localhost:8001/api";
 
 /* ──────────────────────────────────────────────────────────────────────────
    Axios instance for chat-engine
