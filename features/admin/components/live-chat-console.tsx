@@ -58,6 +58,7 @@ const QUEUE_TABS = [
   { key: "ALL" as const, label: "صف فعال" },
   { key: "NEEDS_OPERATOR" as const, label: "منتظر اپراتور" },
   { key: "WITH_OPERATOR" as const, label: "در حال پاسخگویی" },
+  { key: "AI_HANDLING" as const, label: "ربات" },
   { key: "CLOSED" as const, label: "بسته‌شده‌ها" },
 ];
 
@@ -321,6 +322,7 @@ export function LiveChatConsole() {
 
 function useTelegramMedia(conversationId: string, messageId: string | undefined) {
   const [mediaUrl, setMediaUrl] = React.useState<string | null>(null);
+  const [mediaContentType, setMediaContentType] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
 
   const load = React.useCallback(async () => {
@@ -334,9 +336,11 @@ function useTelegramMedia(conversationId: string, messageId: string | undefined)
       });
       if (!res.ok) throw new Error("Failed to fetch media");
       const blob = await res.blob();
+      setMediaContentType(blob.type);
       setMediaUrl(URL.createObjectURL(blob));
     } catch {
       setMediaUrl(null);
+      setMediaContentType(null);
     } finally {
       setLoading(false);
     }
@@ -348,7 +352,7 @@ function useTelegramMedia(conversationId: string, messageId: string | undefined)
     };
   }, [mediaUrl]);
 
-  return { mediaUrl, loading, load };
+  return { mediaUrl, mediaContentType, loading, load };
 }
 
 /* ───────── Message bubble with Telegram media support ───────── */
@@ -361,7 +365,7 @@ function OperatorMessageBubble({ message, conversationId }: { message: OperatorC
 
   // Check for Telegram media (photo/voice)
   const telegramFileId = (message.metadata as { telegramFileId?: string } | null)?.telegramFileId;
-  const { mediaUrl, loading, load } = useTelegramMedia(
+  const { mediaUrl, mediaContentType, loading, load } = useTelegramMedia(
     conversationId,
     telegramFileId ? message.id : undefined,
   );
@@ -408,8 +412,13 @@ function OperatorMessageBubble({ message, conversationId }: { message: OperatorC
         {telegramFileId && (
           <div className="mt-2">
             {mediaUrl ? (
-              // Heuristic: if content-type starts with image, show img; else audio
-              <img src={mediaUrl} alt="رسانه تلگرام" className="max-w-full rounded-lg" />
+              mediaContentType?.startsWith("audio") ? (
+                <audio src={mediaUrl} controls className="w-full max-w-[250px]" />
+              ) : mediaContentType?.startsWith("video") ? (
+                <video src={mediaUrl} controls className="max-w-full rounded-lg" />
+              ) : (
+                <img src={mediaUrl} alt="رسانه تلگرام" className="max-w-full rounded-lg" />
+              )
             ) : (
               <Button
                 variant="outline"

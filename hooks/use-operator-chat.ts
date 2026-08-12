@@ -13,7 +13,34 @@ import {
 } from "@/services/chat.service";
 import { getAccessToken } from "@/lib/api-client";
 
-type QueueFilter = "ALL" | "NEEDS_OPERATOR" | "WITH_OPERATOR" | "CLOSED";
+/** Play a short notification beep using Web Audio API (no external file needed). */
+function playNotificationSound() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    osc.type = "sine";
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.3);
+  } catch {
+    // AudioContext not available — silent fallback.
+  }
+}
+
+/** Quick inline customer label for toast notifications. */
+function getCustomerLabelInline(c: OperatorQueueConversation): string {
+  if (c.customer?.displayName) return c.customer.displayName;
+  if (c.customer?.storeUserId) return `کاربر #${c.customer.storeUserId}`;
+  if (c.customer?.externalId) return `مهمان ${String(c.customer.externalId).slice(0, 8)}`;
+  return "مشتری";
+}
+
+type QueueFilter = "ALL" | "NEEDS_OPERATOR" | "WITH_OPERATOR" | "CLOSED" | "AI_HANDLING" | "OPEN";
 
 export interface UseOperatorChatReturn {
   queue: OperatorQueueConversation[];
@@ -116,11 +143,16 @@ export function useOperatorChat(): UseOperatorChatReturn {
 
     // queue:new — a new conversation entered the queue.
     // Add it to the top of the local list (no full refresh).
+    // Also play a notification sound + show a toast.
     socket.on("queue:new", (item: OperatorQueueConversation) => {
       setQueue((prev) => {
-        // Avoid duplicates
         if (prev.some((c) => c.id === item.id)) return prev;
         return [item, ...prev];
+      });
+      // Notification: sound + toast
+      playNotificationSound();
+      toast.info("💬 مکالمه جدید در صف", {
+        description: `${getCustomerLabelInline(item)} — ${item.channel}`,
       });
     });
 
