@@ -175,9 +175,11 @@ export interface UpdateCurrencyBody {
   name?: string;
   symbol?: string;
   isActive?: boolean;
-  /** When set, a new ExchangeRateHistory entry with source="manual" is created
-   *  and immediately applied to all products using this currency. */
-  manualRate?: number;
+  /** When set, the currency's currentRate + lastAppliedRate are updated and
+   *  all products using this currency are immediately recalculated.
+   *  (Backend field name is `currentRate` — docs say `manualRate` but the
+   *  actual Zod schema + service code uses `currentRate`.) */
+  currentRate?: number;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────

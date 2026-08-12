@@ -31,9 +31,8 @@ export const currenciesService = {
     http.post<Currency>(ENDPOINTS.currencies.create, body),
 
   /** Admin: update a currency's name/isActive, or override its rate manually.
-   *  When `manualRate` is provided, a new ExchangeRateHistory entry with
-   *  source="manual" is created and immediately applied to all products
-   *  using this currency. */
+   *  When `currentRate` is provided, the currency's currentRate + lastAppliedRate
+   *  are updated and all products using this currency are immediately recalculated. */
   update: (id: number, body: UpdateCurrencyBody) =>
     http.patch<Currency>(ENDPOINTS.currencies.update(id), body),
 
