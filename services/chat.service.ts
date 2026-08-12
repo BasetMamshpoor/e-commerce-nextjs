@@ -11,7 +11,7 @@
  * by chatHttp works for both customer and operator endpoints.
  */
 
-import { chatHttp } from "@/lib/chat-api-client";
+import { chatHttp, chatApiClient } from "@/lib/chat-api-client";
 import { APP_CONFIG } from "@/constants/app";
 
 /* ───────── Customer-facing types ───────── */
@@ -51,13 +51,29 @@ export interface ChatSendResponse {
 
 /* ───────── Operator-facing types ───────── */
 
+export type ConversationStatus =
+  | "OPEN"
+  | "AI_HANDLING"
+  | "NEEDS_OPERATOR"
+  | "WITH_OPERATOR"
+  | "CLOSED";
+
+export type ConversationChannel =
+  | "WEBSITE"
+  | "INSTAGRAM"
+  | "WHATSAPP"
+  | "TELEGRAM"
+  | "BALE";
+
 export interface OperatorQueueConversation {
   id: string;
-  channel: string;
-  status: "OPEN" | "AI_HANDLING" | "NEEDS_OPERATOR" | "WITH_OPERATOR" | "CLOSED";
+  channel: ConversationChannel;
+  status: ConversationStatus;
   customer: {
-    guestToken: string;
+    _id?: string;
+    guestToken?: string;
     displayName?: string | null;
+    externalId?: string | null;
     storeUserId?: number | null;
   };
   lastMessageAt: string;
@@ -75,6 +91,11 @@ export interface OperatorChatMessage {
 export interface OperatorReplyBody {
   conversationId: string;
   text: string;
+}
+
+export interface OperatorQueueQuery {
+  status?: ConversationStatus;
+  channel?: ConversationChannel;
 }
 
 /* ───────── Guest token management ───────── */
@@ -113,21 +134,37 @@ export const chatService = {
 
   /* ── Operator endpoints (require ADMIN/EDITOR/SUPPORT role) ── */
 
-  /** Get the queue of conversations needing operator attention. */
-  getOperatorQueue: (status?: "NEEDS_OPERATOR" | "WITH_OPERATOR") =>
-    chatHttp.get<OperatorQueueConversation[]>("/operator/queue", status ? { status } : undefined),
+  /** Get the queue of conversations needing operator attention.
+   *  Without status param, returns NEEDS_OPERATOR + WITH_OPERATOR (classic queue).
+   *  With status, returns conversations matching that status. */
+  getOperatorQueue: (params?: OperatorQueueQuery) =>
+    chatHttp.get<OperatorQueueConversation[]>("/operator/queue", params as Record<string, unknown> | undefined),
 
   /** Get all messages in a conversation (operator view). */
   getOperatorConversation: (conversationId: string) =>
     chatHttp.get<OperatorChatMessage[]>(`/operator/conversations/${conversationId}`),
 
-  /** Send an operator reply to a conversation. */
+  /** Send an operator reply to a conversation (REST fallback for socket). */
   sendOperatorReply: (conversationId: string, text: string) =>
     chatHttp.post<{ id: string | null }>("/operator/reply", { conversationId, text }),
 
-  /** Close a conversation. */
+  /** Close a conversation (ends the thread — next customer message starts fresh). */
   closeOperatorConversation: (conversationId: string) =>
     chatHttp.post<{ id: string; status: string }>(`/operator/conversations/${conversationId}/close`),
+
+  /** Release a conversation back to automated layers (AI/keywords resume). */
+  releaseOperatorConversation: (conversationId: string) =>
+    chatHttp.post<{ id: string; status: string }>(`/operator/conversations/${conversationId}/release`),
+
+  /** Delete a conversation and all its messages (irreversible). */
+  deleteOperatorConversation: (conversationId: string) =>
+    chatHttp.delete<{ id: string }>(`/operator/conversations/${conversationId}`),
+
+  /** Build the URL for a Telegram media proxy (photos/voice from Telegram).
+   *  Returns a URL that can be used with fetch + Authorization header,
+   *  then converted to a blob URL for <img src> or <audio src>. */
+  getOperatorMediaUrl: (conversationId: string, messageId: string) =>
+    `${chatApiClient.defaults.baseURL}/operator/conversations/${conversationId}/messages/${messageId}/media`,
 
   /* ── Exposed for Socket.io connections ── */
 

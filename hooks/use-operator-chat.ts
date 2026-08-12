@@ -9,10 +9,11 @@ import {
   chatService,
   type OperatorChatMessage,
   type OperatorQueueConversation,
+  type OperatorQueueQuery,
 } from "@/services/chat.service";
 import { getAccessToken } from "@/lib/api-client";
 
-type QueueFilter = "ALL" | "NEEDS_OPERATOR" | "WITH_OPERATOR";
+type QueueFilter = "ALL" | "NEEDS_OPERATOR" | "WITH_OPERATOR" | "CLOSED";
 
 export interface UseOperatorChatReturn {
   queue: OperatorQueueConversation[];
@@ -28,6 +29,8 @@ export interface UseOperatorChatReturn {
   refreshQueue: () => Promise<void>;
   sendReply: (text: string) => Promise<void>;
   closeConversation: () => Promise<void>;
+  releaseConversation: () => Promise<void>;
+  deleteConversation: () => Promise<void>;
 }
 
 export function useOperatorChat(): UseOperatorChatReturn {
@@ -51,10 +54,11 @@ export function useOperatorChat(): UseOperatorChatReturn {
     selectedIdRef.current = selectedId;
   }, [selectedId]);
 
+  // Initial queue load via REST — after this, Socket.io handles all updates.
   const refreshQueue = useCallback(async () => {
     try {
-      const status = queueFilter === "ALL" ? undefined : queueFilter;
-      const data = await chatService.getOperatorQueue(status);
+      const status = queueFilter === "ALL" ? undefined : (queueFilter as OperatorQueueQuery["status"]);
+      const data = await chatService.getOperatorQueue(status ? { status } : undefined);
       setQueue(data);
     } catch (err) {
       const message = err instanceof Error ? err.message : "بارگذاری صف ناموفق بود";
@@ -64,6 +68,7 @@ export function useOperatorChat(): UseOperatorChatReturn {
     }
   }, [queueFilter]);
 
+  // Load messages for a conversation via REST (one-time on select).
   const loadMessages = useCallback(async (conversationId: string) => {
     setLoadingMessages(true);
     try {
@@ -77,28 +82,30 @@ export function useOperatorChat(): UseOperatorChatReturn {
     }
   }, []);
 
+  // Initial load when filter changes
   useEffect(() => {
     setLoadingQueue(true);
     refreshQueue();
   }, [refreshQueue]);
 
+  // Load messages when a conversation is selected — NO interval/polling.
+  // New messages arrive via Socket.io queue:update (which patches the queue)
+  // and we re-fetch messages only when a queue:update targets the selected conversation.
   useEffect(() => {
     if (!selectedId) {
       setMessages([]);
       return;
     }
     loadMessages(selectedId);
-    const interval = setInterval(() => {
-      loadMessages(selectedId);
-    }, 4000);
-    return () => clearInterval(interval);
   }, [selectedId, loadMessages]);
 
+  // Socket.io connection — all real-time updates come through here.
   useEffect(() => {
     if (!accessToken) return;
 
     const socket = io(`${chatService.wsBase}/operator`, {
       auth: { token: accessToken },
+      query: { tenantKey: "default" },
       transports: ["websocket", "polling"],
       reconnection: true,
     });
@@ -106,25 +113,88 @@ export function useOperatorChat(): UseOperatorChatReturn {
 
     socket.on("connect", () => setConnected(true));
     socket.on("disconnect", () => setConnected(false));
-    socket.on("queue:new", () => {
-      refreshQueue();
-      const activeId = selectedIdRef.current;
-      if (activeId) loadMessages(activeId);
+
+    // queue:new — a new conversation entered the queue.
+    // Add it to the top of the local list (no full refresh).
+    socket.on("queue:new", (item: OperatorQueueConversation) => {
+      setQueue((prev) => {
+        // Avoid duplicates
+        if (prev.some((c) => c.id === item.id)) return prev;
+        return [item, ...prev];
+      });
+    });
+
+    // queue:update — an existing conversation changed (new customer message,
+    // another operator replied, status changed). Patch the local item.
+    socket.on("queue:update", (item: OperatorQueueConversation) => {
+      setQueue((prev) => {
+        const idx = prev.findIndex((c) => c.id === item.id);
+        if (idx === -1) {
+          // Not in list yet — add it (might match current filter)
+          return [item, ...prev];
+        }
+        // Replace in-place, then re-sort by lastMessageAt (newest first)
+        const next = [...prev];
+        next[idx] = item;
+        next.sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime());
+        return next;
+      });
+
+      // If this conversation is currently selected, re-fetch its messages
+      // so the operator sees the new customer message.
+      if (item.id === selectedIdRef.current) {
+        loadMessages(item.id);
+      }
+    });
+
+    // queue:removed — conversation left the queue (closed, released, deleted).
+    socket.on("queue:removed", (payload: { id: string }) => {
+      setQueue((prev) => prev.filter((c) => c.id !== payload.id));
+      // If the removed conversation was selected, deselect it.
+      if (payload.id === selectedIdRef.current) {
+        setSelectedId(null);
+        setMessages([]);
+      }
+    });
+
+    socket.on("error", (err: { message?: string }) => {
+      toast.error(err?.message ?? "خطا در ارتباط با سرور چت");
     });
 
     return () => {
       socket.disconnect();
     };
-  }, [accessToken, refreshQueue, loadMessages]);
+  }, [accessToken, loadMessages]);
 
+  // Send reply via Socket.io (preferred) with REST fallback.
   const sendReply = useCallback(
     async (text: string) => {
       if (!selectedId || !text.trim()) return;
       setSending(true);
       try {
-        await chatService.sendOperatorReply(selectedId, text.trim());
-        await loadMessages(selectedId);
-        await refreshQueue();
+        if (socketRef.current?.connected) {
+          // Send via socket — no REST round-trip needed.
+          socketRef.current.emit("operator:reply", {
+            conversationId: selectedId,
+            text: text.trim(),
+          });
+          // Optimistically add the operator message to the local list.
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `temp-${Date.now()}`,
+              senderType: "OPERATOR",
+              layer: null,
+              content: text.trim(),
+              metadata: null,
+              createdAt: new Date().toISOString(),
+            },
+          ]);
+        } else {
+          // Fallback: REST
+          await chatService.sendOperatorReply(selectedId, text.trim());
+          await loadMessages(selectedId);
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : "ارسال پاسخ ناموفق بود";
         toast.error(message);
@@ -132,7 +202,7 @@ export function useOperatorChat(): UseOperatorChatReturn {
         setSending(false);
       }
     },
-    [selectedId, loadMessages, refreshQueue],
+    [selectedId, loadMessages],
   );
 
   const closeConversation = useCallback(async () => {
@@ -140,13 +210,40 @@ export function useOperatorChat(): UseOperatorChatReturn {
     try {
       await chatService.closeOperatorConversation(selectedId);
       toast.success("مکالمه بسته شد");
-      setSelectedId(null);
-      await refreshQueue();
+      // Socket.io queue:removed will handle removing from list + deselecting.
     } catch (err) {
       const message = err instanceof Error ? err.message : "بستن مکالمه ناموفق بود";
       toast.error(message);
     }
-  }, [selectedId, refreshQueue]);
+  }, [selectedId]);
+
+  const releaseConversation = useCallback(async () => {
+    if (!selectedId) return;
+    try {
+      await chatService.releaseOperatorConversation(selectedId);
+      toast.success("مکالمه به حالت خودکار برگشت");
+      setSelectedId(null);
+      setMessages([]);
+      // The conversation will leave the operator queue via queue:removed.
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "آزادسازی مکالمه ناموفق بود";
+      toast.error(message);
+    }
+  }, [selectedId]);
+
+  const deleteConversation = useCallback(async () => {
+    if (!selectedId) return;
+    try {
+      await chatService.deleteOperatorConversation(selectedId);
+      toast.success("مکالمه حذف شد");
+      setSelectedId(null);
+      setMessages([]);
+      // Socket.io queue:removed will handle removing from list.
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "حذف مکالمه ناموفق بود";
+      toast.error(message);
+    }
+  }, [selectedId]);
 
   return {
     queue,
@@ -162,5 +259,7 @@ export function useOperatorChat(): UseOperatorChatReturn {
     refreshQueue,
     sendReply,
     closeConversation,
+    releaseConversation,
+    deleteConversation,
   };
 }
