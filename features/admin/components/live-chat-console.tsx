@@ -9,16 +9,34 @@ import {
   Send,
   User,
   XCircle,
+  Unlock,
+  Trash2,
+  Image as ImageIcon,
+  Volume2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/common/empty-state";
 import { useOperatorChat } from "@/hooks/use-operator-chat";
+import { chatService, type OperatorChatMessage, type OperatorQueueConversation } from "@/services/chat.service";
+import { getAccessToken } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { formatDateTimeFa } from "@/utils/format";
-import type { OperatorChatMessage, OperatorQueueConversation } from "@/services/chat.service";
 
 const STATUS_LABELS: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   NEEDS_OPERATOR: { label: "منتظر اپراتور", variant: "destructive" },
@@ -28,16 +46,26 @@ const STATUS_LABELS: Record<string, { label: string; variant: "default" | "secon
   CLOSED: { label: "بسته", variant: "outline" },
 };
 
+const CHANNEL_LABELS: Record<string, string> = {
+  WEBSITE: "وب‌سایت",
+  TELEGRAM: "تلگرام",
+  INSTAGRAM: "اینستاگرام",
+  WHATSAPP: "واتساپ",
+  BALE: "بله",
+};
+
 const QUEUE_TABS = [
-  { key: "ALL" as const, label: "همه" },
+  { key: "ALL" as const, label: "صف فعال" },
   { key: "NEEDS_OPERATOR" as const, label: "منتظر اپراتور" },
   { key: "WITH_OPERATOR" as const, label: "در حال پاسخگویی" },
+  { key: "CLOSED" as const, label: "بسته‌شده‌ها" },
 ];
 
 function getCustomerLabel(conversation: OperatorQueueConversation): string {
   const customer = conversation.customer;
   if (customer?.displayName) return customer.displayName;
   if (customer?.storeUserId) return `کاربر #${customer.storeUserId}`;
+  if (customer?.externalId) return `مهمان ${String(customer.externalId).slice(0, 8)}...`;
   if (customer?.guestToken) return `مهمان ${customer.guestToken.slice(0, 8)}...`;
   return "مشتری ناشناس";
 }
@@ -56,9 +84,12 @@ export function LiveChatConsole() {
     sending,
     sendReply,
     closeConversation,
+    releaseConversation,
+    deleteConversation,
   } = useOperatorChat();
 
   const [input, setInput] = React.useState("");
+  const [channelFilter, setChannelFilter] = React.useState<string>("ALL");
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const selectedConversation = queue.find((c) => c.id === selectedId) ?? null;
 
@@ -72,6 +103,11 @@ export function LiveChatConsole() {
     setInput("");
     await sendReply(text);
   };
+
+  // Filter queue by channel locally (REST filter could also be added)
+  const filteredQueue = channelFilter === "ALL"
+    ? queue
+    : queue.filter((c) => c.channel === channelFilter);
 
   return (
     <div className="flex h-[calc(100dvh-8rem)] flex-col gap-4 lg:flex-row">
@@ -90,6 +126,8 @@ export function LiveChatConsole() {
               {connected ? "آنلاین" : "در حال اتصال..."}
             </div>
           </div>
+
+          {/* Tabs */}
           <div className="mt-2 flex gap-1 overflow-x-auto rounded-lg border border-border bg-muted/30 p-1">
             {QUEUE_TABS.map((tab) => (
               <button
@@ -106,6 +144,21 @@ export function LiveChatConsole() {
               </button>
             ))}
           </div>
+
+          {/* Channel filter */}
+          <Select value={channelFilter} onValueChange={setChannelFilter}>
+            <SelectTrigger className="mt-2 h-8 text-xs">
+              <SelectValue placeholder="همه کانال‌ها" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">همه کانال‌ها</SelectItem>
+              <SelectItem value="WEBSITE">وب‌سایت</SelectItem>
+              <SelectItem value="TELEGRAM">تلگرام</SelectItem>
+              <SelectItem value="INSTAGRAM">اینستاگرام</SelectItem>
+              <SelectItem value="WHATSAPP">واتساپ</SelectItem>
+              <SelectItem value="BALE">بله</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex-1 overflow-y-auto p-2">
@@ -115,7 +168,7 @@ export function LiveChatConsole() {
                 <Skeleton key={i} className="h-16 w-full rounded-lg" />
               ))}
             </div>
-          ) : queue.length === 0 ? (
+          ) : filteredQueue.length === 0 ? (
             <EmptyState
               icon={<MessageCircle className="size-10" />}
               title="مکالمه‌ای در صف نیست"
@@ -124,7 +177,7 @@ export function LiveChatConsole() {
             />
           ) : (
             <div className="space-y-1">
-              {queue.map((conversation) => {
+              {filteredQueue.map((conversation) => {
                 const statusCfg = STATUS_LABELS[conversation.status] ?? STATUS_LABELS.OPEN;
                 const active = selectedId === conversation.id;
                 return (
@@ -145,7 +198,7 @@ export function LiveChatConsole() {
                       </Badge>
                     </div>
                     <p className="mt-1 text-[10px] text-muted-foreground">
-                      {conversation.channel === "WEBSITE" ? "وب‌سایت" : conversation.channel}
+                      {CHANNEL_LABELS[conversation.channel] ?? conversation.channel}
                       {" · "}
                       {formatDateTimeFa(conversation.lastMessageAt)}
                     </p>
@@ -169,27 +222,52 @@ export function LiveChatConsole() {
           </div>
         ) : (
           <>
+            {/* Header with management actions */}
             <div className="flex items-center justify-between gap-2 border-b border-border p-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-bold">{getCustomerLabel(selectedConversation)}</p>
                 <p className="mt-0.5 text-[10px] text-muted-foreground">
-                  {selectedConversation.channel === "WEBSITE" ? "چت وب‌سایت" : selectedConversation.channel}
+                  {CHANNEL_LABELS[selectedConversation.channel] ?? selectedConversation.channel}
                   {selectedConversation.customer?.storeUserId
                     ? ` · کاربر #${selectedConversation.customer.storeUserId}`
                     : null}
                 </p>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0 text-xs"
-                onClick={closeConversation}
-              >
-                <XCircle className="size-3.5" />
-                بستن مکالمه
-              </Button>
+
+              <div className="flex shrink-0 items-center gap-1.5">
+                {/* Management dropdown */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="text-xs">
+                      مدیریت
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={releaseConversation} className="gap-2 text-xs">
+                      <Unlock className="size-3.5" />
+                      آزاد کن (برگشت به ربات)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={closeConversation} className="gap-2 text-xs">
+                      <XCircle className="size-3.5" />
+                      بستن مکالمه
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        if (confirm("این مکالمه و تمام پیام‌های آن حذف می‌شود. مطمئن هستید؟")) {
+                          deleteConversation();
+                        }
+                      }}
+                      className="gap-2 text-xs text-destructive"
+                    >
+                      <Trash2 className="size-3.5" />
+                      حذف کامل
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
 
+            {/* Messages */}
             <div className="flex-1 space-y-3 overflow-y-auto p-3">
               {loadingMessages && messages.length === 0 ? (
                 <div className="space-y-2">
@@ -200,11 +278,12 @@ export function LiveChatConsole() {
               ) : messages.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">پیامی وجود ندارد</p>
               ) : (
-                messages.map((msg) => <OperatorMessageBubble key={msg.id} message={msg} />)
+                messages.map((msg) => <OperatorMessageBubble key={msg.id} message={msg} conversationId={selectedConversation.id} />)
               )}
               <div ref={messagesEndRef} />
             </div>
 
+            {/* Input */}
             <div className="border-t border-border p-3">
               <div className="flex items-center gap-2">
                 <input
@@ -238,11 +317,54 @@ export function LiveChatConsole() {
   );
 }
 
-function OperatorMessageBubble({ message }: { message: OperatorChatMessage }) {
+/* ───────── Telegram media loader hook ───────── */
+
+function useTelegramMedia(conversationId: string, messageId: string | undefined) {
+  const [mediaUrl, setMediaUrl] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(false);
+
+  const load = React.useCallback(async () => {
+    if (!messageId) return;
+    setLoading(true);
+    try {
+      const token = getAccessToken();
+      const url = chatService.getOperatorMediaUrl(conversationId, messageId);
+      const res = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Failed to fetch media");
+      const blob = await res.blob();
+      setMediaUrl(URL.createObjectURL(blob));
+    } catch {
+      setMediaUrl(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [conversationId, messageId]);
+
+  React.useEffect(() => {
+    return () => {
+      if (mediaUrl) URL.revokeObjectURL(mediaUrl);
+    };
+  }, [mediaUrl]);
+
+  return { mediaUrl, loading, load };
+}
+
+/* ───────── Message bubble with Telegram media support ───────── */
+
+function OperatorMessageBubble({ message, conversationId }: { message: OperatorChatMessage; conversationId: string }) {
   const isCustomer = message.senderType === "CUSTOMER";
   const isOperator = message.senderType === "OPERATOR";
   const isEngine = message.senderType === "ENGINE";
   const isSystem = message.senderType === "SYSTEM";
+
+  // Check for Telegram media (photo/voice)
+  const telegramFileId = (message.metadata as { telegramFileId?: string } | null)?.telegramFileId;
+  const { mediaUrl, loading, load } = useTelegramMedia(
+    conversationId,
+    telegramFileId ? message.id : undefined,
+  );
 
   if (isSystem) {
     return (
@@ -281,6 +403,32 @@ function OperatorMessageBubble({ message }: { message: OperatorChatMessage }) {
         )}
       >
         <p className="whitespace-pre-wrap break-words">{message.content}</p>
+
+        {/* Telegram media (photo/voice) */}
+        {telegramFileId && (
+          <div className="mt-2">
+            {mediaUrl ? (
+              // Heuristic: if content-type starts with image, show img; else audio
+              <img src={mediaUrl} alt="رسانه تلگرام" className="max-w-full rounded-lg" />
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={load}
+                disabled={loading}
+                className="gap-1.5 text-xs"
+              >
+                {loading ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <ImageIcon className="size-3" />
+                )}
+                نمایش رسانه
+              </Button>
+            )}
+          </div>
+        )}
+
         <p
           className={cn(
             "mt-1 text-[9px]",
