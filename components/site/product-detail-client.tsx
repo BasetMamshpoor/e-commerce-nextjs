@@ -354,7 +354,7 @@ function ProductInfo({
     ? (product.currentPriceIRT ?? 0)
     : (product.basePrice ?? 0);
   const originalPrice = baseAmount + (selectedVariant?.priceAdjustment ?? 0);
-  const currentPrice = selectedVariant?.effectivePrice ?? originalPrice;
+  const currentPrice = selectedVariant?.finalPrice ?? originalPrice;
   const hasDiscount = originalPrice > currentPrice;
   const discountPct = hasDiscount ? discountPercent(originalPrice, currentPrice) : 0;
   const isOutOfStock = !selectedVariant || selectedVariant.stock <= 0;

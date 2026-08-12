@@ -98,6 +98,7 @@ export const blogService = {
   bySlug: (slug: string) => http.get<BlogPost>(ENDPOINTS.blog.bySlug(slug)),
   adminList: (params?: { page?: number; limit?: number; status?: string; search?: string }) =>
     http.get<PaginatedData<BlogPost>>(ENDPOINTS.blog.adminList, params),
+  adminById: (id: number) => http.get<BlogPost>(ENDPOINTS.blog.adminById(id)),
   create: (body: Partial<BlogPost> & { productIds?: number[] }) =>
     http.post<BlogPost>(ENDPOINTS.blog.create, body),
   /** Create blog post with cover image (multipart/form-data).

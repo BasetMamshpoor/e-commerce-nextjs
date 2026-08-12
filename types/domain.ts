@@ -168,13 +168,16 @@ export interface CreateCurrencyBody {
   code: string;
   name: string;
   symbol?: string;
+  isActive?: boolean;
 }
 
 export interface UpdateCurrencyBody {
+  name?: string;
+  symbol?: string;
   isActive?: boolean;
   /** When set, a new ExchangeRateHistory entry with source="manual" is created
    *  and immediately applied to all products using this currency. */
-  currentRate?: number;
+  manualRate?: number;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -315,7 +318,7 @@ export interface ProductVariant {
   weight?: number | null;
   isDefault: boolean;
   isActive: boolean;
-  effectivePrice?: number;
+  finalPrice?: number;
   /** Variant attribute values with optional per-variant price modifiers. */
   attributeValues: VariantAttributeValue[];
   /** Legacy field — kept for backward compat with older API responses. */

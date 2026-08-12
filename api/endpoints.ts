@@ -288,6 +288,7 @@ export const ENDPOINTS = {
     list: "/blog",
     bySlug: (slug: string) => `/blog/${slug}`,
     adminList: "/blog/admin",
+    adminById: (id: number) => `/blog/admin/${id}`,
     create: "/blog",
     update: (id: number) => `/blog/${id}`,
     delete: (id: number) => `/blog/${id}`,

@@ -222,7 +222,7 @@ export default function AdminProductDetailPage({ params }: { params: Promise<{ i
                   {product.variants?.map((v) => (
                     <TableRow key={v.id}>
                       <TableCell className="font-mono text-xs" dir="ltr">{v.sku}</TableCell>
-                      <TableCell className="text-xs nums-fa">{formatPrice(v.effectivePrice ?? 0)}</TableCell>
+                      <TableCell className="text-xs nums-fa">{formatPrice(v.finalPrice ?? 0)}</TableCell>
                       <TableCell className="text-xs nums-fa">{toPersianDigits(v.stock)}</TableCell>
                     </TableRow>
                   ))}

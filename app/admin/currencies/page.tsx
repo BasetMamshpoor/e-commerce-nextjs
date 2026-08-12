@@ -292,7 +292,7 @@ function EditCurrencyDialog({
     }
     setSaving(true);
     try {
-      const body: { name?: string; isActive?: boolean; currentRate?: number } = {
+      const body: { name?: string; isActive?: boolean; manualRate?: number } = {
         name: name.trim(),
         isActive,
       };
@@ -303,7 +303,7 @@ function EditCurrencyDialog({
           setSaving(false);
           return;
         }
-        body.currentRate = rate;
+        body.manualRate = rate;
       }
       await currenciesService.update(currency.id, body);
       toast.success("ارز به‌روزرسانی شد");
