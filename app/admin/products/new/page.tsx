@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -77,6 +78,8 @@ export default function AdminProductNewPage() {
     categoryIds: [] as number[],
     discountType: "NONE" as DiscountType | "NONE",
     discountValue: "" as string | number,
+    metaTitle: "",
+    metaDescription: "",
   });
 
   const [variants, setVariants] = React.useState<VariantFormData[]>([]);
@@ -221,6 +224,8 @@ export default function AdminProductNewPage() {
         brandId: form.brandId ? Number(form.brandId) : undefined,
         shortDescription: form.shortDescription || undefined,
         description: form.description || undefined,
+        metaTitle: form.metaTitle.trim() || undefined,
+        metaDescription: form.metaDescription.trim() || undefined,
         basePrice,
         pricingMode: form.pricingMode,
         currencyId: isCurrencyBased ? currencyId : undefined,
@@ -325,6 +330,41 @@ export default function AdminProductNewPage() {
               <div className="space-y-2">
                 <Label>دسته‌بندی‌ها *</Label>
                 <CategoryTreeSelect categories={categoryTree} selectedIds={form.categoryIds} onChange={(ids) => setForm({ ...form, categoryIds: ids })} />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">سئو (SEO)</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>
+                  عنوان متا (Meta Title)
+                  <span className="ms-1 text-xs text-muted-foreground nums-fa">
+                    ({toPersianDigits(form.metaTitle.length)}/۱۶۰)
+                  </span>
+                </Label>
+                <Input
+                  value={form.metaTitle}
+                  onChange={(e) => setForm({ ...form, metaTitle: e.target.value.slice(0, 160) })}
+                  placeholder="در صورت خالی بودن، از نام محصول استفاده می‌شود"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>
+                  توضیحات متا (Meta Description)
+                  <span className="ms-1 text-xs text-muted-foreground nums-fa">
+                    ({toPersianDigits(form.metaDescription.length)}/۳۰۰)
+                  </span>
+                </Label>
+                <Textarea
+                  value={form.metaDescription}
+                  onChange={(e) => setForm({ ...form, metaDescription: e.target.value.slice(0, 300) })}
+                  placeholder="در صورت خالی بودن، از توضیح کوتاه محصول استفاده می‌شود"
+                  rows={3}
+                />
               </div>
             </CardContent>
           </Card>

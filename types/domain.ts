@@ -339,6 +339,8 @@ export interface Product {
   slug: string;
   shortDescription?: string | null;
   description?: string | null;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
   status: ProductStatus;
   isFeatured: boolean;
   brandId?: number | null;

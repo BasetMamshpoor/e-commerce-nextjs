@@ -6,8 +6,6 @@ import {
   Trash2,
   Layers,
   AlertCircle,
-  ChevronDown,
-  ChevronLeft,
   Tag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -113,6 +111,19 @@ function estimateFixedIrtVariantPrice(basePrice: number, variant: VariantFormDat
   return Math.round(basePrice + fixedSum + (basePrice * percentSum) / 100);
 }
 
+/** Short read-only label for a single modifier, e.g. "‎+۱۰٪" or "‎-۵۰,۰۰۰ت". */
+function formatModifier(
+  type: AttributeModifierType | null | undefined,
+  value: number | null | undefined,
+  isCurrencyBased: boolean,
+): string {
+  const v = Number(value) || 0;
+  const sign = v > 0 ? "+" : "";
+  if (type === "PERCENTAGE") return `${sign}${toPersianDigits(v)}٪`;
+  if (type === "FIXED_SOURCE_CURRENCY" && isCurrencyBased) return `${sign}${toPersianDigits(v)} ارز`;
+  return `${sign}${toPersianDigits(v)} ت`;
+}
+
 /**
  * VariantBuilder — generates all combinations from selected variant attributes.
  *
@@ -137,9 +148,6 @@ export function VariantBuilder({
     ? MODIFIER_OPTIONS_CURRENCY
     : MODIFIER_OPTIONS_BASE;
 
-  // Track which variants have their price-settings panel expanded.
-  const [expandedPanels, setExpandedPanels] = React.useState<Set<number>>(new Set());
-
   // Track selected attribute value IDs per attribute.
   const [selections, setSelections] = React.useState<Record<number, number[]>>(() => {
     if (variants.length === 0) return {};
@@ -152,6 +160,27 @@ export function VariantBuilder({
             if (!map[attr.id]) map[attr.id] = [];
             if (!map[attr.id].includes(avId)) map[attr.id].push(avId);
           }
+        }
+      }
+    }
+    return map;
+  });
+
+  // Price impact per attribute VALUE — configured ONCE per value (e.g. "رنگ:
+  // قرمز" → +۵٪), not once per generated variant combination. Previously each
+  // combo card had its own editable modifier for the same attribute value,
+  // so an admin had to re-enter the identical number on every card that
+  // included it (and combos could drift out of sync with each other). This
+  // is now the single source of truth; combo generation below reads from it.
+  const [attrValueModifiers, setAttrValueModifiers] = React.useState<
+    Record<number, { modifierType: AttributeModifierType | null; modifierValue: number | null }>
+  >(() => {
+    const map: Record<number, { modifierType: AttributeModifierType | null; modifierValue: number | null }> = {};
+    for (const v of variants) {
+      for (const av of v.attributeValues) {
+        const avId = av.attributeValueId ?? av.id ?? 0;
+        if (avId && av.modifierType) {
+          map[avId] = { modifierType: av.modifierType, modifierValue: av.modifierValue ?? null };
         }
       }
     }
@@ -206,20 +235,16 @@ export function VariantBuilder({
       const existing = existingMap.get(key);
       const isFirst = index === 0;
 
-      // Preserve existing modifiers when regenerating.
-      // NOTE: parentheses are required here — without them, `??` binds looser
-      // than `===`, so `a ?? b ?? 0 === id` evaluates as `a ?? b ?? (0 === id)`
-      // and .find() ends up matching the FIRST attributeValue with a truthy id
-      // instead of the one that actually matches `id`. That bug silently
-      // shuffled price modifiers onto the wrong attribute value whenever
-      // combinations were regenerated (e.g. after adding/removing a value).
+      // attributeValues come straight from the single per-attribute-value
+      // modifier map (attrValueModifiers) — no more fragile lookup into the
+      // previous variant's attributeValues array.
       const attributeValues: VariantAttributeValue[] = combo.map((id) => {
-        const existingAv = existing?.attributeValues.find(
-          (av) => (av.attributeValueId ?? av.id ?? 0) === id,
-        );
-        return (
-          existingAv ?? { attributeValueId: id }
-        );
+        const mod = attrValueModifiers[id];
+        return {
+          attributeValueId: id,
+          modifierType: mod?.modifierType ?? null,
+          modifierValue: mod?.modifierType ? (mod?.modifierValue ?? null) : null,
+        };
       });
 
       return {
@@ -279,43 +304,38 @@ export function VariantBuilder({
     onChange(variants.map((v, i) => (i === index ? { ...v, ...updates } : v)));
   };
 
-  /** Update a single attribute value's modifier within a variant. */
-  const updateAttributeModifier = (
-    variantIndex: number,
-    avIndex: number,
+  /** Update the price modifier for one attribute VALUE — applies to every
+   *  variant combination that includes it. */
+  const updateAttrValueModifier = (
+    avId: number,
     field: "modifierType" | "modifierValue",
     value: string | number | null,
   ) => {
-    onChange(
-      variants.map((v, vi) => {
-        if (vi !== variantIndex) return v;
-        const newAttributeValues = v.attributeValues.map((av, ai) => {
-          if (ai !== avIndex) return av;
-          if (field === "modifierType") {
-            const type = value === "none" || value === "" ? null : (value as AttributeModifierType);
-            // When clearing the type, also clear the value.
-            return {
-              attributeValueId: av.attributeValueId ?? av.id ?? 0,
-              modifierType: type,
-              modifierValue: type ? av.modifierValue ?? null : null,
-            };
-          }
-          return {
-            ...av,
-            modifierValue: value === "" ? null : (value as number),
-          };
-        });
-        return { ...v, attributeValues: newAttributeValues };
-      }),
-    );
-  };
+    setAttrValueModifiers((prev) => {
+      const current = prev[avId] ?? { modifierType: null, modifierValue: null };
+      let next: { modifierType: AttributeModifierType | null; modifierValue: number | null };
+      if (field === "modifierType") {
+        const type = value === "none" || value === "" ? null : (value as AttributeModifierType);
+        // Clearing the type also clears the value.
+        next = { modifierType: type, modifierValue: type ? current.modifierValue : null };
+      } else {
+        next = { ...current, modifierValue: value === "" ? null : (value as number) };
+      }
+      const updatedMap = { ...prev, [avId]: next };
 
-  const togglePanel = (index: number) => {
-    setExpandedPanels((prev) => {
-      const next = new Set(prev);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
+      // Propagate immediately to every existing variant combo containing this value.
+      onChange(
+        variants.map((v) => ({
+          ...v,
+          attributeValues: v.attributeValues.map((av) =>
+            (av.attributeValueId ?? av.id ?? 0) === avId
+              ? { attributeValueId: avId, modifierType: next.modifierType, modifierValue: next.modifierValue }
+              : av,
+          ),
+        })),
+      );
+
+      return updatedMap;
     });
   };
 
@@ -386,6 +406,16 @@ export function VariantBuilder({
 
   const hasSelections = Object.keys(selections).length > 0;
 
+  // Flatten all currently selected attribute values (across every variant
+  // attribute) — this drives the single "price impact per value" section.
+  const selectedAttrValues: { id: number; attrName: string; value: string; colorHex?: string | null }[] = [];
+  for (const attr of variantAttributes) {
+    for (const valId of selections[attr.id] ?? []) {
+      const val = attr.values.find((v) => v.id === valId);
+      if (val) selectedAttrValues.push({ id: val.id, attrName: attr.name, value: val.value, colorHex: val.colorHex });
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Step 1: Select variant attributes and values */}
@@ -423,14 +453,109 @@ export function VariantBuilder({
         </div>
       </div>
 
+      {/* Step 2: Price impact — set ONCE per attribute value (e.g. "رنگ: قرمز")
+          rather than once per generated variant combination. */}
+      {selectedAttrValues.length > 0 && (
+        <>
+          <Separator />
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <span className="flex size-6 items-center justify-center rounded-md bg-primary/10 text-xs font-bold text-primary">
+                ۲
+              </span>
+              تأثیر قیمت هر مقدار
+            </div>
+            <p className="text-xs text-muted-foreground">
+              اگر انتخاب یک مقدار (مثلاً رنگ قرمز یا سایز XL) باید روی قیمت تأثیر بگذارد، همین‌جا یک‌بار تنظیم کنید — این تنظیم روی همه‌ی ترکیب‌هایی که شامل آن مقدار هستند اعمال می‌شود.
+            </p>
+            <div className="space-y-1.5 rounded-lg border border-border p-2.5">
+              {selectedAttrValues.map(({ id, attrName, value, colorHex }) => {
+                const mod = attrValueModifiers[id] ?? { modifierType: null, modifierValue: null };
+                const currentModifierType = mod.modifierType ?? "none";
+                return (
+                  <div key={id} className="grid grid-cols-[1fr_130px_100px] items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 text-xs">
+                      {colorHex && (
+                        <span
+                          className="size-2.5 shrink-0 rounded-full border border-border"
+                          style={{ backgroundColor: colorHex }}
+                        />
+                      )}
+                      <span className="truncate text-muted-foreground">
+                        {attrName}: {value}
+                      </span>
+                    </div>
+
+                    <Select
+                      value={currentModifierType}
+                      onValueChange={(v) => updateAttrValueModifier(id, "modifierType", v)}
+                    >
+                      <SelectTrigger className="h-7 text-[11px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {modifierOptions.map((o) => (
+                          <SelectItem key={o.value} value={o.value} className="text-xs">
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {mod.modifierType ? (
+                      <Input
+                        type="number"
+                        value={mod.modifierValue ?? ""}
+                        onChange={(e) =>
+                          updateAttrValueModifier(
+                            id,
+                            "modifierValue",
+                            e.target.value === "" ? "" : Number(e.target.value),
+                          )
+                        }
+                        placeholder={
+                          mod.modifierType === "PERCENTAGE"
+                            ? "مثلاً 10-"
+                            : mod.modifierType === "FIXED_SOURCE_CURRENCY"
+                              ? "مثلاً 5"
+                              : "مثلاً 50000"
+                        }
+                        step={mod.modifierType === "PERCENTAGE" ? "1" : "1000"}
+                        dir="ltr"
+                        className="h-7 text-[11px] nums-fa"
+                      />
+                    ) : (
+                      <div />
+                    )}
+                  </div>
+                );
+              })}
+              <div className="space-y-0.5 pt-1">
+                <p className="text-[10px] text-muted-foreground">
+                  <span className="font-medium">درصد:</span> مثبت = گران‌تر، منفی = ارزان‌تر (روی قیمت پایه اعمال می‌شود)
+                </p>
+                {isCurrencyBased && (
+                  <p className="text-[10px] text-muted-foreground">
+                    <span className="font-medium">ارز مبدأ:</span> مبلغ ثابت به ارز محصول (مثلاً 5 = ۵ دلار)
+                  </p>
+                )}
+                <p className="text-[10px] text-muted-foreground">
+                  <span className="font-medium">تومان:</span> مبلغ ثابت به تومان (پس از تبدیل اعمال می‌شود)
+                </p>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       <Separator />
 
-      {/* Step 2: Generated variants as cards */}
+      {/* Step 3: Generated variants as cards */}
       {hasSelections ? (
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-sm font-medium text-foreground">
             <span className="flex size-6 items-center justify-center rounded-md bg-primary/10 text-xs font-bold text-primary">
-              ۲
+              ۳
             </span>
             ترکیب‌های تولیدشده
             <Badge variant="secondary" className="text-[10px] nums-fa">
@@ -445,7 +570,6 @@ export function VariantBuilder({
           ) : (
             <div className="space-y-2">
               {variants.map((variant, index) => {
-                const isExpanded = expandedPanels.has(index);
                 const modifierCount = countModifiers(variant);
                 return (
                   <div
@@ -510,7 +634,7 @@ export function VariantBuilder({
                     </div>
 
                     {/* Card body: basic fields */}
-                    <div className="grid grid-cols-2 gap-2 px-2.5 pb-2.5 sm:grid-cols-4">
+                    <div className="grid grid-cols-3 gap-2 px-2.5 pb-2.5">
                       <div>
                         <Label className="text-[10px] text-muted-foreground">SKU</Label>
                         <Input
@@ -545,144 +669,22 @@ export function VariantBuilder({
                           placeholder="—"
                         />
                       </div>
-                      <div>
-                        <Label className="text-[10px] text-muted-foreground" title="مبلغ ثابت تومانی که مستقیماً روی قیمت این تنوع اضافه می‌شود">
-                          افزایش قیمت (ت)
-                        </Label>
-                        <Input
-                          type="number"
-                          min={0}
-                          value={variant.priceAdjustment ?? 0}
-                          onChange={(e) => {
-                            const n = e.target.value === "" ? 0 : Number(e.target.value);
-                            // Backend rejects negative priceAdjustment (validation: min(0)).
-                            // For a cheaper variant, use a negative PERCENTAGE/FIXED_IRT
-                            // modifier on the relevant attribute value instead (تنظیمات قیمت).
-                            updateVariant(index, { priceAdjustment: n < 0 ? 0 : n });
-                          }}
-                          dir="ltr"
-                          className="h-8 text-xs nums-fa"
-                          placeholder="0"
-                        />
-                      </div>
                     </div>
 
-                    {/* Expandable price settings */}
-                    {variant.attributeValues.length > 0 && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => togglePanel(index)}
-                          className="flex w-full items-center justify-between border-t border-border/40 px-2.5 py-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent/50"
-                        >
-                          <span className="flex items-center gap-1.5">
-                            <Tag className="size-3" />
-                            تنظیمات قیمت
-                            {modifierCount > 0 && (
-                              <Badge variant="secondary" className="text-[9px]">
-                                {toPersianDigits(modifierCount)} modifier
-                              </Badge>
-                            )}
-                          </span>
-                          {isExpanded ? (
-                            <ChevronDown className="size-3" />
-                          ) : (
-                            <ChevronLeft className="size-3 rotate-180" />
-                          )}
-                        </button>
-
-                        {isExpanded && (
-                          <div className="space-y-2 border-t border-border/40 p-2.5">
-                            {variant.attributeValues.map((av, avIndex) => {
-                              const info = getAttrValueInfo(av.attributeValueId ?? av.id ?? 0);
-                              const currentModifierType = av.modifierType ?? "none";
-                              return (
-                                <div
-                                  key={avIndex}
-                                  className="grid grid-cols-[1fr_120px_100px] items-center gap-1.5"
-                                >
-                                  {/* Attribute value label */}
-                                  <div className="flex items-center gap-1.5 text-xs">
-                                    {info?.colorHex && (
-                                      <span
-                                        className="size-2.5 shrink-0 rounded-full border border-border"
-                                        style={{ backgroundColor: info.colorHex }}
-                                      />
-                                    )}
-                                    <span className="truncate text-muted-foreground">
-                                      {info ? info.value : `#${av.attributeValueId ?? av.id ?? 0}`}
-                                    </span>
-                                  </div>
-
-                                  {/* Modifier type select */}
-                                  <Select
-                                    value={currentModifierType}
-                                    onValueChange={(v) =>
-                                      updateAttributeModifier(index, avIndex, "modifierType", v)
-                                    }
-                                  >
-                                    <SelectTrigger className="h-7 text-[11px]">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {modifierOptions.map((o) => (
-                                        <SelectItem key={o.value} value={o.value} className="text-xs">
-                                          {o.label}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-
-                                  {/* Modifier value input */}
-                                  {av.modifierType ? (
-                                    <Input
-                                      type="number"
-                                      value={av.modifierValue ?? ""}
-                                      onChange={(e) =>
-                                        updateAttributeModifier(
-                                          index,
-                                          avIndex,
-                                          "modifierValue",
-                                          e.target.value === "" ? "" : Number(e.target.value),
-                                        )
-                                      }
-                                      placeholder={
-                                        av.modifierType === "PERCENTAGE"
-                                          ? "مثلاً 10-"
-                                          : av.modifierType === "FIXED_SOURCE_CURRENCY"
-                                            ? "مثلاً 5"
-                                            : "مثلاً 50000"
-                                      }
-                                      step={
-                                        av.modifierType === "PERCENTAGE" ? "1" : "1000"
-                                      }
-                                      dir="ltr"
-                                      className="h-7 text-[11px] nums-fa"
-                                    />
-                                  ) : (
-                                    <div />
-                                  )}
-                                </div>
-                              );
-                            })}
-
-                            {/* Modifier hints */}
-                            <div className="space-y-0.5 pt-1">
-                              <p className="text-[10px] text-muted-foreground">
-                                <span className="font-medium">درصد:</span> مثبت = گران‌تر، منفی = ارزان‌تر (روی قیمت پایه اعمال می‌شود)
-                              </p>
-                              {isCurrencyBased && (
-                                <p className="text-[10px] text-muted-foreground">
-                                  <span className="font-medium">ارز مبدأ:</span> مبلغ ثابت به ارز محصول (مثلاً 5 = ۵ دلار)
-                                </p>
-                              )}
-                              <p className="text-[10px] text-muted-foreground">
-                                <span className="font-medium">تومان:</span> مبلغ ثابت به تومان (پس از تبدیل اعمال می‌شود)
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                      </>
+                    {/* Price modifiers now applied — configured once per attribute
+                        value in "Step 2" above, not per variant card (see
+                        attrValueModifiers). This is a read-only summary. */}
+                    {modifierCount > 0 && (
+                      <div className="flex flex-wrap items-center gap-1 border-t border-border/40 px-2.5 py-1.5">
+                        <Tag className="size-3 text-muted-foreground" />
+                        {variant.attributeValues
+                          .filter((av) => av.modifierType)
+                          .map((av, i) => (
+                            <Badge key={i} variant="secondary" className="text-[9px] nums-fa">
+                              {formatModifier(av.modifierType, av.modifierValue, isCurrencyBased)}
+                            </Badge>
+                          ))}
+                      </div>
                     )}
 
                     {/* Effective price preview (base + fixed-IRT/percent modifiers, FIXED_IRT mode only) */}
