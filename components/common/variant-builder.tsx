@@ -72,6 +72,48 @@ const MODIFIER_OPTIONS_CURRENCY = [
 ];
 
 /**
+ * Mirrors backend `calculateFinalPrice` (FIXED_IRT branch) in
+ * services/pricingEngine.ts, purely for a local preview — the backend
+ * remains the source of truth for the actually-saved price.
+ * finalPrice = basePrice + priceAdjustment(as FIXED_IRT modifier)
+ *            + sum(FIXED_IRT attribute modifiers)
+ *            + basePrice * sum(PERCENTAGE attribute modifiers) / 100
+ */
+/**
+ * Strips explicit `null` from modifierType/modifierValue before sending to the
+ * backend. The backend's variantAttributeValueSchema declares these fields
+ * with `.optional()` (allows `undefined`) but NOT `.nullable()` (does not
+ * allow `null`). Since the UI sets them to `null` when a modifier is
+ * cleared, and JSON.stringify keeps `null` keys (unlike `undefined`), an
+ * unsanitized payload gets rejected by zod validation with a 400 — which
+ * silently fails the whole variant save. Call this right before building
+ * the request payload for addVariant/updateVariant/createProduct.
+ */
+export function sanitizeAttributeValuesForApi(
+  attributeValues: VariantAttributeValue[],
+): VariantAttributeValue[] {
+  return attributeValues.map((av) => {
+    const id = av.attributeValueId ?? av.id ?? 0;
+    const clean: VariantAttributeValue = { attributeValueId: id };
+    if (av.modifierType != null) {
+      clean.modifierType = av.modifierType;
+      if (av.modifierValue != null) clean.modifierValue = av.modifierValue;
+    }
+    return clean;
+  });
+}
+
+function estimateFixedIrtVariantPrice(basePrice: number, variant: VariantFormData): number {
+  let fixedSum = Number(variant.priceAdjustment) || 0;
+  let percentSum = 0;
+  for (const av of variant.attributeValues) {
+    if (av.modifierType === "FIXED_IRT") fixedSum += Number(av.modifierValue) || 0;
+    else if (av.modifierType === "PERCENTAGE") percentSum += Number(av.modifierValue) || 0;
+  }
+  return Math.round(basePrice + fixedSum + (basePrice * percentSum) / 100);
+}
+
+/**
  * VariantBuilder — generates all combinations from selected variant attributes.
  *
  * Flow:
@@ -165,9 +207,15 @@ export function VariantBuilder({
       const isFirst = index === 0;
 
       // Preserve existing modifiers when regenerating.
+      // NOTE: parentheses are required here — without them, `??` binds looser
+      // than `===`, so `a ?? b ?? 0 === id` evaluates as `a ?? b ?? (0 === id)`
+      // and .find() ends up matching the FIRST attributeValue with a truthy id
+      // instead of the one that actually matches `id`. That bug silently
+      // shuffled price modifiers onto the wrong attribute value whenever
+      // combinations were regenerated (e.g. after adding/removing a value).
       const attributeValues: VariantAttributeValue[] = combo.map((id) => {
         const existingAv = existing?.attributeValues.find(
-          (av) => av.attributeValueId ?? av.id ?? 0 === id,
+          (av) => (av.attributeValueId ?? av.id ?? 0) === id,
         );
         return (
           existingAv ?? { attributeValueId: id }
@@ -462,7 +510,7 @@ export function VariantBuilder({
                     </div>
 
                     {/* Card body: basic fields */}
-                    <div className="grid grid-cols-3 gap-2 px-2.5 pb-2.5">
+                    <div className="grid grid-cols-2 gap-2 px-2.5 pb-2.5 sm:grid-cols-4">
                       <div>
                         <Label className="text-[10px] text-muted-foreground">SKU</Label>
                         <Input
@@ -495,6 +543,26 @@ export function VariantBuilder({
                           dir="ltr"
                           className="h-8 text-xs"
                           placeholder="—"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[10px] text-muted-foreground" title="مبلغ ثابت تومانی که مستقیماً روی قیمت این تنوع اضافه می‌شود">
+                          افزایش قیمت (ت)
+                        </Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={variant.priceAdjustment ?? 0}
+                          onChange={(e) => {
+                            const n = e.target.value === "" ? 0 : Number(e.target.value);
+                            // Backend rejects negative priceAdjustment (validation: min(0)).
+                            // For a cheaper variant, use a negative PERCENTAGE/FIXED_IRT
+                            // modifier on the relevant attribute value instead (تنظیمات قیمت).
+                            updateVariant(index, { priceAdjustment: n < 0 ? 0 : n });
+                          }}
+                          dir="ltr"
+                          className="h-8 text-xs nums-fa"
+                          placeholder="0"
                         />
                       </div>
                     </div>
@@ -617,12 +685,18 @@ export function VariantBuilder({
                       </>
                     )}
 
-                    {/* Effective price preview */}
+                    {/* Effective price preview (base + fixed-IRT/percent modifiers, FIXED_IRT mode only) */}
                     {basePrice > 0 && (
                       <div className="border-t border-border/40 px-2.5 py-1.5">
-                        <p className="text-[10px] text-success nums-fa">
-                          قیمت پایه: {formatPrice(basePrice)} تومان
-                        </p>
+                        {!isCurrencyBased ? (
+                          <p className="text-[10px] text-success nums-fa">
+                            قیمت این تنوع: {formatPrice(estimateFixedIrtVariantPrice(basePrice, variant))} تومان
+                          </p>
+                        ) : (
+                          <p className="text-[10px] text-muted-foreground nums-fa">
+                            قیمت پایه: {formatPrice(basePrice)} تومان (قیمت نهایی بر اساس نرخ ارز لحظه‌ای محاسبه می‌شود)
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>

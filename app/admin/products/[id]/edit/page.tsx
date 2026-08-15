@@ -41,6 +41,7 @@ import {
   categoriesService,
   attributesService,
   currenciesService,
+  mediaService,
 } from "@/services";
 import type {
   Brand,
@@ -189,19 +190,41 @@ export default function AdminProductEditPage({
     setSaving(true);
     try {
       // Separate images:
-      //   - Files (new uploads) → multipart field "images"
+      //   - Files (new uploads) → uploaded to /media FIRST, then merged into
+      //     the JSON "images" array as {mediaId, order, isMain}.
       //   - mediaId (gallery-picked, new) → JSON field "images: [{mediaId, ...}]"
       //   - Existing images (img.id, unchanged) → not sent
-      const newImageFiles: File[] = [];
+      //
+      // NOTE: same reasoning as the "new product" page — multipart requests
+      // don't reconstruct bracket-notation nested arrays (images[], categoryIds[],
+      // displayAttributes[]) on this backend, so we never combine raw file
+      // uploads with the JSON update body anymore. Upload first, then one
+      // plain JSON PUT.
+      const newImageFiles: { file: File; order: number; isMain: boolean }[] = [];
       const galleryImages: Array<{ mediaId: number; order: number; isMain: boolean }> = [];
       for (let i = 0; i < images.length; i++) {
         const img = images[i];
         if (img.file) {
-          newImageFiles.push(img.file);
+          newImageFiles.push({ file: img.file, order: i, isMain: img.isMain });
         } else if (img.mediaId) {
           galleryImages.push({ mediaId: img.mediaId, order: i, isMain: img.isMain });
         }
       }
+
+      if (newImageFiles.length > 0) {
+        const uploaded = await mediaService.bulkUpload(
+          newImageFiles.map((f) => f.file),
+          "products",
+        );
+        uploaded.items.forEach((media, i) => {
+          galleryImages.push({
+            mediaId: media.id,
+            order: newImageFiles[i].order,
+            isMain: newImageFiles[i].isMain,
+          });
+        });
+      }
+      galleryImages.sort((a, b) => a.order - b.order);
 
       const discountType =
         form.discountType === "NONE" ? null : (form.discountType as DiscountType);
@@ -226,19 +249,15 @@ export default function AdminProductEditPage({
         status: form.status,
         isFeatured: form.isFeatured,
         categoryIds: form.categoryIds,
-        // Gallery-picked mediaIds (new images to add via JSON body).
+        // Gallery-picked + newly-uploaded mediaIds (added via JSON body).
         images: galleryImages.length > 0 ? galleryImages : undefined,
         // IDs of existing ProductImages marked for deletion.
         deletedImages: deletedImageIds.length > 0 ? deletedImageIds : undefined,
         displayAttributes,
       };
 
-      if (newImageFiles.length > 0) {
-        // Multipart with files + JSON body (backend merges them).
-        await productsService.updateWithImages(Number(id), updateBody, newImageFiles);
-      } else {
-        await productsService.update(Number(id), updateBody);
-      }
+      // Always plain JSON — see note above.
+      await productsService.update(Number(id), updateBody);
 
       toast.success("محصول به‌روزرسانی شد");
       router.push(`/admin/products/${id}`);

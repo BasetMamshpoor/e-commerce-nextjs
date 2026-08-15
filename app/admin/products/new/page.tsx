@@ -20,7 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { RichTextEditor } from "@/components/common/rich-text-editor";
 import { CategoryTreeSelect } from "@/components/common/category-tree-select";
-import { VariantBuilder, type VariantFormData } from "@/components/common/variant-builder";
+import { VariantBuilder, sanitizeAttributeValuesForApi, type VariantFormData } from "@/components/common/variant-builder";
 import {
   ProductImageUploader,
   type ProductImageItem,
@@ -35,6 +35,7 @@ import {
   categoriesService,
   attributesService,
   currenciesService,
+  mediaService,
 } from "@/services";
 import type { Brand, Category, Attribute, Currency, ProductStatus, DiscountType, ProductPricingMode } from "@/types/domain";
 import { formatPrice, toPersianDigits } from "@/utils/format";
@@ -167,30 +168,54 @@ export default function AdminProductNewPage() {
         weight: v.weight,
         isDefault: v.isDefault,
         isActive: v.isActive,
-        attributeValues: v.attributeValues,
+        attributeValues: sanitizeAttributeValuesForApi(v.attributeValues),
       }));
 
       // 4. Separate images by source:
-      //   - Files (uploaded from disk) → multipart field "images"
+      //   - Files (uploaded from disk) → uploaded to /media FIRST (see below),
+      //     then merged into the JSON "images" array as {mediaId, order, isMain}.
       //   - mediaId (selected from gallery) → JSON field "images: [{mediaId, order, isMain}]"
       //   - Existing images (already saved on this product, loaded from backend) → not sent on CREATE
-      // The backend supports BOTH files and mediaIds in the same multipart request.
-      const newImageFiles: File[] = [];
+      //
+      // NOTE: we intentionally do NOT use multipart/form-data with bracket-notation
+      // fields (e.g. "variants[0][attributeValues][0][attributeValueId]") for this
+      // request. Multer parses multipart fields as flat string keys — it does not
+      // reconstruct nested objects/arrays the way qs does for urlencoded bodies —
+      // so a multipart POST with deeply nested `variants` alongside file uploads
+      // silently loses/mismatches the variants data (this was a major - probably
+      // THE major - source of "variants don't save" bugs). Uploading files to the
+      // already-working POST /media/bulk endpoint first, then sending one plain
+      // JSON body, sidesteps that entirely.
+      const newImageFiles: { file: File; order: number; isMain: boolean }[] = [];
       const galleryImages: Array<{ mediaId: number; order: number; isMain: boolean }> = [];
       for (let i = 0; i < images.length; i++) {
         const img = images[i];
         if (img.file) {
-          // New uploaded file — goes via multipart field "images".
-          newImageFiles.push(img.file);
+          newImageFiles.push({ file: img.file, order: i, isMain: img.isMain });
         } else if (img.mediaId) {
-          // Gallery-picked media — goes via JSON field "images".
           galleryImages.push({ mediaId: img.mediaId, order: i, isMain: img.isMain });
         }
         // Existing images (img.id but no mediaId/file) are skipped on create.
       }
 
-      // 5. Build the body — `images` in the JSON body holds gallery-picked mediaIds.
-      // New uploaded files go via multipart field "images" (separate from JSON).
+      // Upload any new files to /media first (proven, flat multipart endpoint),
+      // then fold the resulting mediaIds into the same `images` array.
+      if (newImageFiles.length > 0) {
+        const uploaded = await mediaService.bulkUpload(
+          newImageFiles.map((f) => f.file),
+          "products",
+        );
+        uploaded.items.forEach((media, i) => {
+          galleryImages.push({
+            mediaId: media.id,
+            order: newImageFiles[i].order,
+            isMain: newImageFiles[i].isMain,
+          });
+        });
+      }
+      galleryImages.sort((a, b) => a.order - b.order);
+
+      // 5. Build the body — always sent as plain JSON (see note above).
       const body = {
         name: form.name.trim(),
         brandId: form.brandId ? Number(form.brandId) : undefined,
@@ -211,11 +236,8 @@ export default function AdminProductNewPage() {
         displayAttributes,
       };
 
-      // 6. Create product — use multipart if there are new image files, else JSON.
-      const product =
-        newImageFiles.length > 0
-          ? await productsService.createWithImages(body, newImageFiles)
-          : await productsService.create(body);
+      // 6. Create product — plain JSON (no multipart).
+      const product = await productsService.create(body);
       toast.success("محصول ایجاد شد");
       router.push(`/admin/products/${product.id}`);
     } catch (e: unknown) {

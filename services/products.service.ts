@@ -113,16 +113,24 @@ export const productsService = {
   update: (id: number, body: UpdateProductBody) =>
     http.put<Product>(ENDPOINTS.products.update(id), body),
 
-  /** Create product with inline images (multipart/form-data).
-   * Uses bracket notation for arrays (Express/multer standard):
-   *   categoryIds[]=7, variants[0][sku]=..., images=<file>
+  /**
+   * @deprecated Broken for products: multer parses multipart fields as flat
+   * string keys and does NOT reconstruct bracket-notation nested arrays
+   * (e.g. "variants[0][attributeValues][0][attributeValueId]", "categoryIds[]",
+   * "displayAttributes[0][...]") into real nested objects on the backend —
+   * unlike a JSON body, or an urlencoded body parsed with `qs`. Sending
+   * files together with `variants`/`categoryIds`/`displayAttributes` via
+   * this method will silently drop or corrupt that data. Upload files via
+   * `mediaService.bulkUpload(files, "products")` first, fold the returned
+   * mediaIds into `body.images`, then call `create()` with a plain JSON
+   * body instead (see app/admin/products/new/page.tsx).
    */
   createWithImages: (body: CreateProductBody, images: File[]) => {
     const fd = buildMultipartFormData(body as unknown as Record<string, unknown>, { images });
     return http.upload<Product>(ENDPOINTS.products.create, fd);
   },
 
-  /** Update product with inline images (multipart/form-data, PUT method). */
+  /** @deprecated See createWithImages — same bracket-notation bug applies to update. */
   updateWithImages: (id: number, body: UpdateProductBody, images: File[]) => {
     const fd = buildMultipartFormData(body as unknown as Record<string, unknown>, { images });
     return http.uploadPut<Product>(ENDPOINTS.products.update(id), fd);

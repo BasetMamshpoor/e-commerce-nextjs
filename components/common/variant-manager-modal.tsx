@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { VariantBuilder, type VariantFormData } from "@/components/common/variant-builder";
+import { VariantBuilder, sanitizeAttributeValuesForApi, type VariantFormData } from "@/components/common/variant-builder";
 import { productsService } from "@/services";
 import type { Attribute, ProductPricingMode, ProductVariant } from "@/types/domain";
 import { toPersianDigits } from "@/utils/format";
@@ -85,9 +85,15 @@ export function VariantManagerModal({
     }
     if (!open) {
       initializedRef.current = false;
-      setError(null);
     }
   }, [open, existingVariants]);
+
+  // Reset the error banner when the dialog is closed (via the X button,
+  // backdrop click, or Escape) — not just the explicit "انصراف" button.
+  const handleOpenChange = (next: boolean) => {
+    if (!next) setError(null);
+    onOpenChange(next);
+  };
 
   // Build a map of existing variants by ID for diffing.
   const existingMap = React.useMemo(() => {
@@ -101,10 +107,10 @@ export function VariantManagerModal({
       setError("حداقل یک تنوع الزامی است");
       return;
     }
-    // Ensure exactly one default
-    if (!variants.some((v) => v.isDefault)) {
-      variants[0].isDefault = true;
-    }
+    // Ensure exactly one default (immutable — avoid mutating state directly).
+    const variantsToSave = variants.some((v) => v.isDefault)
+      ? variants
+      : variants.map((v, i) => (i === 0 ? { ...v, isDefault: true } : v));
 
     setSaving(true);
     setError(null);
@@ -112,7 +118,7 @@ export function VariantManagerModal({
     try {
       const updatedVariants: ProductVariant[] = [];
       const currentIds = new Set(
-        variants.filter((v) => v.id != null).map((v) => v.id as number),
+        variantsToSave.filter((v) => v.id != null).map((v) => v.id as number),
       );
 
       // 1. DELETE removed variants (existed before but not in current list)
@@ -130,8 +136,8 @@ export function VariantManagerModal({
       }
 
       // 2. POST new variants + PUT modified variants
-      for (let i = 0; i < variants.length; i++) {
-        const v = variants[i];
+      for (let i = 0; i < variantsToSave.length; i++) {
+        const v = variantsToSave[i];
         const sku =
           v.sku.trim() || `SKU-${productId}-${i + 1}-${Date.now().toString(36).slice(-4)}`;
         const payload = {
@@ -141,12 +147,25 @@ export function VariantManagerModal({
           weight: v.weight,
           isDefault: v.isDefault,
           isActive: v.isActive,
-          attributeValues: v.attributeValues,
+          attributeValues: sanitizeAttributeValuesForApi(v.attributeValues),
         };
 
         if (v.id != null) {
           // Existing variant — check if changed
           const original = existingMap.get(v.id);
+          const attributeValuesChanged = (() => {
+            const norm = (list: typeof payload.attributeValues) =>
+              [...list]
+                .map((av) => `${av.attributeValueId}:${av.modifierType ?? ""}:${av.modifierValue ?? ""}`)
+                .sort()
+                .join("|");
+            const originalAvs = (original?.attributeValues ?? []).map((av) => ({
+              attributeValueId: av.attributeValueId,
+              modifierType: av.modifierType ?? null,
+              modifierValue: av.modifierValue ?? null,
+            }));
+            return norm(originalAvs) !== norm(payload.attributeValues);
+          })();
           const changed =
             !original ||
             original.sku !== payload.sku ||
@@ -154,7 +173,8 @@ export function VariantManagerModal({
             original.stock !== payload.stock ||
             (original.weight ?? null) !== (payload.weight ?? null) ||
             original.isDefault !== payload.isDefault ||
-            original.isActive !== payload.isActive;
+            original.isActive !== payload.isActive ||
+            attributeValuesChanged;
 
           if (changed) {
             try {
@@ -183,7 +203,7 @@ export function VariantManagerModal({
 
       toast.success("تنوع‌ها ذخیره شدند");
       onSaved(updatedVariants);
-      onOpenChange(false);
+      handleOpenChange(false);
     } catch (e: unknown) {
       const apiErr = e as { message?: string };
       setError(apiErr?.message ?? "ذخیره ناموفق بود");
@@ -193,7 +213,7 @@ export function VariantManagerModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[90vh] !max-w-7xl w-full overflow-y-auto">
         <DialogHeader>
           <DialogTitle>مدیریت تنوع‌ها</DialogTitle>
@@ -225,7 +245,7 @@ export function VariantManagerModal({
             {toPersianDigits(variants.length)} تنوع
           </Badge>
           <DialogFooter>
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+            <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={saving}>
               انصراف
             </Button>
             <Button onClick={handleSave} disabled={saving || variants.length === 0}>
