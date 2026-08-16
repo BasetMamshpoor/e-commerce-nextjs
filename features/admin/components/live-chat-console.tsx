@@ -13,6 +13,8 @@ import {
   Trash2,
   Image as ImageIcon,
   Volume2,
+  X,
+  Reply,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -54,6 +56,13 @@ const CHANNEL_LABELS: Record<string, string> = {
   BALE: "بله",
 };
 
+const SENDER_LABELS: Record<string, string> = {
+  CUSTOMER: "مشتری",
+  ENGINE: "ربات",
+  OPERATOR: "اپراتور",
+  SYSTEM: "سیستم",
+};
+
 const QUEUE_TABS = [
   { key: "ALL" as const, label: "صف فعال" },
   { key: "NEEDS_OPERATOR" as const, label: "منتظر اپراتور" },
@@ -91,8 +100,18 @@ export function LiveChatConsole() {
 
   const [input, setInput] = React.useState("");
   const [channelFilter, setChannelFilter] = React.useState<string>("ALL");
+  const [replyTarget, setReplyTarget] = React.useState<OperatorChatMessage | null>(null);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const selectedConversation = queue.find((c) => c.id === selectedId) ?? null;
+
+  // Selecting a different conversation should always clear any pending
+  // "replying to" state — done here (in the event handler) rather than in
+  // an effect keyed on selectedId, so it's not a synchronous setState call
+  // inside an effect body.
+  const handleSelectConversation = (id: string) => {
+    setReplyTarget(null);
+    setSelectedId(id);
+  };
 
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -101,9 +120,18 @@ export function LiveChatConsole() {
   const handleSend = async () => {
     if (!input.trim()) return;
     const text = input.trim();
+    const replyToMessageId = replyTarget?.id;
     setInput("");
-    await sendReply(text);
+    setReplyTarget(null);
+    await sendReply(text, replyToMessageId);
   };
+
+  // Quick lookup for rendering an inline quote when a message replies to another.
+  const messageById = React.useMemo(() => {
+    const map = new Map<string, OperatorChatMessage>();
+    for (const m of messages) map.set(m.id, m);
+    return map;
+  }, [messages]);
 
   // Filter queue by channel locally (REST filter could also be added)
   const filteredQueue = channelFilter === "ALL"
@@ -184,7 +212,7 @@ export function LiveChatConsole() {
                 return (
                   <button
                     key={conversation.id}
-                    onClick={() => setSelectedId(conversation.id)}
+                    onClick={() => handleSelectConversation(conversation.id)}
                     className={cn(
                       "w-full rounded-lg border p-3 text-right transition-colors",
                       active
@@ -279,13 +307,39 @@ export function LiveChatConsole() {
               ) : messages.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">پیامی وجود ندارد</p>
               ) : (
-                messages.map((msg) => <OperatorMessageBubble key={msg.id} message={msg} conversationId={selectedConversation.id} />)
+                messages.map((msg) => (
+                  <OperatorMessageBubble
+                    key={msg.id}
+                    message={msg}
+                    conversationId={selectedConversation.id}
+                    quotedMessage={msg.replyToMessageId ? messageById.get(msg.replyToMessageId) : undefined}
+                    onReply={() => setReplyTarget(msg)}
+                  />
+                ))
               )}
               <div ref={messagesEndRef} />
             </div>
 
             {/* Input */}
             <div className="border-t border-border p-3">
+              {replyTarget && (
+                <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-3 py-1.5">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-medium text-muted-foreground">
+                      پاسخ به {SENDER_LABELS[replyTarget.senderType] ?? replyTarget.senderType}
+                    </p>
+                    <p className="truncate text-xs text-foreground">{replyTarget.content}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setReplyTarget(null)}
+                    className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    aria-label="لغو پاسخ"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <input
                   type="text"
@@ -357,7 +411,19 @@ function useTelegramMedia(conversationId: string, messageId: string | undefined)
 
 /* ───────── Message bubble with Telegram media support ───────── */
 
-function OperatorMessageBubble({ message, conversationId }: { message: OperatorChatMessage; conversationId: string }) {
+function OperatorMessageBubble({
+  message,
+  conversationId,
+  quotedMessage,
+  onReply,
+}: {
+  message: OperatorChatMessage;
+  conversationId: string;
+  /** The message this one is replying to (if any), for an inline quote preview. */
+  quotedMessage?: OperatorChatMessage;
+  /** Called when the operator wants to reply directly to this message. */
+  onReply: () => void;
+}) {
   const isCustomer = message.senderType === "CUSTOMER";
   const isOperator = message.senderType === "OPERATOR";
   const isEngine = message.senderType === "ENGINE";
@@ -377,7 +443,7 @@ function OperatorMessageBubble({ message, conversationId }: { message: OperatorC
   }
 
   return (
-    <div className={cn("flex gap-2", isCustomer ? "flex-row-reverse" : "flex-row")}>
+    <div className={cn("group flex items-end gap-2", isCustomer ? "flex-row-reverse" : "flex-row")}>
       <div
         className={cn(
           "flex size-7 shrink-0 items-center justify-center rounded-full",
@@ -406,6 +472,19 @@ function OperatorMessageBubble({ message, conversationId }: { message: OperatorC
               : "rounded-tl-sm bg-muted text-foreground",
         )}
       >
+        {/* Inline quote if this message replies to an earlier one. */}
+        {quotedMessage && (
+          <div
+            className={cn(
+              "mb-1.5 rounded-lg border-r-2 px-2 py-1 text-xs opacity-80",
+              isCustomer ? "border-primary-foreground/40" : "border-primary/50 bg-background/40",
+            )}
+          >
+            <p className="font-medium">{SENDER_LABELS[quotedMessage.senderType] ?? quotedMessage.senderType}</p>
+            <p className="truncate">{quotedMessage.content}</p>
+          </div>
+        )}
+
         <p className="whitespace-pre-wrap break-words">{message.content}</p>
 
         {/* Telegram media (photo/voice) */}
@@ -448,6 +527,19 @@ function OperatorMessageBubble({ message, conversationId }: { message: OperatorC
           {isEngine && message.layer ? ` · ${message.layer}` : ""}
         </p>
       </div>
+
+      {/* Reply button — shown on hover, not for temp/optimistic messages. */}
+      {!message.id.startsWith("temp-") && (
+        <button
+          type="button"
+          onClick={onReply}
+          className="mb-1 shrink-0 rounded-full p-1.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover:opacity-100"
+          aria-label="پاسخ به این پیام"
+          title="پاسخ به این پیام"
+        >
+          <Reply className="size-3.5" />
+        </button>
+      )}
     </div>
   );
 }

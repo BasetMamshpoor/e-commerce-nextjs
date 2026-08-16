@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { usePathname } from "next/navigation";
 import { MessageCircle, X, Send, Bot, User, Headphones, Loader2 } from "lucide-react";
 import { useChatEngine } from "@/hooks/use-chat-engine";
 import { cn } from "@/lib/utils";
@@ -10,15 +11,22 @@ export function ChatWidget() {
   const { messages, connected, waitingForOperator, sendMessage, isOpen, setOpen, unreadCount } = useChatEngine();
   const [input, setInput] = React.useState("");
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  // usePathname() is reactive to client-side navigation (unlike reading
+  // window.location.pathname directly in the render body, which only
+  // reflects the URL on whichever render happened to run last — the
+  // widget could stay visible/hidden across a route change until some
+  // unrelated state update happened to trigger a re-render).
+  const pathname = usePathname();
 
   // Auto-scroll to bottom on new messages
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Don't render on server or admin pages
-  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
-  if (pathname.startsWith("/admin") || pathname.startsWith("/login") || pathname.startsWith("/register")) {
+  // Hide on auth pages. (Admin routes live under app/admin, a separate
+  // layout tree from app/(site) where this widget is mounted, so they
+  // never reach this component at all — no check needed for them.)
+  if (pathname?.startsWith("/login") || pathname?.startsWith("/register")) {
     return null;
   }
 

@@ -84,6 +84,10 @@ export interface OperatorChatMessage {
   senderType: "CUSTOMER" | "ENGINE" | "OPERATOR" | "SYSTEM";
   layer?: string | null;
   content: string;
+  /** Set when this message is a reply to a specific earlier message
+   *  (operator replies can target any message, not just the latest;
+   *  engine replies always target the customer message they answered). */
+  replyToMessageId?: string | null;
   metadata?: Record<string, unknown> | null;
   createdAt: string;
 }
@@ -91,6 +95,10 @@ export interface OperatorChatMessage {
 export interface OperatorReplyBody {
   conversationId: string;
   text: string;
+  /** Optional — reply to a specific message instead of the conversation
+   *  in general. On Telegram this becomes a native quoted reply; on the
+   *  website widget it's carried in the payload for optional UI use. */
+  replyToMessageId?: string;
 }
 
 export interface OperatorQueueQuery {
@@ -144,9 +152,10 @@ export const chatService = {
   getOperatorConversation: (conversationId: string) =>
     chatHttp.get<OperatorChatMessage[]>(`/operator/conversations/${conversationId}`),
 
-  /** Send an operator reply to a conversation (REST fallback for socket). */
-  sendOperatorReply: (conversationId: string, text: string) =>
-    chatHttp.post<{ id: string | null }>("/operator/reply", { conversationId, text }),
+  /** Send an operator reply to a conversation (REST fallback for socket).
+   *  Pass replyToMessageId to target a specific message in the history. */
+  sendOperatorReply: (conversationId: string, text: string, replyToMessageId?: string) =>
+    chatHttp.post<{ id: string | null }>("/operator/reply", { conversationId, text, replyToMessageId }),
 
   /** Close a conversation (ends the thread — next customer message starts fresh). */
   closeOperatorConversation: (conversationId: string) =>

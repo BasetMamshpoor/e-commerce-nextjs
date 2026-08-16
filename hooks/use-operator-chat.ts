@@ -54,7 +54,7 @@ export interface UseOperatorChatReturn {
   loadingMessages: boolean;
   sending: boolean;
   refreshQueue: () => Promise<void>;
-  sendReply: (text: string) => Promise<void>;
+  sendReply: (text: string, replyToMessageId?: string) => Promise<void>;
   closeConversation: () => Promise<void>;
   releaseConversation: () => Promise<void>;
   deleteConversation: () => Promise<void>;
@@ -83,6 +83,7 @@ export function useOperatorChat(): UseOperatorChatReturn {
 
   // Initial queue load via REST — after this, Socket.io handles all updates.
   const refreshQueue = useCallback(async () => {
+    setLoadingQueue(true);
     try {
       const status = queueFilter === "ALL" ? undefined : (queueFilter as OperatorQueueQuery["status"]);
       const data = await chatService.getOperatorQueue(status ? { status } : undefined);
@@ -111,18 +112,17 @@ export function useOperatorChat(): UseOperatorChatReturn {
 
   // Initial load when filter changes
   useEffect(() => {
-    setLoadingQueue(true);
     refreshQueue();
   }, [refreshQueue]);
 
   // Load messages when a conversation is selected — NO interval/polling.
   // New messages arrive via Socket.io queue:update (which patches the queue)
   // and we re-fetch messages only when a queue:update targets the selected conversation.
+  // (selectedId only ever becomes null through paths that already clear
+  // `messages` themselves — see queue:removed handler, releaseConversation,
+  // deleteConversation below — so this effect's only job is fetching.)
   useEffect(() => {
-    if (!selectedId) {
-      setMessages([]);
-      return;
-    }
+    if (!selectedId) return;
     loadMessages(selectedId);
   }, [selectedId, loadMessages]);
 
@@ -200,7 +200,7 @@ export function useOperatorChat(): UseOperatorChatReturn {
 
   // Send reply via Socket.io (preferred) with REST fallback.
   const sendReply = useCallback(
-    async (text: string) => {
+    async (text: string, replyToMessageId?: string) => {
       if (!selectedId || !text.trim()) return;
       setSending(true);
       try {
@@ -209,6 +209,7 @@ export function useOperatorChat(): UseOperatorChatReturn {
           socketRef.current.emit("operator:reply", {
             conversationId: selectedId,
             text: text.trim(),
+            replyToMessageId,
           });
           // Optimistically add the operator message to the local list.
           setMessages((prev) => [
@@ -218,13 +219,14 @@ export function useOperatorChat(): UseOperatorChatReturn {
               senderType: "OPERATOR",
               layer: null,
               content: text.trim(),
+              replyToMessageId: replyToMessageId ?? null,
               metadata: null,
               createdAt: new Date().toISOString(),
             },
           ]);
         } else {
           // Fallback: REST
-          await chatService.sendOperatorReply(selectedId, text.trim());
+          await chatService.sendOperatorReply(selectedId, text.trim(), replyToMessageId);
           await loadMessages(selectedId);
         }
       } catch (err) {

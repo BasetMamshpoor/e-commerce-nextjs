@@ -78,6 +78,15 @@ export function useChatEngine(): UseChatEngineReturn {
       if (!isOpenRef.current) setUnreadCount((c) => c + 1);
     });
 
+    // Fired when the conversation is already WITH_OPERATOR (sticky — see
+    // docs/FRONTEND_INTEGRATION.md) so no automated reply was generated;
+    // this is just a delivery ack. No message to append — waitingForOperator
+    // is already true from the earlier engine:reply that triggered the
+    // handoff, and stays true until an actual operator:reply arrives.
+    socket.on("message:received", () => {
+      /* no-op ack */
+    });
+
     socket.on("error", (err: { message?: string }) => {
       setMessages((prev) => [
         ...prev,
