@@ -24,6 +24,7 @@ export default function AdminSettingsPage() {
   const [values, setValues] = React.useState<Record<string, string>>({});
   const [warehouseCoords, setWarehouseCoords] = React.useState(DEFAULT_WAREHOUSE_COORDS);
   const [savingWarehouse, setSavingWarehouse] = React.useState(false);
+  const [roadFactor, setRoadFactor] = React.useState("1.3");
 
   React.useEffect(() => {
     settingsService.adminList().then((data) => {
@@ -35,6 +36,9 @@ export default function AdminSettingsPage() {
       const lng = Number(map.warehouseLng);
       if (Number.isFinite(lat) && Number.isFinite(lng)) {
         setWarehouseCoords({ lat, lng });
+      }
+      if (map.shippingDistanceRoadFactor && Number.isFinite(Number(map.shippingDistanceRoadFactor))) {
+        setRoadFactor(map.shippingDistanceRoadFactor);
       }
     }).finally(() => setLoading(false));
   }, []);
@@ -58,9 +62,14 @@ export default function AdminSettingsPage() {
   const onSaveWarehouse = async () => {
     setSavingWarehouse(true);
     try {
+      const factor = Number(roadFactor);
       await Promise.all([
         settingsService.upsert("warehouseLat", { value: String(warehouseCoords.lat), type: "number" }),
         settingsService.upsert("warehouseLng", { value: String(warehouseCoords.lng), type: "number" }),
+        settingsService.upsert("shippingDistanceRoadFactor", {
+          value: String(Number.isFinite(factor) && factor > 0 ? factor : 1.3),
+          type: "number",
+        }),
       ]);
       toast.success("مبدأ ارسال ذخیره شد");
     } catch {
@@ -101,6 +110,23 @@ export default function AdminSettingsPage() {
             در زمان ثبت سفارش بازمی‌گردد.
           </p>
           <AddressMapPicker value={warehouseCoords} onChange={setWarehouseCoords} />
+          <div className="space-y-1">
+            <Label className="text-xs">
+              ضریب تصحیح مسیر جاده‌ای
+              <span className="mr-1 text-[10px] text-muted-foreground">
+                (فاصله‌ی مستقیم هوایی محاسبه‌شده در این عدد ضرب می‌شود تا به مسیر واقعی جاده نزدیک‌تر باشد — پیش‌فرض ۱٫۳)
+              </span>
+            </Label>
+            <Input
+              type="number"
+              step="0.05"
+              min="1"
+              value={roadFactor}
+              onChange={(e) => setRoadFactor(e.target.value)}
+              dir="ltr"
+              className="max-w-[140px] nums-fa"
+            />
+          </div>
           <Button size="sm" onClick={onSaveWarehouse} disabled={savingWarehouse} className="gap-1.5">
             {savingWarehouse ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
             ذخیره مبدأ ارسال
@@ -114,7 +140,7 @@ export default function AdminSettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {settings
-            .filter((s) => s.key !== "warehouseLat" && s.key !== "warehouseLng")
+            .filter((s) => !["warehouseLat", "warehouseLng", "shippingDistanceRoadFactor"].includes(s.key))
             .map((s) => (
             <div key={s.key} className="flex items-end gap-2">
               <div className="flex-1 space-y-1">
@@ -130,7 +156,7 @@ export default function AdminSettingsPage() {
               </Button>
             </div>
           ))}
-          {settings.filter((s) => s.key !== "warehouseLat" && s.key !== "warehouseLng").length === 0 && (
+          {settings.filter((s) => !["warehouseLat", "warehouseLng", "shippingDistanceRoadFactor"].includes(s.key)).length === 0 && (
             <p className="py-8 text-center text-sm text-muted-foreground">
               تنظیمی موجود نیست
             </p>

@@ -714,8 +714,9 @@ export interface CreateOrderBody {
   discountCode?: string;
   /** Total order weight in grams (used for WEIGHT_DISTANCE pricing). */
   shippingWeight?: number;
-  /** Shipping distance in kilometers (used for WEIGHT_DISTANCE pricing). */
-  shippingDistance?: number;
+  // shippingDistance intentionally removed — distance is always computed
+  // server-side from a configured warehouse origin to the address, never
+  // taken from the client. See services/order/order.service.ts createOrder.
 }
 
 /* ──────────────────────────────────────────────────────────────────────────

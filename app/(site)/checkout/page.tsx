@@ -40,7 +40,7 @@ import {
   useCreateOrder,
   useApplyDiscountCode,
 } from "@/features/checkout/hooks";
-import { shippingCompaniesService, paymentGatewaysService } from "@/services";
+import { shippingCompaniesService, paymentGatewaysService, ordersService } from "@/services";
 import type {
   Address,
   DiscountApplyResult,
@@ -48,22 +48,9 @@ import type {
   ShippingCompany,
   PaymentGateway,
 } from "@/types/domain";
+import type { ShippingEstimate } from "@/services/remaining-services";
 import { formatToman, formatPrice, toPersianDigits } from "@/utils/format";
 import { cn } from "@/lib/utils";
-
-/** Compute shipping cost for a given company + weight/distance inputs. */
-function computeShippingCost(
-  company: ShippingCompany | undefined,
-  weightGrams: number,
-  distanceKm: number,
-): number {
-  if (!company) return 0;
-  if (company.pricingType === "WEIGHT_DISTANCE") {
-    const weightKg = weightGrams / 1000;
-    return (company.pricePerKg ?? 0) * weightKg + (company.pricePerKm ?? 0) * distanceKm;
-  }
-  return company.baseCost;
-}
 
 type Step = "address" | "shipping" | "review" | "payment";
 
@@ -95,17 +82,16 @@ function CheckoutContent() {
   const [discountResult, setDiscountResult] = React.useState<DiscountApplyResult | null>(null);
   const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod>("GATEWAY");
   const [addressDialogOpen, setAddressDialogOpen] = React.useState(false);
-  // For WEIGHT_DISTANCE pricing — auto-calculated from cart item weights
-  // (variant.weight, in kg, x quantity) where available, converted to
-  // grams to match Order.shippingWeight's unit (see schema.prisma comment
-  // "وزن کل (گرم)"). Still editable — admin-entered variant weights may be
-  // missing/approximate, and this is what's actually billed, so the
-  // customer can correct it. Distance still has no way to auto-calculate
-  // (would need an origin/warehouse coordinate, which nothing in the
-  // schema currently has — the customer enters it manually).
-  const [shippingWeight, setShippingWeight] = React.useState<number>(0);
-  const [shippingWeightTouched, setShippingWeightTouched] = React.useState(false);
-  const [shippingDistance, setShippingDistance] = React.useState<number>(0);
+  // Shipping cost for the selected address + company is always computed
+  // server-side (GET /orders/shipping-estimate) — weight from actual cart
+  // item weights and, for WEIGHT_DISTANCE companies, distance from a
+  // configured warehouse origin to the address. Never taken from or
+  // editable by the customer: this used to be a manually-typed estimate
+  // (and, before that, had a unit bug that made the preview 1000x off from
+  // the actual charged amount) — a single server-side source of truth for
+  // both the preview and the real order removes that whole bug class.
+  const [shippingEstimate, setShippingEstimate] = React.useState<ShippingEstimate | null>(null);
+  const [shippingEstimateLoading, setShippingEstimateLoading] = React.useState(false);
 
   // Shipping companies + payment gateways (one-time fetch).
   const [shippingCompanies, setShippingCompanies] = React.useState<ShippingCompany[]>([]);
@@ -140,14 +126,30 @@ function CheckoutContent() {
     }
   }, [shippingCompanies, selectedShippingId]);
 
-  // Auto-fill weight from cart item weights once cart data is available —
-  // only while the customer hasn't manually edited the field, so we never
-  // clobber a correction they made.
+  // Fetch the authoritative shipping cost whenever address or shipping
+  // company changes.
   React.useEffect(() => {
-    if (shippingWeightTouched || !cart) return;
-    const totalKg = cart.items.reduce((sum, item) => sum + (item.weight ?? 0) * item.quantity, 0);
-    if (totalKg > 0) setShippingWeight(Math.round(totalKg * 1000));
-  }, [cart, shippingWeightTouched]);
+    if (!selectedAddressId || !selectedShippingId) {
+      setShippingEstimate(null);
+      return;
+    }
+    let cancelled = false;
+    setShippingEstimateLoading(true);
+    ordersService
+      .shippingEstimate(selectedAddressId, selectedShippingId)
+      .then((result) => {
+        if (!cancelled) setShippingEstimate(result);
+      })
+      .catch(() => {
+        if (!cancelled) setShippingEstimate(null);
+      })
+      .finally(() => {
+        if (!cancelled) setShippingEstimateLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedAddressId, selectedShippingId]);
 
   // Redirect to cart if empty.
   React.useEffect(() => {
@@ -160,7 +162,7 @@ function CheckoutContent() {
   const cartTotal = cart?.total ?? 0;
   const selectedShipping = shippingCompanies.find((s) => s.id === selectedShippingId);
   const isWeightDistance = selectedShipping?.pricingType === "WEIGHT_DISTANCE";
-  const shippingCost = computeShippingCost(selectedShipping, shippingWeight, shippingDistance);
+  const shippingCost = shippingEstimate?.shippingCost ?? (isWeightDistance ? 0 : selectedShipping?.baseCost ?? 0);
   const discountAmount = discountResult?.discountAmount ?? 0;
   const payableTotal = Math.max(0, cartTotal - discountAmount + shippingCost);
   const walletBalance = wallet?.balance ?? 0;
@@ -227,9 +229,15 @@ function CheckoutContent() {
       toast.error("آدرس و روش ارسال را انتخاب کنید");
       return;
     }
-    // For WEIGHT_DISTANCE pricing, weight & distance are required inputs.
-    if (isWeightDistance && (shippingWeight <= 0 || shippingDistance <= 0)) {
-      toast.error("وزن بسته و مسافت را وارد کنید");
+    // Weight and distance are always computed server-side now (see
+    // shippingEstimate) — just make sure we actually have a usable
+    // estimate before letting the customer proceed to payment, so they
+    // don't pay for a shipping cost that turned out to be uncomputable
+    // (e.g. warehouse origin not configured yet).
+    if (isWeightDistance && (!shippingEstimate || shippingEstimate.distanceUnavailableReason)) {
+      toast.error(
+        shippingEstimate?.distanceUnavailableReason ?? "محاسبه هزینه ارسال برای این آدرس ممکن نیست",
+      );
       return;
     }
     // FREIGHT_COLLECT requires no gateway + requires company.acceptsFreightCollect
@@ -256,8 +264,6 @@ function CheckoutContent() {
       paymentMethod,
       gatewaySlug: isFreightCollect ? undefined : (paymentMethod !== "WALLET" ? selectedGatewaySlug ?? undefined : undefined),
       discountCode: discountResult?.code,
-      shippingWeight: isWeightDistance ? shippingWeight : undefined,
-      shippingDistance: isWeightDistance ? shippingDistance : undefined,
     });
   };
 
@@ -380,53 +386,37 @@ function CheckoutContent() {
                   ))
                 )}
 
-                {/* Conditional weight/distance inputs for WEIGHT_DISTANCE pricing */}
+                {/* Read-only shipping cost breakdown for WEIGHT_DISTANCE
+                    companies — weight and distance are always computed
+                    server-side (GET /orders/shipping-estimate), never
+                    entered by the customer. */}
                 {isWeightDistance && (
-                  <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4 space-y-3">
+                  <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4 space-y-2">
                     <p className="flex items-center gap-2 text-sm font-medium text-primary">
                       <Scale className="size-4" />
                       محاسبه هزینه ارسال بر اساس وزن و مسافت
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      شرکت انتخابی شما هزینه را بر اساس وزن بسته و مسافت محاسبه می‌کند.
-                      {!shippingWeightTouched && shippingWeight > 0
-                        ? " وزن از روی اقلام سبد خرید شما محاسبه شده — در صورت نیاز می‌توانید آن را اصلاح کنید."
-                        : " لطفاً مقادیر تقریبی را وارد کنید."}
-                    </p>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">وزن بسته (گرم)</Label>
-                        <Input
-                          type="number"
-                          dir="ltr"
-                          className="text-left"
-                          placeholder="مثال: 2500"
-                          value={shippingWeight || ""}
-                          onChange={(e) => {
-                            setShippingWeightTouched(true);
-                            setShippingWeight(Number(e.target.value));
-                          }}
-                          min={0}
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">مسافت (کیلومتر)</Label>
-                        <Input
-                          type="number"
-                          dir="ltr"
-                          className="text-left"
-                          placeholder="مثال: 15"
-                          value={shippingDistance || ""}
-                          onChange={(e) => setShippingDistance(Number(e.target.value))}
-                          min={0}
-                        />
-                      </div>
-                    </div>
-                    {shippingWeight > 0 && shippingDistance > 0 && (
-                      <p className="text-xs text-muted-foreground nums-fa">
-                        هزینه محاسبه‌شده: {toPersianDigits(formatPrice(shippingCost))} تومان
+                    {shippingEstimateLoading ? (
+                      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Loader2 className="size-3 animate-spin" />
+                        در حال محاسبه...
                       </p>
-                    )}
+                    ) : shippingEstimate?.distanceUnavailableReason ? (
+                      <p className="text-xs text-warning">
+                        {shippingEstimate.distanceUnavailableReason} — لطفاً کمی بعد دوباره امتحان کنید یا با پشتیبانی تماس بگیرید.
+                      </p>
+                    ) : shippingEstimate ? (
+                      <div className="space-y-1 text-xs text-muted-foreground">
+                        <p className="nums-fa">
+                          وزن بسته: {toPersianDigits(shippingEstimate.weightGrams)} گرم
+                          {shippingEstimate.distanceKm != null &&
+                            ` · مسافت: ${toPersianDigits(shippingEstimate.distanceKm)} کیلومتر`}
+                        </p>
+                        <p className="font-medium text-foreground nums-fa">
+                          هزینه ارسال: {toPersianDigits(formatPrice(shippingEstimate.shippingCost))} تومان
+                        </p>
+                      </div>
+                    ) : null}
                   </div>
                 )}
               </CardContent>

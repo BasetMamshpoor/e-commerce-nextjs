@@ -108,9 +108,18 @@ export interface UpdateOrderStatusBody {
   status: Order["status"]; note?: string; trackingCode?: string; packageNumber?: string;
 }
 
+export interface ShippingEstimate {
+  shippingCost: number;
+  weightGrams: number;
+  distanceKm: number | null;
+  distanceUnavailableReason: string | null;
+}
+
 export const ordersService = {
   list: (query?: OrderListQuery) => http.get<PaginatedData<Order>>(ENDPOINTS.orders.list, query),
   create: (body: CreateOrderBody) => http.post<Order>(ENDPOINTS.orders.create, body),
+  shippingEstimate: (addressId: number, shippingCompanyId: number) =>
+    http.get<ShippingEstimate>(ENDPOINTS.orders.shippingEstimate, { addressId, shippingCompanyId }),
   byId: (id: number) => http.get<Order>(ENDPOINTS.orders.byId(id)),
   cancel: (id: number, body: { reason: string }) => http.post<Order>(ENDPOINTS.orders.cancel(id), body),
   requestReturn: (id: number, body: RequestReturnBody) => http.post<Order>(ENDPOINTS.orders.return(id), body),

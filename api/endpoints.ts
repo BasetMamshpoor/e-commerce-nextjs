@@ -139,6 +139,7 @@ export const ENDPOINTS = {
     adminById: (id: number) => `/orders/admin/${id}`,
     adminStatus: (id: number) => `/orders/admin/${id}/status`,
     create: "/orders",
+    shippingEstimate: "/orders/shipping-estimate",
     byId: (id: number) => `/orders/${id}`,
     cancel: (id: number) => `/orders/${id}/cancel`,
     return: (id: number) => `/orders/${id}/return`,
