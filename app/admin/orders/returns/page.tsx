@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { RotateCcw, Check, X, DollarSign, Loader2, Eye } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { RotateCcw, Check, X, DollarSign, Loader2, Eye, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,12 @@ const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secon
 };
 
 export default function AdminReturnsPage() {
+  // Lets the order detail page ("مشاهده درخواست مرجوعی") deep-link straight
+  // to that order's return request(s) instead of the full unfiltered list.
+  const searchParams = useSearchParams();
+  const orderIdParam = searchParams.get("orderId");
+  const orderId = orderIdParam ? Number(orderIdParam) : undefined;
+
   const [data, setData] = React.useState<PaginatedData<OrderReturn> | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [page, setPage] = React.useState(1);
@@ -33,11 +40,11 @@ export default function AdminReturnsPage() {
 
   const load = React.useCallback(() => {
     setLoading(true);
-    ordersService.adminReturns({ page, limit: 20 }).then((res) => {
+    ordersService.adminReturns({ page, limit: 20, orderId }).then((res) => {
       const d = res as any;
       setData(d.items ? d : { items: d, meta: { total: d.length, page: 1, limit: 20, totalPages: 1 } });
     }).finally(() => setLoading(false));
-  }, [page]);
+  }, [page, orderId]);
 
   React.useEffect(() => { load(); }, [load]);
 
@@ -61,7 +68,20 @@ export default function AdminReturnsPage() {
 
   return (
     <div className="space-y-4">
-      <div><h1 className="text-xl font-bold text-foreground sm:text-2xl">درخواست‌های مرجوعی</h1><p className="mt-1 text-sm text-muted-foreground">بررسی و پردازش مرجوعی‌ها</p></div>
+      <div>
+        <h1 className="text-xl font-bold text-foreground sm:text-2xl">درخواست‌های مرجوعی</h1>
+        <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+          بررسی و پردازش مرجوعی‌ها
+          {orderId && (
+            <Badge variant="outline" className="gap-1">
+              فیلتر: سفارش #{toPersianDigits(orderId)}
+              <Link href="/admin/orders/returns" aria-label="حذف فیلتر">
+                <XCircle className="size-3" />
+              </Link>
+            </Badge>
+          )}
+        </p>
+      </div>
       <AdminTable title=""
         columns={[
           { key: "id", header: "شناسه", render: (r) => <span className="font-mono text-xs nums-fa" dir="ltr">#{toPersianDigits(r.id)}</span> },

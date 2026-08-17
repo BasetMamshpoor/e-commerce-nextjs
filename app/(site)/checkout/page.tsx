@@ -103,10 +103,21 @@ function CheckoutContent() {
   // Shipping companies + payment gateways (one-time fetch).
   const [shippingCompanies, setShippingCompanies] = React.useState<ShippingCompany[]>([]);
   const [gateways, setGateways] = React.useState<PaymentGateway[]>([]);
+  const [selectedGatewaySlug, setSelectedGatewaySlug] = React.useState<string | null>(null);
   React.useEffect(() => {
     shippingCompaniesService.list().then(setShippingCompanies).catch(() => {});
     paymentGatewaysService.list().then(setGateways).catch(() => {});
   }, []);
+
+  // Auto-select the first active gateway once loaded (still overridable
+  // below if more than one is configured — previously this was hardcoded
+  // to gateways[0] at submit time with no way for the customer to pick a
+  // different one when the admin had more than one gateway active).
+  React.useEffect(() => {
+    if (gateways.length > 0 && !selectedGatewaySlug) {
+      setSelectedGatewaySlug(gateways[0].slug);
+    }
+  }, [gateways, selectedGatewaySlug]);
 
   // Auto-select first address + first shipping company.
   React.useEffect(() => {
@@ -217,7 +228,7 @@ function CheckoutContent() {
         toast.error("این شرکت ارسال پیش‌پرداخت را پشتیبانی نمی‌کند");
         return;
       }
-      const gatewaySlug = paymentMethod !== "WALLET" ? gateways[0]?.slug : undefined;
+      const gatewaySlug = paymentMethod !== "WALLET" ? selectedGatewaySlug ?? undefined : undefined;
       if (paymentMethod !== "WALLET" && !gatewaySlug) {
         toast.error("درگاه پرداخت در دسترس نیست");
         return;
@@ -227,7 +238,7 @@ function CheckoutContent() {
       addressId: selectedAddressId,
       shippingCompanyId: selectedShippingId,
       paymentMethod,
-      gatewaySlug: isFreightCollect ? undefined : (paymentMethod !== "WALLET" ? gateways[0]?.slug : undefined),
+      gatewaySlug: isFreightCollect ? undefined : (paymentMethod !== "WALLET" ? selectedGatewaySlug ?? undefined : undefined),
       discountCode: discountResult?.code,
       shippingWeight: isWeightDistance ? shippingWeight : undefined,
       shippingDistance: isWeightDistance ? shippingDistance : undefined,
@@ -610,6 +621,34 @@ function CheckoutContent() {
                         </p>
                       )}
                     </RadioGroup>
+
+                    {/* Gateway picker — only shown when the admin has more than
+                        one active gateway configured and the customer picked a
+                        method that needs one. Previously this silently used
+                        whichever gateway happened to be first in the list. */}
+                    {(paymentMethod === "GATEWAY" || paymentMethod === "MIXED") && gateways.length > 1 && (
+                      <div className="rounded-lg border border-border p-3">
+                        <Label className="mb-2 block text-xs text-muted-foreground">درگاه پرداخت</Label>
+                        <RadioGroup value={selectedGatewaySlug ?? ""} onValueChange={setSelectedGatewaySlug}>
+                          <div className="flex flex-wrap gap-2">
+                            {gateways.map((gw) => (
+                              <label
+                                key={gw.slug}
+                                className={cn(
+                                  "flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors",
+                                  selectedGatewaySlug === gw.slug
+                                    ? "border-primary bg-primary/5"
+                                    : "border-border hover:bg-accent/40",
+                                )}
+                              >
+                                <RadioGroupItem value={gw.slug} />
+                                {gw.name}
+                              </label>
+                            ))}
+                          </div>
+                        </RadioGroup>
+                      </div>
+                    )}
 
                     <div className="rounded-lg bg-info/10 p-3 text-xs text-info">
                       <AlertCircle className="mb-1 size-4" />

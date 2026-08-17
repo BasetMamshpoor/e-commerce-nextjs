@@ -58,9 +58,16 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
   const [order, setOrder] = React.useState<Order | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [updatingStatus, setUpdatingStatus] = React.useState(false);
+  const [trackingCode, setTrackingCode] = React.useState("");
+  const [packageNumber, setPackageNumber] = React.useState("");
+  const [savingShippingInfo, setSavingShippingInfo] = React.useState(false);
 
   React.useEffect(() => {
-    ordersService.adminById(Number(id)).then(setOrder).finally(() => setLoading(false));
+    ordersService.adminById(Number(id)).then((o) => {
+      setOrder(o);
+      setTrackingCode(o.trackingCode ?? "");
+      setPackageNumber(o.packageNumber ?? "");
+    }).finally(() => setLoading(false));
   }, [id]);
 
   if (loading) {
@@ -87,15 +94,46 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
   const statusCfg = STATUS_CONFIG[order.status];
 
   const handleStatusChange = async (newStatus: OrderStatus) => {
+    // Cancelling loses inventory reservation + triggers a refund — worth a
+    // reason on record (also shown in the status-history timeline), and a
+    // confirmation since it's not reversible from this dropdown.
+    let note: string | undefined;
+    if (newStatus === "CANCELLED") {
+      const reason = window.prompt("دلیل لغو سفارش را وارد کنید (اختیاری):");
+      if (reason === null) return; // admin cancelled the prompt itself
+      note = reason.trim() || undefined;
+    }
     setUpdatingStatus(true);
     try {
-      const updated = await ordersService.adminUpdateStatus(order.id, { status: newStatus });
+      const updated = await ordersService.adminUpdateStatus(order.id, { status: newStatus, note });
       setOrder(updated);
       toast.success("وضعیت سفارش به‌روزرسانی شد");
-    } catch {
-      toast.error("به‌روزرسانی ناموفق بود");
+    } catch (e: unknown) {
+      // Surface the actual server message — e.g. cancelling a shipped order
+      // now correctly comes back with a specific "از این مسیر قابل لغو
+      // نیست" error instead of a raw generic failure.
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "به‌روزرسانی ناموفق بود");
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  const handleSaveShippingInfo = async () => {
+    setSavingShippingInfo(true);
+    try {
+      const updated = await ordersService.adminUpdateStatus(order.id, {
+        status: order.status,
+        trackingCode: trackingCode.trim() || undefined,
+        packageNumber: packageNumber.trim() || undefined,
+      });
+      setOrder(updated);
+      toast.success("اطلاعات ارسال ذخیره شد");
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "ذخیره ناموفق بود");
+    } finally {
+      setSavingShippingInfo(false);
     }
   };
 
@@ -292,6 +330,52 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
                   </div>
                 )}
               </div>
+              <Separator />
+              <div className="space-y-2">
+                <div>
+                  <label className="mb-1 block text-xs text-muted-foreground">کد رهگیری</label>
+                  <input
+                    value={trackingCode}
+                    onChange={(e) => setTrackingCode(e.target.value)}
+                    placeholder="مثلاً 8931234567"
+                    dir="ltr"
+                    className="h-8 w-full rounded-md border border-border bg-background px-2 text-xs nums-fa"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-muted-foreground">شماره بسته</label>
+                  <input
+                    value={packageNumber}
+                    onChange={(e) => setPackageNumber(e.target.value)}
+                    placeholder="اختیاری"
+                    dir="ltr"
+                    className="h-8 w-full rounded-md border border-border bg-background px-2 text-xs nums-fa"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleSaveShippingInfo}
+                  disabled={
+                    savingShippingInfo ||
+                    (trackingCode === (order.trackingCode ?? "") && packageNumber === (order.packageNumber ?? ""))
+                  }
+                >
+                  {savingShippingInfo ? <Loader2 className="size-3.5 animate-spin" /> : "ذخیره اطلاعات ارسال"}
+                </Button>
+              </div>
+              {order.status === "RETURN_REQUESTED" && (
+                <>
+                  <Separator />
+                  <Button asChild size="sm" variant="secondary" className="w-full gap-1.5">
+                    <Link href={`/admin/orders/returns?orderId=${order.id}`}>
+                      <Package className="size-3.5" />
+                      مشاهده درخواست مرجوعی
+                    </Link>
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
