@@ -95,9 +95,16 @@ function CheckoutContent() {
   const [discountResult, setDiscountResult] = React.useState<DiscountApplyResult | null>(null);
   const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod>("GATEWAY");
   const [addressDialogOpen, setAddressDialogOpen] = React.useState(false);
-  // For WEIGHT_DISTANCE pricing — user-provided weight/distance.
-  // (Future enhancement will auto-calc these from product weight + address.)
+  // For WEIGHT_DISTANCE pricing — auto-calculated from cart item weights
+  // (variant.weight, in kg, x quantity) where available, converted to
+  // grams to match Order.shippingWeight's unit (see schema.prisma comment
+  // "وزن کل (گرم)"). Still editable — admin-entered variant weights may be
+  // missing/approximate, and this is what's actually billed, so the
+  // customer can correct it. Distance still has no way to auto-calculate
+  // (would need an origin/warehouse coordinate, which nothing in the
+  // schema currently has — the customer enters it manually).
   const [shippingWeight, setShippingWeight] = React.useState<number>(0);
+  const [shippingWeightTouched, setShippingWeightTouched] = React.useState(false);
   const [shippingDistance, setShippingDistance] = React.useState<number>(0);
 
   // Shipping companies + payment gateways (one-time fetch).
@@ -132,6 +139,15 @@ function CheckoutContent() {
       setSelectedShippingId(shippingCompanies[0].id);
     }
   }, [shippingCompanies, selectedShippingId]);
+
+  // Auto-fill weight from cart item weights once cart data is available —
+  // only while the customer hasn't manually edited the field, so we never
+  // clobber a correction they made.
+  React.useEffect(() => {
+    if (shippingWeightTouched || !cart) return;
+    const totalKg = cart.items.reduce((sum, item) => sum + (item.weight ?? 0) * item.quantity, 0);
+    if (totalKg > 0) setShippingWeight(Math.round(totalKg * 1000));
+  }, [cart, shippingWeightTouched]);
 
   // Redirect to cart if empty.
   React.useEffect(() => {
@@ -372,7 +388,10 @@ function CheckoutContent() {
                       محاسبه هزینه ارسال بر اساس وزن و مسافت
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      شرکت انتخابی شما هزینه را بر اساس وزن بسته و مسافت محاسبه می‌کند. لطفاً مقادیر تقریبی را وارد کنید.
+                      شرکت انتخابی شما هزینه را بر اساس وزن بسته و مسافت محاسبه می‌کند.
+                      {!shippingWeightTouched && shippingWeight > 0
+                        ? " وزن از روی اقلام سبد خرید شما محاسبه شده — در صورت نیاز می‌توانید آن را اصلاح کنید."
+                        : " لطفاً مقادیر تقریبی را وارد کنید."}
                     </p>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div className="space-y-1.5">
@@ -383,7 +402,10 @@ function CheckoutContent() {
                           className="text-left"
                           placeholder="مثال: 2500"
                           value={shippingWeight || ""}
-                          onChange={(e) => setShippingWeight(Number(e.target.value))}
+                          onChange={(e) => {
+                            setShippingWeightTouched(true);
+                            setShippingWeight(Number(e.target.value));
+                          }}
                           min={0}
                         />
                       </div>

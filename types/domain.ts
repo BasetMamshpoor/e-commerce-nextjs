@@ -424,6 +424,9 @@ export interface CartItem {
   lineTotal: number;
   isAvailable: boolean;
   availableStock: number;
+  /** Variant weight in kg, when set by the admin — used to auto-fill total
+   *  package weight for WEIGHT_DISTANCE shipping companies at checkout. */
+  weight?: number | null;
 }
 
 export interface Cart {
