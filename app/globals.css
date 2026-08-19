@@ -287,6 +287,73 @@
   box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 10px -3px rgba(0, 0, 0, 0.05);
 }
 
+/* ───────── Storefront signature system (footwear-retail motifs) ─────────
+   The store sells shoes, so the landing page's visual signature is drawn
+   from real shoe-retail artifacts — stitched welts and the little
+   notched price/size tags tied to a new pair — rather than generic
+   e-commerce chrome. Used sparingly (section dividers + section eyebrows
+   only), everything else stays quiet. */
+
+/* A stitched seam: two short dashes + a gap, repeating — mimics a
+   saddle-stitched leather welt line. Used between major landing sections
+   instead of a plain margin gap. */
+.stitch-divider {
+  position: relative;
+  height: 1px;
+  margin-block: 2.5rem;
+  background-image: repeating-linear-gradient(
+    to left,
+    var(--border) 0,
+    var(--border) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+}
+.stitch-divider::before,
+.stitch-divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--primary);
+  transform: translateY(-50%);
+  opacity: 0.55;
+}
+.stitch-divider::before { right: -2px; }
+.stitch-divider::after { left: -2px; }
+
+/* A section eyebrow styled like a shoebox size tag — a small notched
+   label above each section's title. */
+.tag-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding-inline: 0.6rem;
+  padding-block: 0.2rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--primary);
+  background: var(--accent);
+  border: 1px dashed color-mix(in oklab, var(--primary) 45%, transparent);
+  border-radius: 999px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-slide-in,
+  .animate-scale-in,
+  .animate-pulse-soft,
+  .skeleton-shimmer {
+    animation: none !important;
+  }
+  .card-hover {
+    transition: none !important;
+  }
+}
+
 /* Glass effect */
 .glass {
   background: rgba(255, 255, 255, 0.7);

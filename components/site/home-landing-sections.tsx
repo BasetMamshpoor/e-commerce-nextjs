@@ -12,6 +12,7 @@ import { SectionHeader } from "@/components/site/section-header";
 import { StoryViewer } from "@/components/site/story-viewer";
 import { useLanding } from "@/features/catalog/hooks";
 import { cn } from "@/lib/utils";
+import { APP_NAME } from "@/constants/app";
 import type {
   Banner,
   Category,
@@ -42,9 +43,12 @@ export function HomeLandingSections() {
 
   return (
     <>
-      {/* Feature strip — always shown */}
+      {/* Feature strip — always shown. Icons sit in a "stamp" circle,
+          echoing the authenticity/quality stamp printed inside a shoebox
+          lid — reinforces the "ضمانت اصالت" promise visually, not just
+          in the copy. */}
       <section
-        className="mb-10 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4"
+        className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 animate-fade-in"
         aria-label="مزایای خرید"
       >
         <FeatureCard icon={<Truck className="size-5" />} title="ارسال سریع" desc="تحویل در کوتاه‌ترین زمان" color="text-blue-600 bg-blue-50 dark:bg-blue-950/30" />
@@ -54,7 +58,16 @@ export function HomeLandingSections() {
       </section>
 
       {data.sections.map((section, idx) => (
-        <LandingSectionRenderer key={`${section.type}-${idx}`} section={section} />
+        <React.Fragment key={`${section.type}-${idx}`}>
+          <LandingSectionRenderer section={section} />
+          {/* Stitched-seam divider between sections — the page's one
+              recurring signature device, standing in for a plain margin
+              gap. Skipped after banners/stories/popups, which already
+              read as separate visual blocks on their own. */}
+          {!["banners", "popups", "stories"].includes(section.type) && (
+            <div className="stitch-divider" aria-hidden="true" />
+          )}
+        </React.Fragment>
       ))}
 
       {/* Newsletter signup — frontend-only widget, not part of /landing sections */}
@@ -94,9 +107,10 @@ function HomeNewsletterInline() {
   };
 
   return (
-    <section className="mb-10 overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-l from-primary/10 to-transparent p-6">
+    <section className="mb-2 overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-l from-primary/10 to-transparent p-6">
       <div className="mx-auto max-w-xl text-center">
-        <h2 className="text-lg font-bold text-foreground sm:text-xl">
+        <span className="tag-eyebrow mb-2">{`عضو خانواده ${APP_NAME} شوید`}</span>
+        <h2 className="text-lg font-extrabold tracking-tight text-foreground sm:text-xl">
           عضویت در خبرنامه
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -148,6 +162,7 @@ function LandingSectionRenderer({ section }: { section: LandingSection }) {
     case "featured_products":
       return (
         <ProductsSection
+          eyebrow="گزیده فروشگاه"
           title={section.label ?? "محصولات ویژه"}
           products={asProducts(data)}
           href="/products?isFeatured=true"
@@ -156,6 +171,7 @@ function LandingSectionRenderer({ section }: { section: LandingSection }) {
     case "latest_products":
       return (
         <ProductsSection
+          eyebrow="تازه‌وارد"
           title={section.label ?? "جدیدترین محصولات"}
           products={asProducts(data)}
           href="/products?sort=newest"
@@ -164,6 +180,7 @@ function LandingSectionRenderer({ section }: { section: LandingSection }) {
     case "top_rated_products":
       return (
         <ProductsSection
+          eyebrow="پرطرفدار"
           title={section.label ?? "محصولات پرامتیاز"}
           products={asProducts(data)}
           href="/products?sort=most_popular"
@@ -173,6 +190,7 @@ function LandingSectionRenderer({ section }: { section: LandingSection }) {
     case "flash_sales":
       return (
         <ProductsSection
+          eyebrow="زمان محدود"
           title={section.label ?? "تخفیف‌های ویژه"}
           products={asProducts(data)}
           href="/products?hasDiscount=true"
@@ -462,16 +480,16 @@ function StoriesSection({ stories }: { stories: Story[] }) {
 function CategoriesSection({ categories }: { categories: Category[] }) {
   if (!categories || categories.length === 0) return null;
   return (
-    <section className="mb-10" aria-label="دسته‌بندی‌ها">
-      <SectionHeader title="دسته‌بندی‌های محبوب" href="/categories" />
+    <section className="mb-2" aria-label="دسته‌بندی‌ها">
+      <SectionHeader eyebrow="از کجا شروع کنیم" title="دسته‌بندی‌های محبوب" href="/categories" />
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
         {categories.slice(0, 12).map((cat) => (
           <Link
             key={cat.id}
             href={`/categories/${cat.slug}`}
-            className="group flex flex-col items-center gap-2 rounded-xl border border-border/60 bg-card p-3 text-center transition-all hover:border-primary/40 hover:shadow-sm"
+            className="group flex flex-col items-center gap-2 rounded-xl border border-border/60 bg-card p-3 text-center transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
           >
-            <div className="relative size-16 overflow-hidden rounded-full bg-muted sm:size-20">
+            <div className="relative size-16 overflow-hidden rounded-full bg-muted ring-1 ring-border/60 transition-shadow group-hover:ring-primary/40 sm:size-20">
               {cat.imageUrl ? (
                 <Image
                   src={cat.imageUrl}
@@ -497,11 +515,13 @@ function CategoriesSection({ categories }: { categories: Category[] }) {
 }
 
 function ProductsSection({
+  eyebrow,
   title,
   products,
   href,
   icon,
 }: {
+  eyebrow?: string;
   title: string;
   products: Product[];
   href?: string;
@@ -509,8 +529,9 @@ function ProductsSection({
 }) {
   if (!products || products.length === 0) return null;
   return (
-    <section className="mb-10">
+    <section className="mb-2">
       <SectionHeader
+        eyebrow={eyebrow}
         title={
           <span className="flex items-center gap-2">
             {icon}
@@ -539,8 +560,8 @@ function ProductsSection({
 function BrandsSection({ brands }: { brands: Brand[] }) {
   if (!brands || brands.length === 0) return null;
   return (
-    <section className="mb-10">
-      <SectionHeader title="برندهای محبوب" href="/brands" />
+    <section className="mb-2">
+      <SectionHeader eyebrow="برندهای اصل" title="برندهای محبوب" href="/brands" />
       <div className="flex gap-3 overflow-x-auto pb-2">
         {brands.slice(0, 12).map((b) => (
           <Link
@@ -569,8 +590,8 @@ function BrandsSection({ brands }: { brands: Brand[] }) {
 function BlogSection({ posts }: { posts: BlogPost[] }) {
   if (!posts || posts.length === 0) return null;
   return (
-    <section className="mb-10">
-      <SectionHeader title="آخرین مقالات" href="/blog" />
+    <section className="mb-2">
+      <SectionHeader eyebrow="مجله" title="آخرین مقالات" href="/blog" />
       <div className="grid gap-3 sm:grid-cols-3">
         {posts.slice(0, 3).map((p) => (
           <Link key={p.id} href={`/blog/${p.slug}`}>
@@ -646,7 +667,9 @@ function FeatureCard({
   return (
     <Card className="group border-border/40 card-hover">
       <CardContent className="flex items-center gap-3 p-4">
-        <div className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${color} transition-transform group-hover:scale-110`}>
+        <div
+          className={`flex size-10 shrink-0 items-center justify-center rounded-full border-2 border-dashed ${color} transition-transform group-hover:scale-110`}
+        >
           {icon}
         </div>
         <div className="min-w-0">
