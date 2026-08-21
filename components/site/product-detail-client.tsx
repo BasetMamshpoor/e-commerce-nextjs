@@ -21,6 +21,8 @@ import {
   Check,
   Trash2,
   Sparkles,
+  FileText,
+  ListChecks,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -107,18 +109,39 @@ export function ProductDetailClient({ product: initialProduct }: { product: Prod
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — icon-led "line" tabs instead of the plain default pill
+          style, and everything explicitly RTL-safe (logical ps-/pe-
+          spacing, explicit dir="rtl" on the rich-text description since
+          admin-authored HTML doesn't always carry its own direction). */}
       <div className="mt-10">
-        <Tabs defaultValue="description">
-          <TabsList className="w-full justify-start">
-            <TabsTrigger value="description">توضیحات</TabsTrigger>
-            <TabsTrigger value="specs">مشخصات</TabsTrigger>
-            <TabsTrigger value="shipping">ارسال و مرجوعی</TabsTrigger>
+        <Tabs defaultValue="description" dir="rtl">
+          <TabsList variant="line" className="h-auto w-full justify-start gap-1 border-b border-border bg-transparent p-0">
+            <TabsTrigger
+              value="description"
+              className="gap-1.5 rounded-none border-b-2 border-transparent px-4 py-3 text-sm font-medium data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+            >
+              <FileText className="size-4" />
+              توضیحات
+            </TabsTrigger>
+            <TabsTrigger
+              value="specs"
+              className="gap-1.5 rounded-none border-b-2 border-transparent px-4 py-3 text-sm font-medium data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+            >
+              <ListChecks className="size-4" />
+              مشخصات
+            </TabsTrigger>
+            <TabsTrigger
+              value="shipping"
+              className="gap-1.5 rounded-none border-b-2 border-transparent px-4 py-3 text-sm font-medium data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+            >
+              <Truck className="size-4" />
+              ارسال و مرجوعی
+            </TabsTrigger>
           </TabsList>
-          <TabsContent value="description" className="mt-4">
+          <TabsContent value="description" className="pt-5">
             <ProductDescription html={product.description} />
           </TabsContent>
-          <TabsContent value="specs" className="mt-4">
+          <TabsContent value="specs" className="pt-5">
             <ProductSpecs
               variant={selectedVariant}
               categories={categories}
@@ -126,7 +149,7 @@ export function ProductDetailClient({ product: initialProduct }: { product: Prod
               displayAttributes={product.displayAttributeValues}
             />
           </TabsContent>
-          <TabsContent value="shipping" className="mt-4">
+          <TabsContent value="shipping" className="pt-5">
             <ShippingInfo />
           </TabsContent>
         </Tabs>
@@ -603,7 +626,13 @@ function ProductInfo({
 
 function ProductDescription({ html }: { html?: string | null }) {
   if (!html) return <p className="text-sm text-muted-foreground">توضیحاتی برای این محصول ثبت نشده است.</p>;
-  return <div className="prose prose-sm max-w-none text-foreground [&_a]:text-primary [&_h2]:mt-4 [&_h2]:text-base [&_h2]:font-bold [&_h3]:mt-3 [&_h3]:font-semibold [&_img]:rounded-lg [&_p]:leading-7 [&_ul]:list-disc [&_ul]:pr-5" dangerouslySetInnerHTML={{ __html: html }} />;
+  return (
+    <div
+      dir="rtl"
+      className="prose prose-sm max-w-none text-foreground [&_a]:text-primary [&_h2]:mt-4 [&_h2]:text-base [&_h2]:font-bold [&_h3]:mt-3 [&_h3]:font-semibold [&_img]:rounded-lg [&_p]:leading-7 [&_ul]:list-disc [&_ul]:pe-5 [&_ul]:ps-0 [&_ol]:list-decimal [&_ol]:pe-5 [&_ol]:ps-0"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
 }
 
 function ProductSpecs({
@@ -631,29 +660,38 @@ function ProductSpecs({
   }
   if (rows.length === 0) return <p className="text-sm text-muted-foreground">مشخصاتی ثبت نشده است.</p>;
   return (
-    <div className="overflow-hidden rounded-lg border border-border">
-      <table className="w-full text-sm">
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i} className={i % 2 === 0 ? "bg-muted/30" : ""}>
-              <td className="w-1/3 px-3 py-2 font-medium text-foreground">{r.label}</td>
-              <td className="px-3 py-2 text-muted-foreground">{r.value}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <dl className="grid grid-cols-1 gap-x-6 gap-y-0 sm:grid-cols-2">
+      {rows.map((r, i) => (
+        <div
+          key={i}
+          className="flex items-center justify-between gap-3 border-b border-border/60 py-3 text-sm last:border-b-0"
+        >
+          <dt className="text-muted-foreground">{r.label}</dt>
+          <dd className="font-medium text-foreground">{r.value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
 function ShippingInfo() {
+  const points = [
+    { icon: Truck, text: "ارسال به سراسر کشور با شرکت‌های حمل و نقل معتبر" },
+    { icon: RotateCcw, text: "۷ روز فرصت بازگشت کالا (با رعایت شرایط)" },
+    { icon: ShieldCheck, text: "ضمانت اصالت و سلامت کالا" },
+  ];
   return (
-    <div className="space-y-3 text-sm text-muted-foreground">
-      <p>سفارش‌های شما پس از تأیید نهایی، در کوتاه‌ترین زمان ممکن پردازش و ارسال می‌شوند.</p>
-      <ul className="space-y-2">
-        <li>• ارسال به سراسر کشور با شرکت‌های حمل و نقل معتبر</li>
-        <li>• ۷ روز فرصت بازگشت کالا (با رعایت شرایط)</li>
-        <li>• ضمانت اصالت و سلامت کالا</li>
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        سفارش‌های شما پس از تأیید نهایی، در کوتاه‌ترین زمان ممکن پردازش و ارسال می‌شوند.
+      </p>
+      <ul className="grid gap-2 sm:grid-cols-3">
+        {points.map((p, i) => (
+          <li key={i} className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-foreground">
+            <p.icon className="mt-0.5 size-4 shrink-0 text-primary" />
+            {p.text}
+          </li>
+        ))}
       </ul>
     </div>
   );

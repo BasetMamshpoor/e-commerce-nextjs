@@ -287,58 +287,44 @@
   box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 10px -3px rgba(0, 0, 0, 0.05);
 }
 
-/* ───────── Storefront signature system (footwear-retail motifs) ─────────
-   The store sells shoes, so the landing page's visual signature is drawn
-   from real shoe-retail artifacts — stitched welts and the little
-   notched price/size tags tied to a new pair — rather than generic
-   e-commerce chrome. Used sparingly (section dividers + section eyebrows
-   only), everything else stays quiet. */
+/* ───────── Storefront signature system ─────────
+   A generic, vertical-agnostic signature (the store isn't limited to any
+   one product category, so nothing here should read as tied to shoes,
+   clothing, or any specific vertical) — built from typography and layout
+   rhythm rather than a subject-specific motif: a large ghost index number
+   beside each section (an editorial-catalog device) and a short kicker
+   rule above each title. */
 
-/* A stitched seam: two short dashes + a gap, repeating — mimics a
-   saddle-stitched leather welt line. Used between major landing sections
-   instead of a plain margin gap. */
-.stitch-divider {
-  position: relative;
-  height: 1px;
-  margin-block: 2.5rem;
-  background-image: repeating-linear-gradient(
-    to left,
-    var(--border) 0,
-    var(--border) 6px,
-    transparent 6px,
-    transparent 12px
-  );
-}
-.stitch-divider::before,
-.stitch-divider::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  width: 5px;
-  height: 5px;
-  border-radius: 999px;
-  background: var(--primary);
-  transform: translateY(-50%);
-  opacity: 0.55;
-}
-.stitch-divider::before { right: -2px; }
-.stitch-divider::after { left: -2px; }
-
-/* A section eyebrow styled like a shoebox size tag — a small notched
-   label above each section's title. */
-.tag-eyebrow {
+/* Small kicker label above a section title — a short colored rule
+   followed by an uppercase-tracked word, like an editorial dateline. */
+.section-kicker {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding-inline: 0.6rem;
-  padding-block: 0.2rem;
-  font-size: 0.6875rem;
+  gap: 0.5rem;
+  font-size: 0.75rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   color: var(--primary);
-  background: var(--accent);
-  border: 1px dashed color-mix(in oklab, var(--primary) 45%, transparent);
+}
+.section-kicker::before {
+  content: "";
+  display: inline-block;
+  width: 1.25rem;
+  height: 2px;
+  background: var(--primary);
   border-radius: 999px;
+}
+
+/* Large ghost index number sitting beside a section header — purely a
+   structural/rhythm device (page 01, 02, 03...), not a product motif, so
+   it stays legible as "premium catalog" regardless of what's being sold. */
+.section-index {
+  font-size: 3.25rem;
+  line-height: 1;
+  font-weight: 800;
+  color: var(--foreground);
+  opacity: 0.06;
+  letter-spacing: -0.02em;
 }
 
 @media (prefers-reduced-motion: reduce) {

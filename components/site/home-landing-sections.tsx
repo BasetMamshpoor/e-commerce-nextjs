@@ -43,12 +43,9 @@ export function HomeLandingSections() {
 
   return (
     <>
-      {/* Feature strip — always shown. Icons sit in a "stamp" circle,
-          echoing the authenticity/quality stamp printed inside a shoebox
-          lid — reinforces the "ضمانت اصالت" promise visually, not just
-          in the copy. */}
+      {/* Feature strip — always shown */}
       <section
-        className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 animate-fade-in"
+        className="mb-10 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 animate-fade-in"
         aria-label="مزایای خرید"
       >
         <FeatureCard icon={<Truck className="size-5" />} title="ارسال سریع" desc="تحویل در کوتاه‌ترین زمان" color="text-blue-600 bg-blue-50 dark:bg-blue-950/30" />
@@ -57,18 +54,27 @@ export function HomeLandingSections() {
         <FeatureCard icon={<Headphones className="size-5" />} title="پشتیبانی ۲۴/۷" desc="همیشه در کنار شما" color="text-orange-600 bg-orange-50 dark:bg-orange-950/30" />
       </section>
 
-      {data.sections.map((section, idx) => (
-        <React.Fragment key={`${section.type}-${idx}`}>
-          <LandingSectionRenderer section={section} />
-          {/* Stitched-seam divider between sections — the page's one
-              recurring signature device, standing in for a plain margin
-              gap. Skipped after banners/stories/popups, which already
-              read as separate visual blocks on their own. */}
-          {!["banners", "popups", "stories"].includes(section.type) && (
-            <div className="stitch-divider" aria-hidden="true" />
-          )}
-        </React.Fragment>
-      ))}
+      {(() => {
+        // Running index for the ghost section numbers (01, 02, ...) — only
+        // counts sections that actually get a numbered header; banners/
+        // popups/stories render as their own visual blocks and don't
+        // participate in that rhythm. Computed as a pure reduce carrying
+        // an explicit counter (no mutable reassignment during render).
+        const { items: withIndex } = data.sections.reduce<{
+          items: { section: LandingSection; index?: number }[];
+          counter: number;
+        }>(
+          (acc, section) => {
+            const unnumbered = ["banners", "popups", "stories"].includes(section.type);
+            const counter = unnumbered ? acc.counter : acc.counter + 1;
+            return { items: [...acc.items, { section, index: unnumbered ? undefined : counter }], counter };
+          },
+          { items: [], counter: 0 },
+        );
+        return withIndex.map(({ section, index }, idx) => (
+          <LandingSectionRenderer key={`${section.type}-${idx}`} section={section} index={index} />
+        ));
+      })()}
 
       {/* Newsletter signup — frontend-only widget, not part of /landing sections */}
       <HomeNewsletterInline />
@@ -109,7 +115,7 @@ function HomeNewsletterInline() {
   return (
     <section className="mb-2 overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-l from-primary/10 to-transparent p-6">
       <div className="mx-auto max-w-xl text-center">
-        <span className="tag-eyebrow mb-2">{`عضو خانواده ${APP_NAME} شوید`}</span>
+        <span className="section-kicker mb-2 justify-center">{`عضو خانواده ${APP_NAME} شوید`}</span>
         <h2 className="text-lg font-extrabold tracking-tight text-foreground sm:text-xl">
           عضویت در خبرنامه
         </h2>
@@ -147,7 +153,7 @@ function HomeNewsletterInline() {
 }
 
 /* ───────── Section renderer ───────── */
-function LandingSectionRenderer({ section }: { section: LandingSection }) {
+function LandingSectionRenderer({ section, index }: { section: LandingSection; index?: number }) {
   const data = section.data;
   switch (section.type) {
     case "banners":
@@ -158,11 +164,12 @@ function LandingSectionRenderer({ section }: { section: LandingSection }) {
     case "stories":
       return <StoriesSection stories={asStories(data)} />;
     case "categories":
-      return <CategoriesSection categories={asCategories(data)} />;
+      return <CategoriesSection categories={asCategories(data)} index={index} />;
     case "featured_products":
       return (
         <ProductsSection
-          eyebrow="گزیده فروشگاه"
+          kicker="گزیده فروشگاه"
+          index={index}
           title={section.label ?? "محصولات ویژه"}
           products={asProducts(data)}
           href="/products?isFeatured=true"
@@ -171,7 +178,8 @@ function LandingSectionRenderer({ section }: { section: LandingSection }) {
     case "latest_products":
       return (
         <ProductsSection
-          eyebrow="تازه‌وارد"
+          kicker="تازه‌وارد"
+          index={index}
           title={section.label ?? "جدیدترین محصولات"}
           products={asProducts(data)}
           href="/products?sort=newest"
@@ -180,7 +188,8 @@ function LandingSectionRenderer({ section }: { section: LandingSection }) {
     case "top_rated_products":
       return (
         <ProductsSection
-          eyebrow="پرطرفدار"
+          kicker="پرطرفدار"
+          index={index}
           title={section.label ?? "محصولات پرامتیاز"}
           products={asProducts(data)}
           href="/products?sort=most_popular"
@@ -190,7 +199,8 @@ function LandingSectionRenderer({ section }: { section: LandingSection }) {
     case "flash_sales":
       return (
         <ProductsSection
-          eyebrow="زمان محدود"
+          kicker="زمان محدود"
+          index={index}
           title={section.label ?? "تخفیف‌های ویژه"}
           products={asProducts(data)}
           href="/products?hasDiscount=true"
@@ -198,9 +208,9 @@ function LandingSectionRenderer({ section }: { section: LandingSection }) {
         />
       );
     case "latest_blog_posts":
-      return <BlogSection posts={asBlogPosts(data)} />;
+      return <BlogSection posts={asBlogPosts(data)} index={index} />;
     case "popular_brands":
-      return <BrandsSection brands={asBrands(data)} />;
+      return <BrandsSection brands={asBrands(data)} index={index} />;
     default:
       return null;
   }
@@ -477,11 +487,11 @@ function StoriesSection({ stories }: { stories: Story[] }) {
   );
 }
 
-function CategoriesSection({ categories }: { categories: Category[] }) {
+function CategoriesSection({ categories, index }: { categories: Category[]; index?: number }) {
   if (!categories || categories.length === 0) return null;
   return (
-    <section className="mb-2" aria-label="دسته‌بندی‌ها">
-      <SectionHeader eyebrow="از کجا شروع کنیم" title="دسته‌بندی‌های محبوب" href="/categories" />
+    <section className={cn("mb-2 rounded-2xl p-4 sm:p-6", index != null && index % 2 === 0 && "bg-muted/40")} aria-label="دسته‌بندی‌ها">
+      <SectionHeader index={index} kicker="از کجا شروع کنیم" title="دسته‌بندی‌های محبوب" href="/categories" />
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
         {categories.slice(0, 12).map((cat) => (
           <Link
@@ -515,13 +525,15 @@ function CategoriesSection({ categories }: { categories: Category[] }) {
 }
 
 function ProductsSection({
-  eyebrow,
+  kicker,
+  index,
   title,
   products,
   href,
   icon,
 }: {
-  eyebrow?: string;
+  kicker?: string;
+  index?: number;
   title: string;
   products: Product[];
   href?: string;
@@ -529,9 +541,10 @@ function ProductsSection({
 }) {
   if (!products || products.length === 0) return null;
   return (
-    <section className="mb-2">
+    <section className={cn("mb-2 rounded-2xl p-4 sm:p-6", index != null && index % 2 === 0 && "bg-muted/40")}>
       <SectionHeader
-        eyebrow={eyebrow}
+        index={index}
+        kicker={kicker}
         title={
           <span className="flex items-center gap-2">
             {icon}
@@ -557,11 +570,11 @@ function ProductsSection({
   );
 }
 
-function BrandsSection({ brands }: { brands: Brand[] }) {
+function BrandsSection({ brands, index }: { brands: Brand[]; index?: number }) {
   if (!brands || brands.length === 0) return null;
   return (
-    <section className="mb-2">
-      <SectionHeader eyebrow="برندهای اصل" title="برندهای محبوب" href="/brands" />
+    <section className={cn("mb-2 rounded-2xl p-4 sm:p-6", index != null && index % 2 === 0 && "bg-muted/40")}>
+      <SectionHeader index={index} kicker="برندهای اصل" title="برندهای محبوب" href="/brands" />
       <div className="flex gap-3 overflow-x-auto pb-2">
         {brands.slice(0, 12).map((b) => (
           <Link
@@ -587,11 +600,11 @@ function BrandsSection({ brands }: { brands: Brand[] }) {
   );
 }
 
-function BlogSection({ posts }: { posts: BlogPost[] }) {
+function BlogSection({ posts, index }: { posts: BlogPost[]; index?: number }) {
   if (!posts || posts.length === 0) return null;
   return (
-    <section className="mb-2">
-      <SectionHeader eyebrow="مجله" title="آخرین مقالات" href="/blog" />
+    <section className={cn("mb-2 rounded-2xl p-4 sm:p-6", index != null && index % 2 === 0 && "bg-muted/40")}>
+      <SectionHeader index={index} kicker="مجله" title="آخرین مقالات" href="/blog" />
       <div className="grid gap-3 sm:grid-cols-3">
         {posts.slice(0, 3).map((p) => (
           <Link key={p.id} href={`/blog/${p.slug}`}>
@@ -668,7 +681,7 @@ function FeatureCard({
     <Card className="group border-border/40 card-hover">
       <CardContent className="flex items-center gap-3 p-4">
         <div
-          className={`flex size-10 shrink-0 items-center justify-center rounded-full border-2 border-dashed ${color} transition-transform group-hover:scale-110`}
+          className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${color} transition-transform group-hover:scale-110`}
         >
           {icon}
         </div>

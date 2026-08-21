@@ -5,28 +5,39 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { toPersianDigits } from "@/utils/format";
 
 /**
- * Reusable section header with an optional "tag" eyebrow (styled after a
- * shoebox size tag — a small notched label above the title), title, and
- * optional "view all" link.
+ * Reusable section header — an optional kicker label, an optional large
+ * ghost index number (e.g. "۰۱") as the page's recurring structural
+ * signature, a title, and an optional "view all" link.
  */
 export function SectionHeader({
   title,
-  eyebrow,
+  kicker,
+  index,
   href,
   ctaLabel = "مشاهده همه",
 }: {
   title: React.ReactNode;
-  eyebrow?: string;
+  kicker?: string;
+  /** Section order, rendered as a large ghost numeral (e.g. 1 -> "۰۱"). */
+  index?: number;
   href?: string;
   ctaLabel?: string;
 }) {
   return (
     <div className="mb-4 flex items-end justify-between gap-3">
-      <div className="min-w-0">
-        {eyebrow && <span className="tag-eyebrow mb-2">{eyebrow}</span>}
-        <h2 className="text-lg font-extrabold tracking-tight text-foreground sm:text-xl">{title}</h2>
+      <div className="flex min-w-0 items-end gap-3">
+        {index != null && (
+          <span className="section-index hidden nums-fa sm:inline" aria-hidden="true">
+            {toPersianDigits(String(index).padStart(2, "0"))}
+          </span>
+        )}
+        <div className="min-w-0">
+          {kicker && <span className="section-kicker mb-1.5">{kicker}</span>}
+          <h2 className="text-lg font-extrabold tracking-tight text-foreground sm:text-xl">{title}</h2>
+        </div>
       </div>
       {href && (
         <Button asChild variant="ghost" size="sm" className="shrink-0 text-primary">

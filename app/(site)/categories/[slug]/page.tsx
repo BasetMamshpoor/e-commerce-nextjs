@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { ChevronLeft, ChevronRight, PackageSearch } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -126,6 +127,30 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ slug:
           </Select>
         </div>
       </div>
+
+      {/* Subcategories — clicking a category should let you drill further
+          down before landing on a product list, not jump straight to
+          products. Each of these links to /categories/[child-slug], which
+          shows that category's own subcategories in turn (recursive
+          browsing via navigation, one level at a time). */}
+      {!catLoading && (category?.children?.length ?? 0) > 0 && (
+        <div className="mb-6 flex flex-wrap gap-2">
+          {category!.children!.map((child) => (
+            <Link
+              key={child.id}
+              href={`/categories/${child.slug}`}
+              className="flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm text-foreground transition-colors hover:border-primary/50 hover:bg-accent/50 hover:text-primary"
+            >
+              {child.imageUrl && (
+                <span className="relative size-5 overflow-hidden rounded-full bg-muted">
+                  <Image src={child.imageUrl} alt="" fill sizes="20px" className="object-cover" />
+                </span>
+              )}
+              {child.name}
+            </Link>
+          ))}
+        </div>
+      )}
 
       <div className="flex gap-6">
         <aside className="hidden w-64 shrink-0 lg:block">

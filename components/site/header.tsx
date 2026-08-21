@@ -153,7 +153,8 @@ export function Header() {
 
       {/* Category nav (desktop) */}
       <nav className="hidden border-t border-border/60 bg-card lg:block">
-        <div className="container-site flex h-11 items-center gap-4 text-sm">
+        <div className="container-site flex h-11 items-center gap-5 text-sm">
+          <CategoryLink href="/products">همه محصولات</CategoryLink>
           <CategoryNavMenu />
           <div className="mr-auto flex items-center gap-4">
             <CategoryLink href="/products?hasDiscount=true">تخفیف‌دارها</CategoryLink>

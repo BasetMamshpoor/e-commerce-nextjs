@@ -2,134 +2,107 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { ChevronDown, ChevronLeft } from "lucide-react";
 
-import {
-  NavigationMenu,
-  NavigationMenuContent,
-  NavigationMenuItem,
-  NavigationMenuLink,
-  NavigationMenuList,
-  NavigationMenuTrigger,
-  navigationMenuTriggerStyle,
-} from "@/components/ui/navigation-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCategoriesTree } from "@/features/catalog/hooks";
 import type { Category } from "@/types/domain";
 import { cn } from "@/lib/utils";
 
 /**
- * Mega-menu navigation showing the category tree.
- * Each top-level category opens a flyout listing its children (max 2 levels deep).
+ * Single "دسته‌بندی‌ها" trigger — hovering opens a cascading multi-column
+ * flyout (a column per level, populated on hover of the item above it),
+ * supporting an arbitrary category tree depth rather than the fixed
+ * 2-level flyout this replaced. Desktop only (rendered under `lg:block`
+ * by Header) — mobile reaches categories via the bottom nav bar instead,
+ * where hover isn't a meaningful interaction anyway.
  */
 export function CategoryNavMenu() {
   const { data: tree, isLoading } = useCategoriesTree();
+  const [open, setOpen] = React.useState(false);
+  const [activePath, setActivePath] = React.useState<Category[]>([]);
+  const closeTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const openMenu = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setOpen(true);
+  };
+  const scheduleClose = () => {
+    closeTimer.current = setTimeout(() => {
+      setOpen(false);
+      setActivePath([]);
+    }, 150);
+  };
+
+  React.useEffect(() => {
+    return () => {
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    };
+  }, []);
 
   if (isLoading) {
-    return (
-      <div className="hidden items-center gap-2 lg:flex">
-        <Skeleton className="h-4 w-20" />
-        <Skeleton className="h-4 w-24" />
-        <Skeleton className="h-4 w-20" />
-      </div>
-    );
+    return <Skeleton className="h-5 w-24" />;
   }
+  if (!tree || tree.length === 0) return null;
 
-  if (!tree || tree.length === 0) {
-    // No categories yet — show a single link to /products.
-    return (
-      <NavigationMenu className="hidden lg:flex">
-        <NavigationMenuList>
-          <NavigationMenuItem>
-            <Link href="/products" legacyBehavior passHref>
-              <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                همه محصولات
-              </NavigationMenuLink>
-            </Link>
-          </NavigationMenuItem>
-        </NavigationMenuList>
-      </NavigationMenu>
-    );
+  // One column for the root list, plus one more column per level of
+  // activePath whose category actually has children.
+  const columns: Category[][] = [tree];
+  for (const cat of activePath) {
+    if (cat.children && cat.children.length > 0) columns.push(cat.children);
+    else break;
   }
 
   return (
-    <NavigationMenu className="hidden lg:flex">
-      <NavigationMenuList>
-        <NavigationMenuItem>
-          <Link href="/products" legacyBehavior passHref>
-            <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-              همه محصولات
-            </NavigationMenuLink>
-          </Link>
-        </NavigationMenuItem>
-        {tree.slice(0, 6).map((cat) => (
-          <NavigationMenuItem key={cat.id}>
-            <CategoryMegaMenu category={cat} />
-          </NavigationMenuItem>
-        ))}
-      </NavigationMenuList>
-    </NavigationMenu>
-  );
-}
+    <div className="relative" onMouseEnter={openMenu} onMouseLeave={scheduleClose}>
+      <button
+        type="button"
+        className="flex items-center gap-1 py-3 text-sm font-medium text-foreground transition-colors hover:text-primary"
+        aria-expanded={open}
+        aria-haspopup="true"
+        onClick={() => setOpen((o) => !o)}
+      >
+        دسته‌بندی‌ها
+        <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
+      </button>
 
-function CategoryMegaMenu({ category }: { category: Category }) {
-  const children = category.children ?? [];
-
-  if (children.length === 0) {
-    return (
-      <Link href={`/categories/${category.slug}`} legacyBehavior passHref>
-        <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-          {category.name}
-        </NavigationMenuLink>
-      </Link>
-    );
-  }
-
-  return (
-    <>
-      <NavigationMenuTrigger className="text-sm">
-        <Link
-          href={`/categories/${category.slug}`}
-          className="text-foreground hover:text-primary"
+      {open && (
+        <div
+          className="absolute top-full right-0 z-50 flex overflow-hidden rounded-xl border border-border bg-card shadow-xl animate-fade-in"
+          onMouseEnter={openMenu}
         >
-          {category.name}
-        </Link>
-      </NavigationMenuTrigger>
-      <NavigationMenuContent>
-        <ul className="grid w-[400px] gap-1 p-2 md:w-[500px] md:grid-cols-2">
-          {children.map((child) => (
-            <li key={child.id}>
-              <MegaMenuLink category={child} />
-            </li>
+          {columns.map((items, colIndex) => (
+            <ul
+              key={colIndex}
+              className="max-h-96 w-56 overflow-y-auto border-e border-border/60 py-2 last:border-e-0"
+            >
+              {items.map((cat) => {
+                const isActive = activePath[colIndex]?.id === cat.id;
+                const hasChildren = (cat.children?.length ?? 0) > 0;
+                return (
+                  <li key={cat.id}>
+                    <Link
+                      href={`/categories/${cat.slug}`}
+                      onMouseEnter={() => setActivePath((prev) => [...prev.slice(0, colIndex), cat])}
+                      onClick={() => {
+                        setOpen(false);
+                        setActivePath([]);
+                      }}
+                      className={cn(
+                        "flex items-center justify-between gap-2 px-4 py-2 text-sm transition-colors",
+                        isActive ? "bg-accent text-primary" : "text-foreground hover:bg-accent/60",
+                      )}
+                    >
+                      {cat.name}
+                      {hasChildren && <ChevronLeft className="size-3.5 shrink-0 text-muted-foreground" />}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
           ))}
-        </ul>
-      </NavigationMenuContent>
-    </>
-  );
-}
-
-function MegaMenuLink({ category }: { category: Category }) {
-  const sub = category.children ?? [];
-  return (
-    <Link
-      href={`/categories/${category.slug}`}
-      className={cn(
-        "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors",
-        "hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+        </div>
       )}
-    >
-      <div className="flex items-center justify-between text-sm font-medium leading-none text-foreground">
-        {category.name}
-        {sub.length > 0 && (
-          <ChevronLeft className="size-3.5 text-muted-foreground" />
-        )}
-      </div>
-      {sub.length > 0 && (
-        <p className="line-clamp-1 text-xs leading-snug text-muted-foreground">
-          {sub.slice(0, 4).map((s) => s.name).join("، ")}
-          {sub.length > 4 ? ` و ${sub.length - 4} مورد دیگر` : ""}
-        </p>
-      )}
-    </Link>
+    </div>
   );
 }
