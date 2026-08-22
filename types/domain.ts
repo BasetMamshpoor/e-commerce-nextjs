@@ -321,6 +321,10 @@ export interface ProductVariant {
   isDefault: boolean;
   isActive: boolean;
   finalPrice?: number;
+  /** Price before any active product-level discount (still after
+   *  variant/attribute modifiers) — use as the "compare at" /
+   *  strikethrough price. Equals finalPrice when no discount is active. */
+  originalPrice?: number;
   /** Variant attribute values with optional per-variant price modifiers. */
   attributeValues: VariantAttributeValue[];
   /** Legacy field — kept for backward compat with older API responses. */

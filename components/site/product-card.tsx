@@ -48,7 +48,17 @@ export function ProductCard({
   const hasDiscount = product.hasActiveDiscount;
   const isOutOfStock = !product.isInStock;
 
-  const compareAtPrice = hasDiscount && maxPrice > minPrice ? maxPrice : null;
+  // NOTE: minPrice/maxPrice are the range of FINAL (post-discount,
+  // post-variant-modifier) prices across variants — they answer "do
+  // variants differ in price from each other", which is unrelated to
+  // whether a discount is active. Comparing them (maxPrice > minPrice)
+  // to decide whether to show a "was" price meant the discount badge/
+  // strikethrough never appeared for the very common case of a single
+  // variant or uniformly-priced variants, since minPrice === maxPrice
+  // there regardless of any active discount. hasActiveDiscount is the
+  // actual authoritative flag; basePrice is the real pre-discount
+  // reference price.
+  const compareAtPrice = hasDiscount && product.basePrice > minPrice ? product.basePrice : null;
   const discountPct = compareAtPrice
     ? discountPercent(compareAtPrice, minPrice)
     : 0;

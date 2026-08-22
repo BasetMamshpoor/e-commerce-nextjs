@@ -489,38 +489,113 @@ function StoriesSection({ stories }: { stories: Story[] }) {
 
 function CategoriesSection({ categories, index }: { categories: Category[]; index?: number }) {
   if (!categories || categories.length === 0) return null;
+  const items = categories.slice(0, 9);
+  const [featured, ...rest] = items;
+
   return (
     <section className={cn("mb-2 rounded-2xl p-4 sm:p-6", index != null && index % 2 === 0 && "bg-muted/40")} aria-label="دسته‌بندی‌ها">
       <SectionHeader index={index} kicker="از کجا شروع کنیم" title="دسته‌بندی‌های محبوب" href="/categories" />
-      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-        {categories.slice(0, 12).map((cat) => (
+
+      {/* Mobile: compact circular-icon grid — a bento layout doesn't have
+          enough room to read well at this size, and this pattern is a
+          proven, thumb-friendly standard for category browsing. */}
+      <div className="grid grid-cols-3 gap-3 sm:hidden">
+        {items.map((cat) => (
+          <CategoryIconTile key={cat.id} category={cat} />
+        ))}
+      </div>
+
+      {/* sm+: bento layout — one larger featured tile (name-on-image, or a
+          tinted card if the category has no image) plus uniform smaller
+          tiles, instead of a flat uniform grid. Works for any product
+          category since the "feature" is just whichever category the
+          admin ordered first, not a product-specific motif. */}
+      <div className="hidden grid-cols-4 gap-3 sm:grid sm:auto-rows-[7.5rem] lg:grid-cols-6">
+        {featured && (
+          <Link
+            href={`/categories/${featured.slug}`}
+            className="group relative col-span-2 row-span-2 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm transition-all hover:scale-[1.02] hover:shadow-lg"
+          >
+            {featured.imageUrl ? (
+              <>
+                <Image
+                  src={featured.imageUrl}
+                  alt={featured.name}
+                  fill
+                  sizes="320px"
+                  className="object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                <span className="absolute bottom-3 right-3 text-base font-extrabold text-white sm:text-lg">
+                  {featured.name}
+                </span>
+              </>
+            ) : (
+              <div className="flex size-full flex-col items-center justify-center gap-2 bg-primary/5 p-4 text-center">
+                <span className="text-xl font-extrabold text-primary">{featured.name.slice(0, 2)}</span>
+                <span className="text-base font-extrabold text-foreground">{featured.name}</span>
+              </div>
+            )}
+          </Link>
+        )}
+        {rest.map((cat) => (
           <Link
             key={cat.id}
             href={`/categories/${cat.slug}`}
-            className="group flex flex-col items-center gap-2 rounded-xl border border-border/60 bg-card p-3 text-center transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+            className="group relative overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm transition-all hover:scale-[1.02] hover:shadow-lg"
           >
-            <div className="relative size-16 overflow-hidden rounded-full bg-muted ring-1 ring-border/60 transition-shadow group-hover:ring-primary/40 sm:size-20">
-              {cat.imageUrl ? (
+            {cat.imageUrl ? (
+              <>
                 <Image
                   src={cat.imageUrl}
                   alt={cat.name}
                   fill
-                  sizes="80px"
-                  className="object-cover transition-transform group-hover:scale-105"
+                  sizes="160px"
+                  className="object-cover transition-transform duration-300 group-hover:scale-105"
                 />
-              ) : (
-                <div className="flex size-full items-center justify-center text-muted-foreground text-xs">
-                  {cat.name.slice(0, 2)}
-                </div>
-              )}
-            </div>
-            <span className="line-clamp-1 text-xs font-medium text-foreground sm:text-sm">
-              {cat.name}
-            </span>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                <span className="absolute bottom-2 right-2 line-clamp-1 text-xs font-bold text-white">
+                  {cat.name}
+                </span>
+              </>
+            ) : (
+              <div className="flex size-full flex-col items-center justify-center gap-1 bg-muted/60 p-2 text-center">
+                <span className="text-sm font-bold text-muted-foreground">{cat.name.slice(0, 2)}</span>
+                <span className="line-clamp-1 text-xs font-medium text-foreground">{cat.name}</span>
+              </div>
+            )}
           </Link>
         ))}
       </div>
     </section>
+  );
+}
+
+function CategoryIconTile({ category }: { category: Category }) {
+  return (
+    <Link
+      href={`/categories/${category.slug}`}
+      className="group flex flex-col items-center gap-2 rounded-xl border border-border/60 bg-card p-3 text-center transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+    >
+      <div className="relative size-16 overflow-hidden rounded-full bg-muted ring-1 ring-border/60 transition-shadow group-hover:ring-primary/40">
+        {category.imageUrl ? (
+          <Image
+            src={category.imageUrl}
+            alt={category.name}
+            fill
+            sizes="64px"
+            className="object-cover transition-transform group-hover:scale-105"
+          />
+        ) : (
+          <div className="flex size-full items-center justify-center text-muted-foreground text-xs">
+            {category.name.slice(0, 2)}
+          </div>
+        )}
+      </div>
+      <span className="line-clamp-1 text-xs font-medium text-foreground">
+        {category.name}
+      </span>
+    </Link>
   );
 }
 

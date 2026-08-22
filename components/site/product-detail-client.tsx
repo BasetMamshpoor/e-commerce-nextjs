@@ -19,7 +19,6 @@ import {
   ChevronRight,
   ChevronLeft as ChevronLeftIcon,
   Check,
-  Trash2,
   Sparkles,
   FileText,
   ListChecks,
@@ -46,7 +45,7 @@ import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
 import { useProducts } from "@/features/catalog/hooks/use-products";
-import { useAddToCart } from "@/features/cart/hooks";
+import { AddToCartButton } from "@/components/site/add-to-cart-button";
 import { useCart } from "@/features/cart/hooks";
 import { useWishlistToggle } from "@/features/wishlist/hooks";
 import { useComparisonToggle } from "@/features/comparison/hooks";
@@ -349,7 +348,6 @@ function ProductInfo({
   onSelectVariant: (v: ProductVariant) => void;
 }) {
   const [quantity, setQuantity] = React.useState(1);
-  const addToCart = useAddToCart();
   const { data: cart } = useCart();
   const wishlistToggle = useWishlistToggle();
   const comparisonToggle = useComparisonToggle();
@@ -376,7 +374,16 @@ function ProductInfo({
   const baseAmount = isCurrencyBased
     ? (product.currentPriceIRT ?? 0)
     : (product.basePrice ?? 0);
-  const originalPrice = baseAmount + (selectedVariant?.priceAdjustment ?? 0);
+  // originalPrice/finalPrice now come straight from the backend
+  // (attachVariantPrices in product.service.ts, via the same
+  // pricingEngine used by cart/checkout) — includes attribute-value
+  // modifiers AND the product's discount correctly, unlike the previous
+  // "baseAmount + priceAdjustment" approximation here, which ignored
+  // percentage/fixed attribute modifiers entirely and (before the
+  // backend fix) never reflected the discount either, so the "hasDiscount"
+  // check below was comparing two equal, always-pre-discount numbers and
+  // could never be true.
+  const originalPrice = selectedVariant?.originalPrice ?? (baseAmount + (selectedVariant?.priceAdjustment ?? 0));
   const currentPrice = selectedVariant?.finalPrice ?? originalPrice;
   const hasDiscount = originalPrice > currentPrice;
   const discountPct = hasDiscount ? discountPercent(originalPrice, currentPrice) : 0;
@@ -566,27 +573,30 @@ function ProductInfo({
         </div>
         {!isOutOfStock && (
           <div className="flex items-center gap-2">
-            <div className="flex items-center rounded-lg border border-border">
-              <Button variant="ghost" size="icon" className="size-9 rounded-l-none" onClick={() => setQuantity((q) => Math.max(1, q - 1))} disabled={quantity <= 1}>
-                <Minus className="size-3" />
-              </Button>
-              <span className="w-10 text-center text-sm font-medium nums-fa">{toPersianDigits(quantity)}</span>
-              <Button variant="ghost" size="icon" className="size-9 rounded-r-none" onClick={() => setQuantity((q) => Math.min(maxQty, q + 1))} disabled={quantity >= maxQty}>
-                <Plus className="size-3" />
-              </Button>
-            </div>
-            {inCartQty === 0 ? (
-              <Button onClick={() => addToCart.mutate({ variantId: selectedVariant!.id, quantity })} disabled={addToCart.isPending} size="lg" className="flex-1 shadow-sm">
-                {addToCart.isPending ? <Skeleton className="size-5 rounded" /> : <><ShoppingCart className="size-4" /> افزودن به سبد</>}
-              </Button>
-            ) : (
-              <Button asChild size="lg" variant="outline" className="shadow-sm">
-                <Link href="/cart">
-                  {inCartQty === 1 ? <Trash2 className="size-4 text-destructive" /> : <span className="flex size-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground nums-fa">{toPersianDigits(inCartQty)}</span>}
-                  در سبد خرید
-                </Link>
-              </Button>
+            {/* Quantity-to-add selector — only relevant before the item is
+                in the cart. Once it is, AddToCartButton below becomes the
+                same +/- stepper that edits the cart quantity directly, so
+                having two separate quantity controls at once would be
+                redundant and confusing. */}
+            {inCartQty === 0 && (
+              <div className="flex items-center rounded-lg border border-border">
+                <Button variant="ghost" size="icon" className="size-9 rounded-l-none" onClick={() => setQuantity((q) => Math.max(1, q - 1))} disabled={quantity <= 1}>
+                  <Minus className="size-3" />
+                </Button>
+                <span className="w-10 text-center text-sm font-medium nums-fa">{toPersianDigits(quantity)}</span>
+                <Button variant="ghost" size="icon" className="size-9 rounded-r-none" onClick={() => setQuantity((q) => Math.min(maxQty, q + 1))} disabled={quantity >= maxQty}>
+                  <Plus className="size-3" />
+                </Button>
+              </div>
             )}
+            <AddToCartButton
+              variantId={selectedVariant!.id}
+              quantity={quantity}
+              maxQuantity={maxQty}
+              size="lg"
+              fullWidth={inCartQty > 0}
+              className="flex-1 shadow-sm"
+            />
           </div>
         )}
       </div>
