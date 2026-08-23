@@ -70,8 +70,8 @@ export default function AdminDashboardPage() {
         setSales(sl);
         setStatusBreakdown(sb);
         setTopProducts(tp);
-        const items = (ro as any).items ?? ro;
-        setRecentOrders(Array.isArray(items) ? items : []);
+        const items = ro.items ?? [];
+        setRecentOrders(items);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -88,7 +88,6 @@ export default function AdminDashboardPage() {
           title="درآمد کل"
           value={overview ? formatToman(overview.totalRevenue) : "—"}
           icon={<DollarSign className="size-5" />}
-          trend="total"
           color="text-green-600"
           bgColor="bg-green-50 dark:bg-green-950/30"
         />
@@ -96,7 +95,6 @@ export default function AdminDashboardPage() {
           title="سفارش‌ها"
           value={overview ? toPersianDigits(overview.totalOrders) : "—"}
           icon={<ShoppingCart className="size-5" />}
-          trend="total"
           color="text-blue-600"
           bgColor="bg-blue-50 dark:bg-blue-950/30"
         />
@@ -104,7 +102,6 @@ export default function AdminDashboardPage() {
           title="کاربران"
           value={overview ? toPersianDigits(overview.totalUsers) : "—"}
           icon={<Users className="size-5" />}
-          trend="total"
           color="text-purple-600"
           bgColor="bg-purple-50 dark:bg-purple-950/30"
         />
@@ -112,14 +109,13 @@ export default function AdminDashboardPage() {
           title="محصولات"
           value={overview ? toPersianDigits(overview.totalProducts) : "—"}
           icon={<Package className="size-5" />}
-          trend="total"
           color="text-orange-600"
           bgColor="bg-orange-50 dark:bg-orange-950/30"
         />
       </div>
 
       {/* Today's stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="flex items-center gap-4 p-4">
             <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -129,6 +125,19 @@ export default function AdminDashboardPage() {
               <p className="text-xs text-muted-foreground">درآمد امروز</p>
               <p className="text-xl font-bold text-foreground nums-fa">
                 {overview ? formatToman(overview.todayRevenue) : "—"}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-blue-500/20 bg-blue-500/5">
+          <CardContent className="flex items-center gap-4 p-4">
+            <div className="flex size-12 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600">
+              <ShoppingCart className="size-6" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">سفارش‌های امروز</p>
+              <p className="text-xl font-bold text-foreground nums-fa">
+                {overview ? toPersianDigits(overview.todayOrders) : "—"}
               </p>
             </div>
           </CardContent>
@@ -314,30 +323,20 @@ function KpiCard({
   title,
   value,
   icon,
-  trend,
   color,
   bgColor,
 }: {
   title: string;
   value: string;
   icon: React.ReactNode;
-  trend: "up" | "down" | "total";
   color: string;
   bgColor: string;
 }) {
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <div className={cn("flex size-10 items-center justify-center rounded-lg", bgColor, color)}>
-            {icon}
-          </div>
-          {trend === "up" && (
-            <Badge className="gap-1 bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400">
-              <TrendingUp className="size-3" />
-              +
-            </Badge>
-          )}
+        <div className={cn("flex size-10 items-center justify-center rounded-lg", bgColor, color)}>
+          {icon}
         </div>
         <p className="mt-3 text-xs text-muted-foreground">{title}</p>
         <p className="mt-1 text-xl font-bold text-foreground">{value}</p>
