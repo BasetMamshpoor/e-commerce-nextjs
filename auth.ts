@@ -228,7 +228,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const isLoggedIn = !!auth?.user;
       const { pathname } = request.nextUrl;
 
-      if (pathname.startsWith("/admin")) return isLoggedIn;
+      if (pathname.startsWith("/admin")) {
+        // Role check belongs here too, not just in AuthGuard client-side —
+        // without it, a logged-in customer hitting /admin gets past the
+        // edge middleware and the admin shell/layout can mount (and its
+        // data fetches can fire) before AuthGuard's effect redirects them
+        // away a moment later.
+        const role = (auth?.user as { role?: string } | undefined)?.role;
+        return isLoggedIn && (role === "ADMIN" || role === "EDITOR" || role === "SUPPORT");
+      }
       if (pathname.startsWith("/account")) return isLoggedIn;
       if (pathname.startsWith("/checkout")) return isLoggedIn;
 

@@ -100,27 +100,40 @@ export function GuestOnly({
 }) {
   const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
+  // Only redirect based on the FIRST auth state this component sees once
+  // loading resolves — i.e. "arrived at /login already logged in" (typed
+  // the URL, clicked a stale bookmark, etc). A login/register submission
+  // on this same page already does its own explicit, immediate redirect
+  // (use-login.ts fetches a guaranteed-fresh session and pushes right
+  // away). Without this guard, that redirect races against this effect
+  // reacting to isAuthenticated flipping true a moment later — and this
+  // effect can lose that race using a user object whose role hasn't
+  // finished hydrating yet, sending e.g. an admin to /account instead of
+  // /admin. Guarding to "first resolved state only" makes this effect
+  // fire at most once per mount, for the direct-navigation case only.
+  const hasHandledInitialAuth = React.useRef(false);
 
   React.useEffect(() => {
-    if (isLoading) return;
-    if (isAuthenticated) {
-      // Read redirect param directly from URL (avoids useSearchParams Suspense requirement).
-      const params = new URLSearchParams(window.location.search);
-      const redirect = params.get("redirect");
+    if (isLoading || hasHandledInitialAuth.current) return;
+    hasHandledInitialAuth.current = true;
+    if (!isAuthenticated) return;
 
-      if (redirect && redirect.startsWith("/") && !redirect.startsWith("/login")) {
-        router.replace(redirect);
-        return;
-      }
+    // Read redirect param directly from URL (avoids useSearchParams Suspense requirement).
+    const params = new URLSearchParams(window.location.search);
+    const redirect = params.get("redirect");
 
-      // Role-based redirect: staff → /admin, customer → /account.
-      if (redirectTo) {
-        router.replace(redirectTo);
-        return;
-      }
-      const isStaff = user?.role === "ADMIN" || user?.role === "EDITOR" || user?.role === "SUPPORT";
-      router.replace(isStaff ? "/admin" : "/account");
+    if (redirect && redirect.startsWith("/") && !redirect.startsWith("/login")) {
+      router.replace(redirect);
+      return;
     }
+
+    // Role-based redirect: staff → /admin, customer → /account.
+    if (redirectTo) {
+      router.replace(redirectTo);
+      return;
+    }
+    const isStaff = user?.role === "ADMIN" || user?.role === "EDITOR" || user?.role === "SUPPORT";
+    router.replace(isStaff ? "/admin" : "/account");
   }, [isAuthenticated, isLoading, user, router, redirectTo]);
 
   if (isLoading || isAuthenticated) {
