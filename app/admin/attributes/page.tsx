@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Settings, Trash2, X } from "lucide-react";
+import { Plus, Settings, Trash2, X, Pencil, Check } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ export default function AdminAttributesPage() {
   const [attributes, setAttributes] = React.useState<Attribute[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [editingAttr, setEditingAttr] = React.useState<Attribute | null>(null);
 
   const load = React.useCallback(() => {
     setLoading(true);
@@ -47,8 +48,9 @@ export default function AdminAttributesPage() {
       await attributesService.delete(id);
       toast.success("ویژگی حذف شد");
       load();
-    } catch {
-      toast.error("حذف ناموفق — در تنوع محصول استفاده شده");
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "حذف ناموفق — در تنوع محصول استفاده شده");
     }
   };
 
@@ -57,8 +59,9 @@ export default function AdminAttributesPage() {
       await attributesService.deleteValue(valueId);
       toast.success("مقدار حذف شد");
       load();
-    } catch {
-      toast.error("حذف ناموفق");
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "حذف ناموفق — این مقدار در تنوع محصولی استفاده شده است");
     }
   };
 
@@ -69,7 +72,7 @@ export default function AdminAttributesPage() {
           <h1 className="text-xl font-bold text-foreground sm:text-2xl">ویژگی‌ها</h1>
           <p className="mt-1 text-sm text-muted-foreground">مدیریت ویژگی‌های محصولات (رنگ، سایز، جنس و...)</p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
+        <Button onClick={() => { setEditingAttr(null); setDialogOpen(true); }}>
           <Plus className="size-4" />
           ویژگی جدید
         </Button>
@@ -90,14 +93,24 @@ export default function AdminAttributesPage() {
                   <Settings className="size-4 text-primary" />
                   {attr.name}
                 </CardTitle>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7 text-muted-foreground hover:text-destructive"
-                  onClick={() => handleDelete(attr.id)}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
+                <div className="flex items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 text-muted-foreground hover:text-primary"
+                    onClick={() => { setEditingAttr(attr); setDialogOpen(true); }}
+                  >
+                    <Pencil className="size-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 text-muted-foreground hover:text-destructive"
+                    onClick={() => handleDelete(attr.id)}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="flex flex-wrap gap-1">
@@ -107,30 +120,13 @@ export default function AdminAttributesPage() {
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {attr.values.map((v) => (
-                    <span
+                    <ValueBadge
                       key={v.id}
-                      className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs"
-                      title={v.order ? `ترتیب: ${v.order}` : undefined}
-                    >
-                      {attr.inputType === "COLOR" && v.colorHex && (
-                        <span
-                          className="size-2.5 rounded-full border border-border"
-                          style={{ backgroundColor: v.colorHex }}
-                        />
-                      )}
-                      {v.value}
-                      {v.order ? (
-                        <span className="text-[10px] text-muted-foreground nums-fa">
-                          ({v.order})
-                        </span>
-                      ) : null}
-                      <button
-                        onClick={() => handleDeleteValue(attr.id, v.id)}
-                        className="text-muted-foreground hover:text-destructive"
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </span>
+                      value={v}
+                      isColor={attr.inputType === "COLOR"}
+                      onSaved={load}
+                      onDelete={() => handleDeleteValue(attr.id, v.id)}
+                    />
                   ))}
                 </div>
                 <AddValueForm attributeId={attr.id} inputType={attr.inputType} onAdded={load} />
@@ -143,9 +139,116 @@ export default function AdminAttributesPage() {
       <AttributeFormDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
+        attribute={editingAttr}
         onSaved={load}
       />
     </div>
+  );
+}
+
+function ValueBadge({
+  value,
+  isColor,
+  onSaved,
+  onDelete,
+}: {
+  value: Attribute["values"][number];
+  isColor: boolean;
+  onSaved: () => void;
+  onDelete: () => void;
+}) {
+  const [editing, setEditing] = React.useState(false);
+  const [text, setText] = React.useState(value.value);
+  const [colorHex, setColorHex] = React.useState(value.colorHex ?? "#000000");
+  const [order, setOrder] = React.useState(String(value.order ?? 0));
+  const [saving, setSaving] = React.useState(false);
+
+  const startEdit = () => {
+    setText(value.value);
+    setColorHex(value.colorHex ?? "#000000");
+    setOrder(String(value.order ?? 0));
+    setEditing(true);
+  };
+
+  const save = async () => {
+    if (!text.trim()) return;
+    setSaving(true);
+    try {
+      await attributesService.updateValue(value.id, {
+        value: text.trim(),
+        colorHex: isColor ? colorHex : undefined,
+        order: order ? Number(order) : 0,
+      });
+      setEditing(false);
+      onSaved();
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "ذخیره ناموفق بود");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md border border-primary/40 bg-background px-1.5 py-0.5">
+        {isColor && (
+          <input
+            type="color"
+            value={colorHex}
+            onChange={(e) => setColorHex(e.target.value)}
+            className="size-5 shrink-0 cursor-pointer rounded border border-border p-0"
+          />
+        )}
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && save()}
+          className="h-6 w-20 rounded border border-border bg-background px-1 text-xs"
+          autoFocus
+        />
+        <input
+          type="number"
+          value={order}
+          onChange={(e) => setOrder(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && save()}
+          title="ترتیب"
+          className="h-6 w-10 rounded border border-border bg-background px-1 text-[10px] nums-fa"
+          dir="ltr"
+        />
+        <button onClick={save} disabled={saving} className="text-primary hover:text-primary/80">
+          <Check className="size-3.5" />
+        </button>
+        <button onClick={() => setEditing(false)} className="text-muted-foreground hover:text-foreground">
+          <X className="size-3.5" />
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs"
+      title={value.order ? `ترتیب: ${value.order}` : undefined}
+    >
+      {isColor && value.colorHex && (
+        <span
+          className="size-2.5 rounded-full border border-border"
+          style={{ backgroundColor: value.colorHex }}
+        />
+      )}
+      <button onClick={startEdit} className="hover:underline">
+        {value.value}
+      </button>
+      {value.order ? (
+        <span className="text-[10px] text-muted-foreground nums-fa">
+          ({value.order})
+        </span>
+      ) : null}
+      <button onClick={onDelete} className="text-muted-foreground hover:text-destructive">
+        <X className="size-3" />
+      </button>
+    </span>
   );
 }
 
@@ -251,10 +354,12 @@ function AddValueForm({
 function AttributeFormDialog({
   open,
   onOpenChange,
+  attribute,
   onSaved,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  attribute: Attribute | null;
   onSaved: () => void;
 }) {
   const [name, setName] = React.useState("");
@@ -265,12 +370,12 @@ function AttributeFormDialog({
 
   React.useEffect(() => {
     if (open) {
-      setName("");
-      setInputType("SELECT");
-      setIsFilterable(true);
-      setIsVariant(false);
+      setName(attribute?.name ?? "");
+      setInputType(attribute?.inputType ?? "SELECT");
+      setIsFilterable(attribute?.isFilterable ?? true);
+      setIsVariant(attribute?.isVariant ?? false);
     }
-  }, [open]);
+  }, [open, attribute]);
 
   const onSubmit = async () => {
     if (!name.trim()) {
@@ -279,12 +384,18 @@ function AttributeFormDialog({
     }
     setSaving(true);
     try {
-      await attributesService.create({ name, inputType, isFilterable, isVariant });
-      toast.success("ویژگی ایجاد شد");
+      if (attribute) {
+        await attributesService.update(attribute.id, { name, inputType, isFilterable, isVariant });
+        toast.success("ویژگی به‌روزرسانی شد");
+      } else {
+        await attributesService.create({ name, inputType, isFilterable, isVariant });
+        toast.success("ویژگی ایجاد شد");
+      }
       onOpenChange(false);
       onSaved();
-    } catch {
-      toast.error("ذخیره ناموفق بود");
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "ذخیره ناموفق بود");
     } finally {
       setSaving(false);
     }
@@ -294,7 +405,7 @@ function AttributeFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>ویژگی جدید</DialogTitle>
+          <DialogTitle>{attribute ? "ویرایش ویژگی" : "ویژگی جدید"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">

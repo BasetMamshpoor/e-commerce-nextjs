@@ -56,8 +56,9 @@ export default function AdminBrandsPage() {
       await brandsService.delete(id);
       toast.success("برند حذف شد");
       load();
-    } catch {
-      toast.error("حذف ناموفق — دارای محصول است");
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "حذف ناموفق بود");
     }
   };
 

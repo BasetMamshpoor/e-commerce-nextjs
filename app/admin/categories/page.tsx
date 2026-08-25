@@ -282,17 +282,28 @@ function CategoryFormDialog({
     }
   };
 
-  // Flatten categories for parent select.
+  // Flatten categories for parent select — excluding the category being
+  // edited AND all of its descendants. Without excluding descendants, an
+  // admin editing "Electronics" (which has child "Phones") could select
+  // "Phones" as Electronics' own parent, creating a circular reference in
+  // the tree (Electronics' parent -> Phones -> Electronics).
   const flatCats = React.useMemo(() => {
+    const excludedIds = new Set<number>();
+    const collectDescendants = (cat: Category) => {
+      excludedIds.add(cat.id);
+      cat.children?.forEach(collectDescendants);
+    };
+    if (category) collectDescendants(category);
+
     const result: Category[] = [];
     const walk = (cats: Category[]) => {
       for (const c of cats) {
-        result.push(c);
+        if (!excludedIds.has(c.id)) result.push(c);
         if (c.children) walk(c.children);
       }
     };
     walk(allCategories);
-    return result.filter((c) => c.id !== category?.id);
+    return result;
   }, [allCategories, category]);
 
   return (
