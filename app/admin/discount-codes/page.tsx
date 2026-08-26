@@ -23,8 +23,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AdminTable } from "@/features/admin/components/admin-table";
-import { discountCodesService } from "@/services";
-import type { DiscountCode, DiscountType, PaginatedData } from "@/types/domain";
+import { CategoryTreeSelect } from "@/components/common/category-tree-select";
+import { discountCodesService, categoriesService } from "@/services";
+import type { DiscountCode, DiscountType, PaginatedData, Category } from "@/types/domain";
 import { formatPrice, toPersianDigits, formatDateTimeFa } from "@/utils/format";
 
 export default function AdminDiscountCodesPage() {
@@ -185,7 +186,11 @@ function DiscountFormDialog({
     maxUsage: "",
     maxUsagePerUser: "1",
     isActive: true,
+    startsAt: "",
+    expiresAt: "",
+    categoryIds: [] as number[],
   });
+  const [categoryTree, setCategoryTree] = React.useState<Category[]>([]);
   const [saving, setSaving] = React.useState(false);
 
   React.useEffect(() => {
@@ -199,13 +204,23 @@ function DiscountFormDialog({
         maxUsage: discount?.maxUsage?.toString() ?? "",
         maxUsagePerUser: discount?.maxUsagePerUser?.toString() ?? "1",
         isActive: discount?.isActive ?? true,
+        // datetime-local inputs need "YYYY-MM-DDTHH:mm" — trim the
+        // seconds/timezone off the ISO string the backend returns.
+        startsAt: discount?.startsAt ? discount.startsAt.slice(0, 16) : "",
+        expiresAt: discount?.expiresAt ? discount.expiresAt.slice(0, 16) : "",
+        categoryIds: discount?.categoryIds ?? [],
       });
+      categoriesService.tree().then(setCategoryTree).catch(() => {});
     }
   }, [open, discount]);
 
   const onSubmit = async () => {
     if (!form.code.trim()) {
       toast.error("کد الزامی است");
+      return;
+    }
+    if (form.startsAt && form.expiresAt && form.expiresAt <= form.startsAt) {
+      toast.error("تاریخ انقضا باید بعد از تاریخ شروع باشد");
       return;
     }
     setSaving(true);
@@ -219,6 +234,9 @@ function DiscountFormDialog({
         maxUsage: form.maxUsage ? Number(form.maxUsage) : undefined,
         maxUsagePerUser: form.maxUsagePerUser ? Number(form.maxUsagePerUser) : undefined,
         isActive: form.isActive,
+        startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : undefined,
+        expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : undefined,
+        categoryIds: form.categoryIds,
       };
       if (discount) {
         await discountCodesService.update(discount.id, body);
@@ -229,8 +247,9 @@ function DiscountFormDialog({
       }
       onOpenChange(false);
       onSaved();
-    } catch {
-      toast.error("ذخیره ناموفق بود");
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "ذخیره ناموفق بود");
     } finally {
       setSaving(false);
     }
@@ -310,6 +329,37 @@ function DiscountFormDialog({
                 onChange={(e) => setForm({ ...form, maxUsagePerUser: e.target.value })}
               />
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>تاریخ شروع</Label>
+              <Input
+                type="datetime-local"
+                value={form.startsAt}
+                onChange={(e) => setForm({ ...form, startsAt: e.target.value })}
+                dir="ltr"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>تاریخ انقضا</Label>
+              <Input
+                type="datetime-local"
+                value={form.expiresAt}
+                onChange={(e) => setForm({ ...form, expiresAt: e.target.value })}
+                dir="ltr"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>
+              محدود به دسته‌بندی‌های خاص
+              <span className="mr-1 text-xs text-muted-foreground">(خالی = همه‌ی محصولات)</span>
+            </Label>
+            <CategoryTreeSelect
+              categories={categoryTree}
+              selectedIds={form.categoryIds}
+              onChange={(ids) => setForm({ ...form, categoryIds: ids })}
+            />
           </div>
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} className="size-4 rounded" />

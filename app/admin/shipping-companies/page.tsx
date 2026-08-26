@@ -41,7 +41,7 @@ export default function AdminShippingCompaniesPage() {
     if (!deleteId) return;
     setDeleting(true);
     try { await shippingCompaniesService.delete(deleteId); toast.success("حذف شد"); setDeleteId(null); load(); }
-    catch { toast.error("حذف ناموفق — در سفارش استفاده شده"); }
+    catch (e: unknown) { const apiErr = e as { message?: string }; toast.error(apiErr?.message ?? "حذف ناموفق بود"); }
     finally { setDeleting(false); }
   };
 
@@ -312,8 +312,9 @@ function ShippingFormDialog({
       }
       onOpenChange(false);
       onSaved();
-    } catch {
-      toast.error("ذخیره ناموفق بود");
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "ذخیره ناموفق بود");
     } finally {
       setSaving(false);
     }
