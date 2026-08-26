@@ -86,24 +86,31 @@ export default function AdminProductNewPage() {
   const [images, setImages] = React.useState<ProductImageItem[]>([]);
   const [displayAttrs, setDisplayAttrs] = React.useState<DisplayAttributeFormData[]>([]);
 
-  // Initial load: brands + category tree + ALL attributes
-  // Per api.md: attributes are global, filtered by type (isVariant, isDisplay) —
-  // NOT filtered by product's categories.
+  // Initial load: brands + category tree + currencies. Attributes load
+  // separately (see below) since they now depend on form.categoryIds.
   React.useEffect(() => {
     Promise.all([
       brandsService.list({ includeInactive: true }),
       categoriesService.tree(),
-      attributesService.list(),
       currenciesService.adminList(),
     ])
-      .then(([b, c, a, cur]) => {
+      .then(([b, c, cur]) => {
         setBrands(b);
         setCategoryTree(c);
-        setAttributes(a);
         setCurrencies(cur);
       })
       .finally(() => setLoading(false));
   }, []);
+
+  // Refetch attributes whenever the product's selected categories change —
+  // scoped to what's actually relevant (attributes attached to any of
+  // these categories, plus ones with no category restriction) instead of
+  // every attribute in the system regardless of what the product is.
+  // Runs once on mount too (form.categoryIds starts empty, which the
+  // backend treats as "no filter" — same as fetching everything).
+  React.useEffect(() => {
+    attributesService.list(form.categoryIds).then(setAttributes).catch(() => {});
+  }, [form.categoryIds]);
 
   const onSubmit = async () => {
     if (!form.name.trim()) {

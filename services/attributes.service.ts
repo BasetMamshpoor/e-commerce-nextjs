@@ -11,6 +11,8 @@ import type { Attribute, AttributeInputType, AttributeValue } from "@/types/doma
 export interface CreateAttributeBody {
   name: string; slug?: string; inputType: AttributeInputType;
   isFilterable?: boolean; isVariant?: boolean; isDisplay?: boolean;
+  /** Category IDs this attribute applies to — omit/empty means "all categories". */
+  categoryIds?: number[];
 }
 export interface AddAttributeValueBody {
   value: string;
@@ -19,7 +21,13 @@ export interface AddAttributeValueBody {
 }
 
 export const attributesService = {
-  list: () => http.get<Attribute[]>(ENDPOINTS.attributes.list),
+  /** Pass categoryIds to get only attributes that apply to (at least one
+   *  of) those categories, plus any with no category restriction. Used by
+   *  product create/edit to keep the variant/display attribute pickers
+   *  scoped to what's actually relevant instead of every attribute in the
+   *  system. */
+  list: (categoryIds?: number[]) =>
+    http.get<Attribute[]>(ENDPOINTS.attributes.list, categoryIds?.length ? { categoryIds: categoryIds.join(",") } : undefined),
   byId: (id: number) => http.get<Attribute>(ENDPOINTS.attributes.byId(id)),
   create: (body: CreateAttributeBody) => http.post<Attribute>(ENDPOINTS.attributes.create, body),
   update: (id: number, body: Partial<CreateAttributeBody>) => http.put<Attribute>(ENDPOINTS.attributes.update(id), body),

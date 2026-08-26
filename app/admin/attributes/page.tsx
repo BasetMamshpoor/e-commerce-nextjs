@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CategoryTreeSelect } from "@/components/common/category-tree-select";
+import { categoriesService } from "@/services";
 import {
   Dialog,
   DialogContent,
@@ -25,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { attributesService } from "@/services";
-import type { Attribute, AttributeInputType } from "@/types/domain";
+import type { Attribute, AttributeInputType, Category } from "@/types/domain";
 
 export default function AdminAttributesPage() {
   const [attributes, setAttributes] = React.useState<Attribute[]>([]);
@@ -366,6 +368,8 @@ function AttributeFormDialog({
   const [inputType, setInputType] = React.useState<AttributeInputType>("SELECT");
   const [isFilterable, setIsFilterable] = React.useState(true);
   const [isVariant, setIsVariant] = React.useState(false);
+  const [categoryIds, setCategoryIds] = React.useState<number[]>([]);
+  const [categoryTree, setCategoryTree] = React.useState<Category[]>([]);
   const [saving, setSaving] = React.useState(false);
 
   React.useEffect(() => {
@@ -374,6 +378,8 @@ function AttributeFormDialog({
       setInputType(attribute?.inputType ?? "SELECT");
       setIsFilterable(attribute?.isFilterable ?? true);
       setIsVariant(attribute?.isVariant ?? false);
+      setCategoryIds(attribute?.categories?.map((c) => c.categoryId) ?? []);
+      categoriesService.tree().then(setCategoryTree).catch(() => {});
     }
   }, [open, attribute]);
 
@@ -385,10 +391,10 @@ function AttributeFormDialog({
     setSaving(true);
     try {
       if (attribute) {
-        await attributesService.update(attribute.id, { name, inputType, isFilterable, isVariant });
+        await attributesService.update(attribute.id, { name, inputType, isFilterable, isVariant, categoryIds });
         toast.success("ویژگی به‌روزرسانی شد");
       } else {
-        await attributesService.create({ name, inputType, isFilterable, isVariant });
+        await attributesService.create({ name, inputType, isFilterable, isVariant, categoryIds });
         toast.success("ویژگی ایجاد شد");
       }
       onOpenChange(false);
@@ -434,6 +440,19 @@ function AttributeFormDialog({
               <input type="checkbox" checked={isVariant} onChange={(e) => setIsVariant(e.target.checked)} className="size-4 rounded" />
               <span className="text-sm">استفاده در تنوع محصول</span>
             </label>
+          </div>
+          <div className="space-y-2">
+            <Label>
+              دسته‌بندی‌های قابل استفاده
+              <span className="mr-1 text-xs text-muted-foreground">
+                (خالی = همه‌ی دسته‌بندی‌ها)
+              </span>
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              اگر دسته‌بندی خاصی انتخاب نکنید، این ویژگی برای همه‌ی محصولات در دسترس خواهد بود. با انتخاب
+              دسته‌بندی، فقط موقع ثبت/ویرایش محصولی که در همان دسته‌بندی(ها) باشد پیشنهاد می‌شود.
+            </p>
+            <CategoryTreeSelect categories={categoryTree} selectedIds={categoryIds} onChange={setCategoryIds} />
           </div>
         </div>
         <DialogFooter>

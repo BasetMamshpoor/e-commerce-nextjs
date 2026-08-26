@@ -252,6 +252,10 @@ export interface Attribute {
   isVariant: boolean;
   isDisplay: boolean;
   values: AttributeValue[];
+  /** Categories this attribute applies to. Empty/absent means it applies
+   *  to every category (no restriction) — the default for attributes
+   *  created before this existed. */
+  categories?: { categoryId: number }[];
   createdAt: string;
   updatedAt?: string;
 }

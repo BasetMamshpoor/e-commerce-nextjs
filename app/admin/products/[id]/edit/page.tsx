@@ -117,13 +117,11 @@ export default function AdminProductEditPage({
       productsService.adminById(Number(id)),
       brandsService.list({ includeInactive: true }),
       categoriesService.tree(),
-      attributesService.list(),
       currenciesService.adminList(),
     ])
-      .then(([p, b, c, a, cur]) => {
+      .then(([p, b, c, cur]) => {
         setBrands(b);
         setCategoryTree(c);
-        setAttributes(a);
         setCurrencies(cur);
         const product = p as Product;
         const cats = getProductCategories(product);
@@ -163,6 +161,15 @@ export default function AdminProductEditPage({
       })
       .finally(() => setLoading(false));
   }, [id]);
+
+  // Refetch attributes whenever the product's selected categories change —
+  // same reasoning as the "new product" page: scope the variant/display
+  // attribute pickers to what's actually relevant instead of every
+  // attribute in the system. Fires once the initial load above populates
+  // form.categoryIds too.
+  React.useEffect(() => {
+    attributesService.list(form.categoryIds).then(setAttributes).catch(() => {});
+  }, [form.categoryIds]);
 
   const onSubmit = async () => {
     if (!form.name.trim()) {
