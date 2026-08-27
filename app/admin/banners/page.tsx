@@ -94,7 +94,22 @@ export default function AdminBannersPage() {
                 <Button variant="ghost" size="icon" className="size-8" onClick={() => { setEditing(b); setDialogOpen(true); }}>
                   <Pencil className="size-4" />
                 </Button>
-                <Button variant="ghost" size="icon" className="size-8 hover:text-destructive" onClick={async () => { if (!confirm("حذف؟")) return; await bannersService.delete(b.id); toast.success("حذف شد"); load(); }}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 hover:text-destructive"
+                  onClick={async () => {
+                    if (!confirm("حذف؟")) return;
+                    try {
+                      await bannersService.delete(b.id);
+                      toast.success("حذف شد");
+                      load();
+                    } catch (e: unknown) {
+                      const apiErr = e as { message?: string };
+                      toast.error(apiErr?.message ?? "حذف ناموفق بود");
+                    }
+                  }}
+                >
                   <Trash2 className="size-4" />
                 </Button>
               </div>

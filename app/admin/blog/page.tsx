@@ -65,14 +65,15 @@ export default function AdminBlogPage() {
 
   const load = React.useCallback(() => {
     setLoading(true);
-    const params: { page: number; limit: number; status?: string } = { page, limit: 20 };
+    const params: { page: number; limit: number; status?: string; search?: string } = { page, limit: 20 };
     if (statusFilter !== "ALL") params.status = statusFilter;
+    if (search.trim()) params.search = search.trim();
     blogService
       .adminList(params)
       .then(setData)
       .catch(() => toast.error("بارگذاری مقالات ناموفق بود"))
       .finally(() => setLoading(false));
-  }, [page, statusFilter]);
+  }, [page, statusFilter, search]);
 
   React.useEffect(() => {
     load();
@@ -87,9 +88,6 @@ export default function AdminBlogPage() {
   }, [loadCategories]);
 
   const items = data?.items ?? [];
-  const filtered = search.trim()
-    ? items.filter((p) => p.title.toLowerCase().includes(search.trim().toLowerCase()))
-    : items;
 
   const onDelete = async (post: BlogPost) => {
     try {
@@ -97,8 +95,9 @@ export default function AdminBlogPage() {
       toast.success("مقاله حذف شد");
       setDeleteTarget(null);
       load();
-    } catch {
-      toast.error("حذف ناموفق بود");
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "حذف ناموفق بود");
     }
   };
 
@@ -287,7 +286,7 @@ export default function AdminBlogPage() {
             ),
           },
         ]}
-        data={filtered}
+        data={items}
         isLoading={loading}
         getRowId={(p) => String(p.id)}
         page={page}
@@ -295,7 +294,10 @@ export default function AdminBlogPage() {
         total={data?.meta?.total ?? 0}
         onPageChange={setPage}
         searchValue={search}
-        onSearchChange={setSearch}
+        onSearchChange={(v) => {
+          setSearch(v);
+          setPage(1);
+        }}
         searchPlaceholder="جستجو در مقالات..."
         emptyTitle="مقاله‌ای یافت نشد"
       />
