@@ -53,14 +53,19 @@ export default function AdminTicketDetailPage() {
   const handleSend = async (message: string, files?: File[]): Promise<Ticket> => {
     setSending(true);
     try {
-      if (files && files.length > 0) {
-        await ticketsService.adminAddMessageWithAttachments(numericId, { message }, files);
-      } else {
-        await ticketsService.adminAddMessage(numericId, { message });
-      }
-      // Backend returns empty messages — must refetch
+      // Return the actual API response, not the (stale, pre-refetch) closed-
+      // over `ticket` state — TicketChat doesn't currently use this return
+      // value, but the customer-facing ticket page's equivalent handler
+      // does return the real response, and this should behave the same way
+      // rather than silently returning wrong data if a future caller starts
+      // relying on it.
+      const updated =
+        files && files.length > 0
+          ? await ticketsService.adminAddMessageWithAttachments(numericId, { message }, files)
+          : await ticketsService.adminAddMessage(numericId, { message });
+      // Backend returns empty messages — must refetch for the full thread.
       await load();
-      return ticket ?? ({} as Ticket);
+      return updated;
     } finally {
       setSending(false);
     }
@@ -71,8 +76,9 @@ export default function AdminTicketDetailPage() {
       await ticketsService.adminUpdate(numericId, { status });
       toast.success("وضعیت تغییر کرد");
       await load();
-    } catch {
-      toast.error("تغییر وضعیت ناموفق بود");
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "تغییر وضعیت ناموفق بود");
     }
   };
 
@@ -81,8 +87,9 @@ export default function AdminTicketDetailPage() {
       await ticketsService.adminUpdate(numericId, { priority });
       toast.success("اولویت تغییر کرد");
       await load();
-    } catch {
-      toast.error("تغییر اولویت ناموفق بود");
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "تغییر اولویت ناموفق بود");
     }
   };
 

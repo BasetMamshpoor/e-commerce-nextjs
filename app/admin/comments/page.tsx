@@ -56,11 +56,11 @@ export default function AdminCommentsPage() {
 
   const handleApprove = async (id: number) => {
     try { await commentsService.adminUpdate(id, { status: "APPROVED" }); toast.success("نظر تأیید شد"); load(); }
-    catch { toast.error("عملیات ناموفق بود"); }
+    catch (e: unknown) { const apiErr = e as { message?: string }; toast.error(apiErr?.message ?? "عملیات ناموفق بود"); }
   };
   const handleReject = async (id: number) => {
     try { await commentsService.adminUpdate(id, { status: "REJECTED" }); toast.success("نظر رد شد"); load(); }
-    catch { toast.error("عملیات ناموفق بود"); }
+    catch (e: unknown) { const apiErr = e as { message?: string }; toast.error(apiErr?.message ?? "عملیات ناموفق بود"); }
   };
   const handleDelete = async (id: number) => {
     if (!confirm("حذف این نظر؟")) return;

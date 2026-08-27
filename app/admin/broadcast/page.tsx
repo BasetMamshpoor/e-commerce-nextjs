@@ -24,14 +24,20 @@ export default function AdminBroadcastPage() {
 
   const onSend = async () => {
     if (!form.title.trim() || !form.message.trim()) { toast.error("عنوان و پیام الزامی است"); return; }
+    const rawIds = form.userIds.split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
+    const userIds = rawIds.map(Number);
+    const invalidId = rawIds.find((_, i) => !Number.isFinite(userIds[i]));
+    if (invalidId) {
+      toast.error(`«${invalidId}» یک شناسه‌ی کاربر معتبر نیست`);
+      return;
+    }
     setSending(true); setSentCount(null);
     try {
-      const userIds = form.userIds.split(/[,\n]/).map((s) => s.trim()).filter(Boolean).map(Number);
       const result = await notificationsService.broadcast({ type: form.type, title: form.title, message: form.message, link: form.link || undefined, userIds: userIds.length > 0 ? userIds : undefined });
       setSentCount(result.sentCount);
       toast.success(`پخش به ${toPersianDigits(result.sentCount)} کاربر ارسال شد`);
       setForm({ ...form, title: "", message: "", link: "" });
-    } catch { toast.error("ارسال ناموفق بود"); }
+    } catch (e: unknown) { const apiErr = e as { message?: string }; toast.error(apiErr?.message ?? "ارسال ناموفق بود"); }
     finally { setSending(false); }
   };
 

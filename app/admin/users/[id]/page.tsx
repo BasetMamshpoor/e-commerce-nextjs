@@ -47,7 +47,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { usersAdminService } from "@/services";
-import type { UserRole } from "@/types/domain";
+import type { UserRole, AdminUserDetail, UserSession } from "@/types/domain";
 import { formatDateTimeFa, toPersianDigits, formatPrice } from "@/utils/format";
 
 const ROLE_LABELS: Record<UserRole, { label: string; color: string }> = {
@@ -60,8 +60,8 @@ const ROLE_LABELS: Record<UserRole, { label: string; color: string }> = {
 export default function AdminUserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
   const router = useRouter();
-  const [user, setUser] = React.useState<any>(null);
-  const [sessions, setSessions] = React.useState<any[]>([]);
+  const [user, setUser] = React.useState<AdminUserDetail | null>(null);
+  const [sessions, setSessions] = React.useState<UserSession[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [blockOpen, setBlockOpen] = React.useState(false);
   const [blockReason, setBlockReason] = React.useState("");
@@ -122,8 +122,9 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
       setBlockOpen(false);
       setBlockReason("");
       load();
-    } catch {
-      toast.error("عملیات ناموفق بود");
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "عملیات ناموفق بود");
     }
   };
 
@@ -132,8 +133,9 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
       await usersAdminService.unblock(user.id);
       toast.success("رفع مسدودیت شد");
       load();
-    } catch {
-      toast.error("عملیات ناموفق بود");
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "عملیات ناموفق بود");
     }
   };
 
@@ -144,8 +146,9 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
       toast.success("نقش تغییر کرد");
       setRoleChange(null);
       load();
-    } catch {
-      toast.error("تغییر نقش ناموفق بود");
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "تغییر نقش ناموفق بود");
     }
   };
 
@@ -155,8 +158,9 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
       await usersAdminService.revokeSession(user.id, sessionId);
       toast.success("نشست ابطال شد");
       load();
-    } catch {
-      toast.error("عملیات ناموفق بود");
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "عملیات ناموفق بود");
     }
   };
 
@@ -166,8 +170,9 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
       await usersAdminService.revokeAllSessions(user.id);
       toast.success("از تمام دستگاه‌ها خارج شد");
       load();
-    } catch {
-      toast.error("عملیات ناموفق بود");
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "عملیات ناموفق بود");
     }
   };
 
@@ -458,8 +463,9 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
                   setWalletAmount("");
                   setWalletDescription("");
                   load();
-                } catch {
-                  toast.error("تعدیل موجودی ناموفق بود");
+                } catch (e: unknown) {
+                  const apiErr = e as { message?: string };
+                  toast.error(apiErr?.message ?? "تعدیل موجودی ناموفق بود");
                 } finally {
                   setWalletProcessing(false);
                 }

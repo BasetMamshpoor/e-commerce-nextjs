@@ -28,7 +28,7 @@ export default function AdminTicketDepartmentsPage() {
     if (!deleteDept) return;
     setDeleting(true);
     try { await ticketsService.deleteDepartment(deleteDept.id); toast.success("بخش حذف شد"); setDeleteDept(null); load(); }
-    catch { toast.error("حذف ناموفق — دارای تیکت است"); }
+    catch (e: unknown) { const apiErr = e as { message?: string }; toast.error(apiErr?.message ?? "حذف ناموفق بود"); }
     finally { setDeleting(false); }
   };
 
@@ -79,7 +79,7 @@ function DepartmentFormDialog({ open, onOpenChange, department, onSaved }: {
       if (department) { await ticketsService.updateDepartment(department.id, { name: name.trim() }); toast.success("بخش به‌روزرسانی شد"); }
       else { await ticketsService.createDepartment({ name: name.trim() }); toast.success("بخش ایجاد شد"); }
       onOpenChange(false); onSaved();
-    } catch { toast.error("ذخیره ناموفق بود"); }
+    } catch (e: unknown) { const apiErr = e as { message?: string }; toast.error(apiErr?.message ?? "ذخیره ناموفق بود"); }
     finally { setSaving(false); }
   };
   return (
