@@ -234,6 +234,7 @@ export const ENDPOINTS = {
     subscribe: "/newsletter/subscribe",
     unsubscribe: "/newsletter/unsubscribe",
     adminSubscribers: "/newsletter/admin/subscribers",
+    exportSubscribers: "/newsletter/admin/subscribers/export",
   },
 
   search: {

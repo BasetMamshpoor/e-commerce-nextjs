@@ -62,8 +62,11 @@ export const storiesService = {
 export const newsletterService = {
   subscribe: (email: string) => http.post(ENDPOINTS.newsletter.subscribe, { email }),
   unsubscribe: (email: string) => http.post(ENDPOINTS.newsletter.unsubscribe, { email }),
-  adminSubscribers: (params?: { page?: number; limit?: number }) =>
+  adminSubscribers: (params?: { page?: number; limit?: number; search?: string }) =>
     http.get<PaginatedData<NewsletterSubscriber>>(ENDPOINTS.newsletter.adminSubscribers, params),
+  /** All matching subscribers, unpaginated — for CSV export. */
+  exportSubscribers: (search?: string) =>
+    http.get<NewsletterSubscriber[]>(ENDPOINTS.newsletter.exportSubscribers, search ? { search } : undefined),
 };
 
 /* ───────── Search ───────── */

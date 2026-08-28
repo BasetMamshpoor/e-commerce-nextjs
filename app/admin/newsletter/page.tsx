@@ -18,37 +18,53 @@ export default function AdminNewsletterPage() {
   const [loading, setLoading] = React.useState(true);
   const [page, setPage] = React.useState(1);
   const [search, setSearch] = React.useState("");
+  const [exporting, setExporting] = React.useState(false);
 
   const load = React.useCallback(() => {
     setLoading(true);
     newsletterService
-      .adminSubscribers({ page, limit: 20 })
+      .adminSubscribers({ page, limit: 20, search: search.trim() || undefined })
       .then(setData)
       .finally(() => setLoading(false));
-  }, [page]);
+  }, [page, search]);
 
   React.useEffect(() => {
     load();
   }, [load]);
 
   const items = (data?.items ?? []) as NewsletterSubscriber[];
-  const filtered = search.trim()
-    ? items.filter((s) => s.email.toLowerCase().includes(search.trim().toLowerCase()))
-    : items;
 
-  const onExport = () => {
-    const csv = ["email,createdAt"];
-    for (const s of items) {
-      csv.push(`${s.email},${s.createdAt}`);
+  const onExport = async () => {
+    setExporting(true);
+    try {
+      // Export ALL matching subscribers (respecting the current search),
+      // not just the currently-loaded page — the paginated list endpoint
+      // is capped at 100 rows/page, so building the CSV from `items`
+      // silently truncated the export to whatever page the admin happened
+      // to be viewing.
+      const all = await newsletterService.exportSubscribers(search.trim() || undefined);
+      if (all.length === 0) {
+        toast.error("موردی برای خروجی گرفتن وجود ندارد");
+        return;
+      }
+      const csv = ["email,createdAt"];
+      for (const s of all) {
+        csv.push(`${s.email},${s.createdAt}`);
+      }
+      const blob = new Blob([csv.join("\n")], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `newsletter-subscribers-${Date.now()}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`خروجی CSV با ${toPersianDigits(all.length)} مشترک دانلود شد`);
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "خروجی گرفتن ناموفق بود");
+    } finally {
+      setExporting(false);
     }
-    const blob = new Blob([csv.join("\n")], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `newsletter-subscribers-${Date.now()}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("خروجی CSV دانلود شد");
   };
 
   return (
@@ -96,8 +112,9 @@ export default function AdminNewsletterPage() {
                   await newsletterService.unsubscribe(s.email);
                   toast.success("عضویت لغو شد");
                   load();
-                } catch {
-                  toast.error("لغو عضویت ناموفق بود");
+                } catch (e: unknown) {
+                  const apiErr = e as { message?: string };
+                  toast.error(apiErr?.message ?? "لغو عضویت ناموفق بود");
                 }
               }}
               aria-label="لغو عضویت"
@@ -107,7 +124,7 @@ export default function AdminNewsletterPage() {
           ),
         },
       ]}
-      data={filtered}
+      data={items}
       isLoading={loading}
       getRowId={(s) => String(s.id)}
       page={page}
@@ -115,12 +132,15 @@ export default function AdminNewsletterPage() {
       total={data?.meta?.total ?? 0}
       onPageChange={setPage}
       searchValue={search}
-      onSearchChange={setSearch}
+      onSearchChange={(v) => {
+        setSearch(v);
+        setPage(1);
+      }}
       searchPlaceholder="جستجو در ایمیل‌ها..."
       headerActions={
-        <Button variant="outline" size="sm" onClick={onExport} disabled={items.length === 0}>
+        <Button variant="outline" size="sm" onClick={onExport} disabled={exporting || (data?.meta?.total ?? 0) === 0}>
           <Download className="size-4" />
-          خروجی CSV
+          {exporting ? "در حال آماده‌سازی..." : "خروجی CSV"}
         </Button>
       }
       emptyTitle="هیچ مشترکی وجود ندارد"

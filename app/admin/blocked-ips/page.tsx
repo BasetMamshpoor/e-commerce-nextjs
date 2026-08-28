@@ -15,11 +15,19 @@ import { securityService } from "@/services";
 import type { BlockedIp } from "@/types/domain";
 import { formatDateTimeFa, toPersianDigits } from "@/utils/format";
 
+// Mirrors the backend's validation (blocked-ip.validation.ts) — catches an
+// obviously-malformed IP before the round-trip, since a typo here used to
+// silently create a "blocked IP" that would never match any real request.
+const ipv4Pattern = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
+const ipv6Pattern = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
+const isValidIp = (v: string) => ipv4Pattern.test(v) || ipv6Pattern.test(v);
+
 export default function AdminBlockedIpsPage() {
   const [ips, setIps] = React.useState<BlockedIp[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [ip, setIp] = React.useState("");
   const [reason, setReason] = React.useState("");
+  const [expiresAt, setExpiresAt] = React.useState("");
   const [adding, setAdding] = React.useState(false);
 
   const load = React.useCallback(() => {
@@ -36,15 +44,25 @@ export default function AdminBlockedIpsPage() {
       toast.error("آدرس IP را وارد کنید");
       return;
     }
+    if (!isValidIp(ip.trim())) {
+      toast.error("فرمت آدرس IP معتبر نیست");
+      return;
+    }
     setAdding(true);
     try {
-      await securityService.blockIp({ ip, reason: reason || undefined });
+      await securityService.blockIp({
+        ip: ip.trim(),
+        reason: reason || undefined,
+        expiresAt: expiresAt ? new Date(expiresAt).toISOString() : undefined,
+      });
       toast.success("IP مسدود شد");
       setIp("");
       setReason("");
+      setExpiresAt("");
       load();
-    } catch {
-      toast.error("مسدودسازی ناموفق بود");
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "مسدودسازی ناموفق بود");
     } finally {
       setAdding(false);
     }
@@ -56,8 +74,9 @@ export default function AdminBlockedIpsPage() {
       await securityService.unblockIp(id);
       toast.success("رفع مسدودیت شد");
       load();
-    } catch {
-      toast.error("عملیات ناموفق بود");
+    } catch (e: unknown) {
+      const apiErr = e as { message?: string };
+      toast.error(apiErr?.message ?? "عملیات ناموفق بود");
     }
   };
 
@@ -81,12 +100,24 @@ export default function AdminBlockedIpsPage() {
                 placeholder="1.2.3.4"
               />
             </div>
-            <div className="space-y-1.5 sm:col-span-2">
+            <div className="space-y-1.5">
               <Label className="text-xs">دلیل</Label>
               <Input
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="مثال: تلاش مکرر ورود ناموفق"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">
+                انقضا
+                <span className="mr-1 text-[10px] text-muted-foreground">(خالی = دائمی)</span>
+              </Label>
+              <Input
+                type="datetime-local"
+                value={expiresAt}
+                onChange={(e) => setExpiresAt(e.target.value)}
+                dir="ltr"
               />
             </div>
           </div>
