@@ -181,7 +181,20 @@ function NotificationItem({
   );
 
   if (notification.link) {
-    return <Link href={notification.link}>{content}</Link>;
+    return (
+      <Link
+        href={notification.link}
+        onClick={() => {
+          // Clicking through to the linked content implies the
+          // notification has been seen — previously only the explicit
+          // checkmark button marked it read, so a notification could sit
+          // "unread" forever even after the user had already acted on it.
+          if (!notification.isRead) markRead.mutate(notification.id);
+        }}
+      >
+        {content}
+      </Link>
+    );
   }
   return content;
 }

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Breadcrumb } from "@/components/common/breadcrumb";
 import { EmptyState } from "@/components/common/empty-state";
+import { Pagination } from "@/components/common/pagination";
 import { useTickets, useCreateTicket, useDepartments } from "@/features/tickets/hooks";
 import { formatDateTimeFa, toPersianDigits } from "@/utils/format";
 import { cn } from "@/lib/utils";
@@ -46,11 +47,19 @@ const PRIORITY_LABELS: Record<TicketPriority, string> = {
 
 export default function UserTicketsPage() {
   const [statusTab, setStatusTab] = React.useState<TicketStatus | "ALL">("ALL");
-  const { data, isLoading } = useTickets(statusTab === "ALL" ? undefined : { status: statusTab });
+  // Same pagination bug as the orders list: this page never accepted a
+  // `page` param or showed any pagination controls — useTickets defaults
+  // to APP_CONFIG.defaultPageSize (20) per page, so a customer with more
+  // than 20 tickets could never reach anything older than their most
+  // recent 20.
+  const [page, setPage] = React.useState(1);
+  const { data, isLoading } = useTickets(statusTab === "ALL" ? { page } : { status: statusTab, page });
   const [createOpen, setCreateOpen] = React.useState(false);
   const { data: departments } = useDepartments();
 
   const items = data?.items ?? [];
+  const totalPages = data?.meta?.totalPages ?? 1;
+  const total = data?.meta?.total ?? 0;
 
   return (
     <div className="space-y-6">
@@ -72,7 +81,10 @@ export default function UserTicketsPage() {
         {STATUS_TABS.map((t) => (
           <button
             key={t.key}
-            onClick={() => setStatusTab(t.key)}
+            onClick={() => {
+              setStatusTab(t.key);
+              setPage(1);
+            }}
             className={cn(
               "shrink-0 rounded-md px-4 py-2 text-xs font-medium transition-colors",
               statusTab === t.key ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
@@ -89,26 +101,31 @@ export default function UserTicketsPage() {
       ) : items.length === 0 ? (
         <EmptyState icon={<TicketIcon className="size-12" />} title="تیکتی وجود ندارد" description="برای ارتباط با پشتیبانی، تیکت جدیدی ایجاد کنید." className="py-12" />
       ) : (
-        <div className="space-y-2">
-          {items.map((t) => {
-            const cfg = STATUS_CONFIG[t.status] ?? STATUS_CONFIG.OPEN;
-            return (
-              <Link key={t.id} href={`/account/tickets/${t.id}`}>
-                <div className="flex items-center justify-between rounded-lg border border-border/40 p-3 transition-colors hover:bg-accent/30">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-foreground">{t.subject}</p>
-                    <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                      <Badge variant={cfg.variant} className="text-[9px]">{cfg.label}</Badge>
-                      <span>اولویت: {PRIORITY_LABELS[t.priority]}</span>
-                      {t.department && <span>بخش: {t.department.name}</span>}
-                      <span className="flex items-center gap-0.5"><Clock className="size-3" />{formatDateTimeFa(t.createdAt)}</span>
+        <>
+          <div className="space-y-2">
+            {items.map((t) => {
+              const cfg = STATUS_CONFIG[t.status] ?? STATUS_CONFIG.OPEN;
+              return (
+                <Link key={t.id} href={`/account/tickets/${t.id}`}>
+                  <div className="flex items-center justify-between rounded-lg border border-border/40 p-3 transition-colors hover:bg-accent/30">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground">{t.subject}</p>
+                      <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant={cfg.variant} className="text-[9px]">{cfg.label}</Badge>
+                        <span>اولویت: {PRIORITY_LABELS[t.priority]}</span>
+                        {t.department && <span>بخش: {t.department.name}</span>}
+                        <span className="flex items-center gap-0.5"><Clock className="size-3" />{formatDateTimeFa(t.createdAt)}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
+                </Link>
+              );
+            })}
+          </div>
+          {totalPages > 1 && (
+            <Pagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+          )}
+        </>
       )}
 
       <CreateTicketDialog open={createOpen} onOpenChange={setCreateOpen} departments={departments ?? []} />

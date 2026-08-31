@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -159,9 +160,9 @@ export default function ProfilePage() {
                   />
                   <p className="text-xs text-muted-foreground">
                     برای تغییر ایمیل به{" "}
-                    <a href="/account/security" className="text-primary hover:underline">
+                    <Link href="/account/security" className="text-primary hover:underline">
                       بخش امنیت
-                    </a>{" "}
+                    </Link>{" "}
                     مراجعه کنید
                   </p>
                 </div>
@@ -178,9 +179,9 @@ export default function ProfilePage() {
                   />
                   <p className="text-xs text-muted-foreground">
                     برای تغییر شماره به{" "}
-                    <a href="/account/security" className="text-primary hover:underline">
+                    <Link href="/account/security" className="text-primary hover:underline">
                       بخش امنیت
-                    </a>{" "}
+                    </Link>{" "}
                     مراجعه کنید
                   </p>
                 </div>

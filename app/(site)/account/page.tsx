@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/common/breadcrumb";
 import { useUserMe, useWallet } from "@/features/account/hooks";
 import { useOrders } from "@/features/checkout/hooks";
-import { useNotifications } from "@/features/notifications/hooks";
+import { useNotifications, useUnreadNotificationsCount } from "@/features/notifications/hooks";
 import { useTickets } from "@/features/tickets/hooks";
 import { formatToman, formatRelativeFa, toPersianDigits } from "@/utils/format";
 import type { OrderStatus } from "@/types/domain";
@@ -41,6 +41,7 @@ export default function AccountDashboardPage() {
   const { data: wallet, isLoading: walletLoading } = useWallet(1, 3);
   const { data: ordersData, isLoading: ordersLoading } = useOrders();
   const { data: notifsData, isLoading: notifsLoading } = useNotifications({ limit: 3 });
+  const { data: unreadData, isLoading: unreadLoading } = useUnreadNotificationsCount();
   const { data: ticketsData, isLoading: ticketsLoading } = useTickets({ limit: 3 });
 
   const recentOrders = ordersData?.items ?? [];
@@ -89,7 +90,7 @@ export default function AccountDashboardPage() {
         <StatCard
           icon={<Bell className="size-5" />}
           label="نوتیفیکیشن‌های جدید"
-          value={notifsLoading ? "..." : toPersianDigits(notifsData?.meta.total ?? 0)}
+          value={unreadLoading ? "..." : toPersianDigits(unreadData?.count ?? 0)}
           href="/account/notifications"
         />
       </div>

@@ -33,7 +33,7 @@ import {
 } from "@/features/account/hooks";
 import { passwordSchema, identifierSchema } from "@/features/auth/schemas/auth.schema";
 import { APP_CONFIG } from "@/constants/app";
-import { isValidEmail, isValidIranMobile } from "@/utils/format";
+import { isValidEmail, isValidIranMobile, toPersianDigits } from "@/utils/format";
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "رمز فعلی الزامی است"),
@@ -207,7 +207,7 @@ function ChangeIdentifierSection() {
               </p>
             </div>
             <div className="space-y-2">
-              <Label>کد تایید ۵ رقمی</Label>
+              <Label>کد تایید {toPersianDigits(APP_CONFIG.otpLength)} رقمی</Label>
               <div className="flex justify-center" dir={"ltr"}>
                 <InputOTP
                   maxLength={APP_CONFIG.otpLength}

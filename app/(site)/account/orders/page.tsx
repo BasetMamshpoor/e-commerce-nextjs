@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Breadcrumb } from "@/components/common/breadcrumb";
 import { EmptyState } from "@/components/common/empty-state";
 import { AuthGuard } from "@/components/common/auth-guard";
+import { Pagination } from "@/components/common/pagination";
 import { useOrders } from "@/features/checkout/hooks";
 import { formatToman, formatPrice, formatDateTimeFa, toPersianDigits } from "@/utils/format";
 import type { Order, OrderStatus } from "@/types/domain";
@@ -37,8 +38,16 @@ export default function OrdersPage() {
 }
 
 function OrdersContent() {
-  const { data, isLoading } = useOrders();
+  // Real bug fixed here: this page never accepted a `page` param or showed
+  // pagination controls at all — useOrders defaults to
+  // APP_CONFIG.defaultPageSize (20) per page, so a customer with more than
+  // 20 orders could never see anything older than their most recent 20; the
+  // rest were silently unreachable from this list.
+  const [page, setPage] = React.useState(1);
+  const { data, isLoading } = useOrders({ page });
   const orders = data?.items ?? [];
+  const total = data?.meta?.total ?? 0;
+  const totalPages = data?.meta?.totalPages ?? 1;
 
   return (
     <div className="container-site py-6">
@@ -52,9 +61,9 @@ function OrdersContent() {
 
       <h1 className="mb-6 text-xl font-bold text-foreground sm:text-2xl">
         سفارش‌های من
-        {orders.length > 0 && (
+        {total > 0 && (
           <span className="mr-2 text-sm font-normal text-muted-foreground">
-            ({toPersianDigits(orders.length)} سفارش)
+            ({toPersianDigits(total)} سفارش)
           </span>
         )}
       </h1>
@@ -78,11 +87,16 @@ function OrdersContent() {
           className="border border-dashed border-border rounded-xl"
         />
       ) : (
-        <div className="space-y-3">
-          {orders.map((order) => (
-            <OrderListItem key={order.id} order={order} />
-          ))}
-        </div>
+        <>
+          <div className="space-y-3">
+            {orders.map((order) => (
+              <OrderListItem key={order.id} order={order} />
+            ))}
+          </div>
+          {totalPages > 1 && (
+            <Pagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} className="mt-6" />
+          )}
+        </>
       )}
     </div>
   );
